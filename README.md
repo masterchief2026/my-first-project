@@ -1,12 +1,12 @@
 # My First Project
 
-This is a practise project for learning how to use GitHub and open pull requests.
+This is a practice project for learning how to use GitHub and open pull requests.
 
-## Getting Startted
+## Getting Started
 
-Clone the repo and explore the files. Contributions are wellcome!
+Clone the repo and explore the files. Contributions are welcome!
 
 ## Features
 
-- Simple and easy to understnad
-- Great for beginers
+- Simple and easy to understand
+- Great for beginners
