@@ -44,13 +44,32 @@ export default function StravaCallbackScreen() {
 
       if (!response.ok || data.error) {
         console.error('Edge function error:', data);
-        setStatus('Failed to connect Strava. Please try again.');
-        setTimeout(() => window.close(), 2000);
+        setStatus(response.status === 409 && data.error ? data.error : 'Failed to connect Strava. Please try again.');
+        setTimeout(() => window.close(), response.status === 409 ? 4000 : 2000);
         return;
       }
 
-      setStatus('Strava connected! Closing...');
-      setTimeout(() => window.close(), 2000);
+      setStatus("Don't close this tab yet — importing your full training history now. This can take a minute for a long history.");
+
+      // Pull the user's entire Strava history, not just recent activities, so
+      // connecting doesn't feel like starting their Effort/Time Earned from
+      // zero. Must be awaited — closing this tab kills the in-flight request
+      // to the edge function before it finishes, truncating the import.
+      try {
+        await fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/strava-full-import`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`,
+            'apikey': process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!,
+          },
+        });
+        setStatus('Import complete!');
+      } catch {
+        setStatus("Strava connected, but the history import didn't finish — you can re-run it anytime from your profile.");
+      }
+
+      setTimeout(() => window.close(), 1500);
 
     } catch (err) {
       console.error('Exchange error:', err);

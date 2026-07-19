@@ -3,13 +3,9 @@ import { StyleSheet, TouchableOpacity, View, Text, ScrollView, TextInput, Modal 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { supabase } from '../lib/supabase';
-
-const ACTIVITY_ICONS: Record<string, string> = {
-  Run: '🏃', Ride: '🚴', Swim: '🏊', WeightTraining: '🏋️',
-  Workout: '💪', Hike: '🥾', Walk: '🚶', Yoga: '🧘',
-  CrossFit: '🤸', Rowing: '🚣', Hyrox: '🔥', HIIT: '⚡',
-  AlpineSki: '⛷️', NordicSki: '🎿', VirtualRide: '🚴', VirtualRun: '🏃',
-};
+import { formatDisplayName } from '../lib/identity';
+import { ACTIVITY_ICONS } from '../constants/activityIcons';
+import { RivalTopNav } from '../components/rival';
 
 // Class-based types use sessions (1 session = 45 min) instead of free duration entry
 const SESSION_TYPES = new Set([
@@ -75,7 +71,7 @@ export default function PlanScreen() {
         .eq('user_id', user.id)
         .gte('started_at', weekStart.toISOString())
         .lt('started_at', weekEnd.toISOString()),
-      supabase.from('league_members').select('league_id, leagues(id, name)').eq('user_id', user.id),
+      supabase.from('league_members').select('league_id, leagues(id, name)').eq('user_id', user.id).eq('status', 'active'),
     ]);
 
     // Build scoring map
@@ -95,7 +91,7 @@ export default function PlanScreen() {
     const leagueStandings: LeagueStanding[] = await Promise.all(
       leagueMemberships.map(async (league: any) => {
         const { data: membersData } = await supabase
-          .from('league_members').select('user_id, users(display_name, email)').eq('league_id', league.id);
+          .from('league_members').select('user_id, users(display_name, email, username, display_style)').eq('league_id', league.id).eq('status', 'active');
 
         const members = await Promise.all(
           (membersData || []).map(async (m: any) => {
@@ -105,7 +101,7 @@ export default function PlanScreen() {
               .gte('started_at', weekStart.toISOString())
               .lt('started_at', weekEnd.toISOString());
             const score = (acts || []).reduce((s, a) => s + (a.effort_score || 0), 0);
-            const name = m.users?.display_name || m.users?.email?.split('@')[0] || 'Athlete';
+            const name = formatDisplayName(m.users);
             return { user_id: m.user_id, name, score: Math.round(score * 10) / 10 };
           })
         );
@@ -185,6 +181,7 @@ export default function PlanScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <RivalTopNav active="today" />
       <ScrollView contentContainerStyle={styles.content}>
 
         <View style={styles.header}>
@@ -194,26 +191,26 @@ export default function PlanScreen() {
         </View>
 
         <Text style={styles.title}>Plan Your Week</Text>
-        <Text style={styles.subtitle}>Add workouts you're planning to see your projected league position.</Text>
+        <Text style={styles.subtitle}>Add workouts you're planning to see your projected team position.</Text>
 
-        {/* Current vs projected XP */}
+        {/* Current vs projected Effort */}
         <View style={styles.xpCard}>
           <View style={styles.xpBlock}>
             <Text style={styles.xpBlockLabel}>Earned so far</Text>
             <Text style={styles.xpBlockValue}>{currentWeekXp}</Text>
-            <Text style={styles.xpBlockUnit}>XP</Text>
+            <Text style={styles.xpBlockUnit}>Effort</Text>
           </View>
           <View style={styles.xpDivider} />
           <View style={styles.xpBlock}>
             <Text style={styles.xpBlockLabel}>Planned</Text>
             <Text style={[styles.xpBlockValue, { color: '#8DC63F' }]}>+{Math.round(totalPlannedXp * 10) / 10}</Text>
-            <Text style={styles.xpBlockUnit}>XP</Text>
+            <Text style={styles.xpBlockUnit}>Effort</Text>
           </View>
           <View style={styles.xpDivider} />
           <View style={styles.xpBlock}>
             <Text style={styles.xpBlockLabel}>Projected</Text>
             <Text style={[styles.xpBlockValue, { color: '#E91E8C' }]}>{projectedTotal}</Text>
-            <Text style={styles.xpBlockUnit}>XP</Text>
+            <Text style={styles.xpBlockUnit}>Effort</Text>
           </View>
         </View>
 
@@ -239,7 +236,7 @@ export default function PlanScreen() {
               <Text style={styles.plannedType}>{a.activity_type}</Text>
               <Text style={styles.plannedMeta}>{a.duration_minutes} min · ×{scoringConfig[a.activity_type] ?? 1.0}</Text>
             </View>
-            <Text style={styles.plannedXp}>+{a.projected_xp} XP</Text>
+            <Text style={styles.plannedXp}>+{a.projected_xp} Effort</Text>
             <TouchableOpacity onPress={() => removePlanned(a.id)} style={styles.removeBtn}>
               <Text style={styles.removeBtnText}>✕</Text>
             </TouchableOpacity>
@@ -249,7 +246,7 @@ export default function PlanScreen() {
         {/* League impact */}
         {leagues.length > 0 && (
           <>
-            <Text style={[styles.sectionTitle, { marginTop: 28, marginBottom: 12 }]}>League impact</Text>
+            <Text style={[styles.sectionTitle, { marginTop: 28, marginBottom: 12 }]}>Team impact</Text>
             {leagues.map((league) => {
               const moved = league.projectedRank < league.currentRank;
               const dropped = league.projectedRank > league.currentRank;
@@ -287,7 +284,7 @@ export default function PlanScreen() {
                           </Text>
                           <View style={styles.miniScoreBlock}>
                             <Text style={[styles.miniScore, isMe && { color: '#E91E8C' }]}>
-                              {Math.round(projScore * 10) / 10} pts
+                              {Math.round(projScore * 10) / 10} Effort
                             </Text>
                             {isMe && totalPlannedXp > 0 && (
                               <Text style={styles.miniBonus}>+{Math.round(totalPlannedXp * 10) / 10}</Text>
@@ -308,11 +305,11 @@ export default function PlanScreen() {
 
         {!loading && leagues.length === 0 && (
           <View style={styles.noLeagues}>
-            <Text style={styles.noLeaguesText}>Join a league to see your projected position here.</Text>
+            <Text style={styles.noLeaguesText}>Join a team to see your projected position here.</Text>
           </View>
         )}
 
-        <Text style={styles.disclaimer}>* XP estimates based on duration × scoring multiplier. Actual XP may vary slightly.</Text>
+        <Text style={styles.disclaimer}>* Effort estimates based on duration × scoring multiplier. Actual Effort may vary slightly.</Text>
 
       </ScrollView>
 
@@ -364,8 +361,8 @@ export default function PlanScreen() {
                   </TouchableOpacity>
                 </View>
                 <View style={styles.previewRow}>
-                  <Text style={styles.previewLabel}>Estimated XP</Text>
-                  <Text style={styles.previewXp}>+{estimateXp(selectedType, sessions * SESSION_MINUTES)} XP</Text>
+                  <Text style={styles.previewLabel}>Estimated Effort</Text>
+                  <Text style={styles.previewXp}>+{estimateXp(selectedType, sessions * SESSION_MINUTES)} Effort</Text>
                 </View>
               </>
             ) : (
@@ -381,8 +378,8 @@ export default function PlanScreen() {
                 />
                 {duration && parseFloat(duration) > 0 && (
                   <View style={styles.previewRow}>
-                    <Text style={styles.previewLabel}>Estimated XP</Text>
-                    <Text style={styles.previewXp}>+{estimateXp(selectedType, parseFloat(duration))} XP</Text>
+                    <Text style={styles.previewLabel}>Estimated Effort</Text>
+                    <Text style={styles.previewXp}>+{estimateXp(selectedType, parseFloat(duration))} Effort</Text>
                   </View>
                 )}
               </>
@@ -412,7 +409,7 @@ export default function PlanScreen() {
                           : `${a.duration_minutes} min`}
                       </Text>
                     </View>
-                    <Text style={styles.modalPlannedXp}>+{a.projected_xp} XP</Text>
+                    <Text style={styles.modalPlannedXp}>+{a.projected_xp} Effort</Text>
                     <TouchableOpacity onPress={() => removePlanned(a.id)}>
                       <Text style={styles.removeBtnText}>✕</Text>
                     </TouchableOpacity>
@@ -420,7 +417,7 @@ export default function PlanScreen() {
                 ))}
                 <View style={styles.modalTotalRow}>
                   <Text style={styles.modalTotalLabel}>Total planned</Text>
-                  <Text style={styles.modalTotalXp}>+{Math.round(totalPlannedXp * 10) / 10} XP</Text>
+                  <Text style={styles.modalTotalXp}>+{Math.round(totalPlannedXp * 10) / 10} Effort</Text>
                 </View>
               </>
             )}

@@ -3,8 +3,10 @@ import { StyleSheet, View, Text, ScrollView, TouchableOpacity } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { supabase } from '../lib/supabase';
+import { fetchAllActivities } from '../lib/fetchAllActivities';
 import { ACHIEVEMENTS, CATEGORY_LABELS, checkAchievements } from '../lib/achievements';
 import { calculateStreak } from '../lib/streak';
+import { RivalTopNav } from '../components/rival';
 
 export default function AchievementsScreen() {
   const [earnedIds, setEarnedIds] = useState<Set<string>>(new Set());
@@ -17,14 +19,16 @@ export default function AchievementsScreen() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    const { data: activities } = await supabase
-      .from('activities')
-      .select('activity_type, distance_meters, elevation_meters, effort_score')
-      .eq('user_id', user.id);
+    // started_at is required by calculateStreak — without it every row is
+    // skipped and streak achievements can never unlock.
+    const activities = await fetchAllActivities(
+      user.id,
+      'activity_type, distance_meters, elevation_meters, effort_score, started_at'
+    );
 
-    const totalXp = (activities || []).reduce((s, a) => s + (a.effort_score || 0), 0);
-    const streak = calculateStreak(activities || []);
-    const calculated = checkAchievements(activities || [], totalXp, streak.longestEver);
+    const totalXp = activities.reduce((s, a) => s + (a.effort_score || 0), 0);
+    const streak = calculateStreak(activities);
+    const calculated = checkAchievements(activities, totalXp, streak.longestEver);
 
     // Load already-saved achievements
     const { data: saved } = await supabase
@@ -52,6 +56,7 @@ export default function AchievementsScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <RivalTopNav active="today" />
       <ScrollView contentContainerStyle={styles.content}>
 
         <View style={styles.header}>

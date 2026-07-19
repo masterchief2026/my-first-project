@@ -25,42 +25,26 @@ export default function JoinLeagueScreen() {
       return;
     }
 
-    // Find league by invite code
-    const { data: league, error: leagueError } = await supabase
-      .from('leagues')
-      .select('id, name')
-      .eq('invite_code', code.trim().toUpperCase())
-      .maybeSingle();
+    // Validate the code AND join in one server-side step (SECURITY DEFINER
+    // RPC — supabase/join_league_with_code.sql). The code is the credential:
+    // this works on public teams too, and upgrades a pending join-request to
+    // active. A client-side insert can't do either without loosening RLS.
+    const { data: result, error: joinError } = await supabase
+      .rpc('join_league_with_code', { code: code.trim().toUpperCase() });
 
-    if (leagueError || !league) {
-      setError('Invalid invite code. Please check and try again.');
+    if (joinError || !result || result.error) {
+      console.log('Join error:', JSON.stringify(joinError ?? result?.error));
+      setError(
+        result?.error === 'invalid_code'
+          ? 'Invalid invite code. Please check and try again.'
+          : 'Failed to join team. Please try again.'
+      );
       setLoading(false);
       return;
     }
 
-    // Check if already a member
-    const { data: existing } = await supabase
-      .from('league_members')
-      .select('id')
-      .eq('league_id', league.id)
-      .eq('user_id', user.id)
-      .maybeSingle();
-
-    if (!existing) {
-      const { error: joinError } = await supabase
-        .from('league_members')
-        .insert({ league_id: league.id, user_id: user.id, role: 'member' });
-
-      if (joinError) {
-        console.log('Join error:', JSON.stringify(joinError));
-        setError('Failed to join league. Please try again.');
-        setLoading(false);
-        return;
-      }
-    }
-
     setLoading(false);
-    router.replace({ pathname: '/league', params: { id: league.id } });
+    router.replace({ pathname: '/league', params: { id: result.league_id } });
   }
 
   return (
@@ -73,7 +57,7 @@ export default function JoinLeagueScreen() {
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.title}>Join a League</Text>
+        <Text style={styles.title}>Join a Team</Text>
         <Text style={styles.subtitle}>Enter the invite code your friend shared with you.</Text>
 
         <View style={styles.form}>
@@ -99,7 +83,7 @@ export default function JoinLeagueScreen() {
           disabled={loading}
         >
           <Text style={styles.joinButtonText}>
-            {loading ? 'Joining...' : 'Join League'}
+            {loading ? 'Joining...' : 'Join Team'}
           </Text>
         </TouchableOpacity>
 

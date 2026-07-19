@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+
+<html class="h-full" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>RIVAL - Fitness Shared</title>
+<!-- Tailwind CSS CDN -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Google Fonts: Manrope -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind Configuration -->
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'rival-orange': '#d97757',
+            'rival-dark': '#1a1a1a',
+          },
+          fontFamily: {
+            sans: ['Manrope', 'sans-serif'],
+          },
+        }
+      }
+    }
+  </script>
+<!-- Custom Styles for Overlay and Transitions -->
+<style data-purpose="layout-effects">
+    .hero-overlay {
+      background: linear-gradient(rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.5));
+    }
+    
+    .button-transition {
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* Ensure full screen height across mobile browsers */
+    .min-h-screen-ios {
+      min-height: -webkit-fill-available;
+    }
+  </style>
+</head>
+<body class="h-full m-0 font-sans text-white bg-black">
+<!-- BEGIN: Onboarding Hero Section -->
+<main class="relative h-screen w-full flex flex-col items-center justify-between py-12 px-6 bg-cover bg-center overflow-hidden min-h-screen-ios" data-purpose="onboarding-landing" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCitQMchnuBCzo0Q6OXBLfnSPso-sucjMQjta72dSkYNGJt7AwggwGxq2g31x70-92raclZQjwLo94VtPV-LwmI9APGD4PpZD_IV7HWx1ZtR3nbMyNBqKNHRVTYteq0VjVvk5YmvelS9l-jkbTGIHOfgobL2QZ7OMJBeycB0P3Q8ZVS4etYaVphq-Ryg0-L0_bmMJOgiqq0imQvsyL3CGJIy3GIZFH1rZ3zZA1MTnCImfksZ4YoDwxoLKxelyF0e_cy46qyIOVoo6Jd');">
+<!-- Dark overlay for legibility -->
+<div class="absolute inset-0 hero-overlay pointer-events-none"></div>
+<!-- BEGIN: Header Logo -->
+<header class="relative z-10" data-purpose="navigation-header">
+<div class="flex flex-col items-center space-y-1">
+<h1 class="text-3xl font-extrabold tracking-[0.2em] text-white uppercase" id="rival-logo">
+          RIVAL
+        </h1>
+<div class="h-1 w-8 bg-rival-orange rounded-full"></div>
+</div>
+</header>
+<!-- END: Header Logo -->
+<!-- BEGIN: Central Content -->
+<section class="relative z-10 w-full max-w-4xl text-center" data-purpose="hero-content">
+<h2 class="text-4xl md:text-6xl lg:text-7xl font-extrabold tracking-tight leading-tight mb-10 drop-shadow-2xl">
+        Fitness is better <br class="hidden md:block"/> when it's shared
+      </h2>
+<div class="flex justify-center">
+<button class="button-transition bg-rival-orange hover:bg-white hover:text-rival-orange text-white text-lg md:text-xl font-bold py-5 px-12 rounded-full shadow-2xl transform hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-rival-orange focus:ring-offset-4 focus:ring-offset-black" data-purpose="get-started-button" type="button">
+          Get Started
+        </button>
+</div>
+</section>
+<!-- END: Central Content -->
+<!-- BEGIN: Footer Elements -->
+<footer class="relative z-10 w-full flex justify-center opacity-60" data-purpose="page-footer">
+<p class="text-sm font-medium tracking-widest uppercase">
+        Refined Ember Series
+      </p>
+</footer>
+<!-- END: Footer Elements -->
+</main>
+<!-- END: Onboarding Hero Section -->
+</body></html>

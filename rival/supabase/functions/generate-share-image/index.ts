@@ -158,35 +158,35 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '')
 
-    // ── Weekly quota check (5 per rolling 7 days, free tier) ─────────────
+    // ── Daily quota check (2 per rolling 24h, free tier — a shot + a mulligan) ──
     // BYPASS_USER_IDS is a comma-separated list of user IDs exempt from the quota
     // (admins, devs, testers). Set it in Supabase edge function secrets.
     const bypassIds = (Deno.env.get('BYPASS_USER_IDS') ?? '').split(',').map(s => s.trim()).filter(Boolean)
     const quotaBypassed = bypassIds.includes(user.id)
 
-    const WEEKLY_LIMIT = 5
-    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+    const DAILY_LIMIT = 2
+    const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
     const { count } = await supabase
       .from('ai_generations')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', user.id)
-      .gte('created_at', weekAgo)
+      .gte('created_at', dayAgo)
     const used = count ?? 0
-    if (!quotaBypassed && used >= WEEKLY_LIMIT) {
+    if (!quotaBypassed && used >= DAILY_LIMIT) {
       // Tell the client when the oldest generation in the window ages out
       const { data: oldest } = await supabase
         .from('ai_generations')
         .select('created_at')
         .eq('user_id', user.id)
-        .gte('created_at', weekAgo)
+        .gte('created_at', dayAgo)
         .order('created_at', { ascending: true })
         .limit(1)
         .single()
       const resetAt = oldest
-        ? new Date(new Date(oldest.created_at).getTime() + 7 * 24 * 60 * 60 * 1000).toISOString()
+        ? new Date(new Date(oldest.created_at).getTime() + 24 * 60 * 60 * 1000).toISOString()
         : null
       return new Response(
-        JSON.stringify({ error: 'Weekly limit reached', remaining: 0, resetAt }),
+        JSON.stringify({ error: 'Daily limit reached', remaining: 0, resetAt }),
         { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -220,8 +220,11 @@ Deno.serve(async (req) => {
     const durationSec = activity?.duration_seconds ?? null
     const durationMin = durationSec ? Math.round(durationSec / 60) : null
     const elevationM = activity?.elevation_meters ? Math.round(activity.elevation_meters) : null
-    const durationFormatted = durationMin != null
-      ? (durationMin < 60 ? `${durationMin}m` : `${Math.floor(durationMin / 60)}h ${durationMin % 60}m`)
+    // Clock format ("39:24", "1:23:45") — a bare "39m" under a Time label reads as metres
+    const durationFormatted = durationSec != null
+      ? (durationSec >= 3600
+          ? `${Math.floor(durationSec / 3600)}:${String(Math.floor((durationSec % 3600) / 60)).padStart(2, '0')}:${String(Math.round(durationSec % 60)).padStart(2, '0')}`
+          : `${Math.floor(durationSec / 60)}:${String(Math.round(durationSec % 60)).padStart(2, '0')}`)
       : null
 
     const mmss = (totalMin: number, unit: string) =>
@@ -318,6 +321,7 @@ Deno.serve(async (req) => {
 
     let generatedB64: string | null = null
     let lastError: string | null = null
+    let refused = false
 
     for (let attempt = 0; attempt < 2; attempt++) {
       const openaiRes = await fetch('https://api.openai.com/v1/responses', { method: 'POST', headers: openaiHeaders, body: openaiPayload })
@@ -325,10 +329,28 @@ Deno.serve(async (req) => {
       const openaiData = await openaiRes.json()
       const imageCall = openaiData?.output?.find((o: any) => o.type === 'image_generation_call')
       if (imageCall?.result) { generatedB64 = imageCall.result; break }
+      // gpt-4o declining to call the image tool at all (upstream moderation, not our
+      // code) shows up as a plain "message" output instead of an image_generation_call.
+      // Surface this distinctly so the client can show a clean message instead of the
+      // raw OpenAI payload — this is far more common on photos with multiple real
+      // people, or heavily body/skin-transforming styles, but is probabilistic either way.
+      const refusalMsg = openaiData?.output?.find((o: any) => o.type === 'message')
+      if (refusalMsg) refused = true
       lastError = JSON.stringify(openaiData?.output ?? 'no output')
     }
 
-    if (!generatedB64) return new Response(JSON.stringify({ error: `No image from OpenAI after 2 attempts: ${lastError}` }), { status: 500, headers: corsHeaders })
+    if (!generatedB64) {
+      return new Response(
+        JSON.stringify({
+          error: refused
+            ? "This image couldn't be generated due to AI privacy policies — try a different style or photo."
+            : 'Generation failed — please try again.',
+          refused,
+          debug: lastError,
+        }),
+        { status: 500, headers: corsHeaders }
+      )
+    }
     const rawBytes = Uint8Array.from(atob(generatedB64), c => c.charCodeAt(0))
 
     const rawFileName = `${user.id}/${activityId}-raw-${Date.now()}.jpg`
@@ -342,7 +364,7 @@ Deno.serve(async (req) => {
       rawUrl: rawUrlData.publicUrl,
       stats: { distanceKm, durationMin, elevationM, statsLine },
       surpriseIndex,
-      remaining: WEEKLY_LIMIT - used - 1,
+      remaining: DAILY_LIMIT - used - 1,
     }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   } catch (err) {
     return new Response(JSON.stringify({ error: String(err) }), { status: 500, headers: corsHeaders })

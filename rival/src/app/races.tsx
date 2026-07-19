@@ -3,6 +3,9 @@ import { StyleSheet, TouchableOpacity, View, Text, ScrollView, TextInput, Modal,
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { supabase } from '../lib/supabase';
+import { formatDisplayName } from '../lib/identity';
+import { isoToDisplayDate, displayToIsoDate } from '../lib/dateFormat';
+import { RivalTopNav } from '../components/rival';
 
 const RACE_TYPES = ['Run', 'Ride', 'Swim', 'Triathlon', 'HYROX', 'CrossFit', 'Other', 'Custom'];
 
@@ -50,7 +53,13 @@ const HYROX_STATIONS: { name: string; distance_km: number }[] = [
   { name: 'Wall Balls', distance_km: 0 },
 ];
 
-const HYROX_CATEGORIES = ['Singles', 'Doubles', 'Pro', "Women's Pro"];
+// Official HYROX format × division structure: Singles/Doubles/Relay, each with an
+// Open and Pro division; Doubles and Relay also have Mixed alongside Men/Women.
+const HYROX_CATEGORIES = [
+  'Men', 'Women', 'Men Pro', 'Women Pro',
+  'Doubles Men', 'Doubles Women', 'Doubles Mixed', 'Doubles Pro Men', 'Doubles Pro Women',
+  'Relay Men', 'Relay Women', 'Relay Mixed',
+];
 const CROSSFIT_FORMATS = ['Open', 'Local Comp', 'Sanctional', 'Games'];
 
 type Discipline = { name: string; distance_km: number };
@@ -68,7 +77,7 @@ type Race = {
   disciplines: Discipline[] | null;
   goal_finish_time: string | null;
   actual_finish_time: string | null;
-  users: { display_name: string | null; email: string };
+  users: { display_name: string | null; email: string; username: string | null; display_style: string | null };
   interest_count: number;
   i_am_interested: boolean;
   avg_weekly_km: number;
@@ -106,6 +115,14 @@ function getFinishMessage(actualTime: string, goalTime: string | null): string {
 function parseDateLocal(dateStr: string): Date {
   const [y, m, d] = dateStr.split('-').map(Number);
   return new Date(y, m - 1, d);
+}
+
+function todayLocalStr(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 function daysUntil(dateStr: string): number {
@@ -162,7 +179,7 @@ export default function RacesScreen() {
   const [triSwim, setTriSwim] = useState('');
   const [triBike, setTriBike] = useState('');
   const [triRun, setTriRun] = useState('');
-  const [hyroxCategory, setHyroxCategory] = useState('Singles');
+  const [hyroxCategory, setHyroxCategory] = useState('Men');
   const [crossfitFormat, setCrossfitFormat] = useState('Open');
   const [goalFinishTime, setGoalFinishTime] = useState('');
   const [finishModalRace, setFinishModalRace] = useState<Race | null>(null);
@@ -184,7 +201,7 @@ export default function RacesScreen() {
       { name: 'Bike', distance_km: parseFloat(triBike) || 0 },
       { name: 'Run', distance_km: parseFloat(triRun) || 0 },
     ];
-    if (raceType === 'HYROX') return HYROX_STATIONS;
+    if (raceType === 'HYROX') return [{ name: hyroxCategory, distance_km: 0 }, ...HYROX_STATIONS];
     if (raceType === 'CrossFit') return [{ name: crossfitFormat, distance_km: 0 }];
     if (raceType === 'Custom') return customDisciplines.filter((d) => d.name.trim()).map((d) => ({ name: d.name.trim(), distance_km: parseFloat(d.distance) || 0 }));
     return null;
@@ -197,7 +214,7 @@ export default function RacesScreen() {
   function removeCustomDiscipline(index: number) { setCustomDisciplines((prev) => prev.filter((_, i) => i !== index)); }
 
   function isFormValid(): boolean {
-    if (!raceName || !raceDate) return false;
+    if (!raceName || !raceDate || !displayToIsoDate(raceDate)) return false;
     if (raceType === 'Triathlon') return !!(triSwim || triBike || triRun);
     if (raceType === 'HYROX' || raceType === 'CrossFit') return true;
     if (raceType === 'Custom') return customDisciplines.some((d) => d.name.trim());
@@ -211,27 +228,27 @@ export default function RacesScreen() {
     if (!user) return;
     setUserId(user.id);
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = todayLocalStr();
 
     // Get league mates
     const { data: membershipData } = await supabase
-      .from('league_members').select('league_id').eq('user_id', user.id);
+      .from('league_members').select('league_id').eq('user_id', user.id).eq('status', 'active');
     const leagueIds = (membershipData || []).map((m: any) => m.league_id);
 
     let friendIds: string[] = [];
     if (leagueIds.length > 0) {
       const { data: leagueMembersData } = await supabase
-        .from('league_members').select('user_id').in('league_id', leagueIds).neq('user_id', user.id);
+        .from('league_members').select('user_id').in('league_id', leagueIds).neq('user_id', user.id).eq('status', 'active');
       friendIds = [...new Set((leagueMembersData || []).map((m: any) => m.user_id))];
     }
     const friendSet = new Set(friendIds);
     setLeagueMateIds(friendSet);
 
     const [racesRes, pastRes, interestsRes, activitiesRes] = await Promise.all([
-      supabase.from('races').select('*, users(display_name, email)')
+      supabase.from('races').select('*, users(display_name, email, username, display_style)')
         .or(`is_public.eq.true,user_id.eq.${user.id}`)
         .gte('race_date', today).order('race_date', { ascending: true }),
-      supabase.from('races').select('*, users(display_name, email)')
+      supabase.from('races').select('*, users(display_name, email, username, display_style)')
         .eq('user_id', user.id).lt('race_date', today).order('race_date', { ascending: false }),
       supabase.from('race_interests').select('race_id, user_id'),
       supabase.from('activities').select('distance_meters, started_at')
@@ -264,26 +281,51 @@ export default function RacesScreen() {
 
   async function saveRace() {
     if (!isFormValid()) return;
+    const isoDate = displayToIsoDate(raceDate);
+    if (!isoDate) return;
     setSaving(true);
     const payload = {
       name: raceName.trim(), race_type: raceType, distance_km: computedDistance(),
-      race_date: raceDate, location: location.trim() || null,
+      race_date: isoDate, location: location.trim() || null,
       registration_url: regUrl.trim() || null, disciplines: buildDisciplines(),
       goal_finish_time: goalFinishTime.trim() || null,
     };
     if (editingRace) {
       await supabase.from('races').update(payload).eq('id', editingRace.id);
     } else {
-      await supabase.from('races').insert({ ...payload, user_id: userId, is_public: true });
+      const { data: newRace } = await supabase
+        .from('races')
+        .insert({ ...payload, user_id: userId, is_public: true })
+        .select('id')
+        .single();
+      if (newRace) notifyLeagueMatesOfNewRace(newRace.id);
     }
     setSaving(false);
     closeModal();
     load();
   }
 
+  async function notifyLeagueMatesOfNewRace(raceId: string) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      await fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/race-added-notifications`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+          'apikey': process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!,
+        },
+        body: JSON.stringify({ raceId }),
+      });
+    } catch {
+      // best-effort — don't block the race save on notification failures
+    }
+  }
+
   function openEdit(race: Race) {
     setEditingRace(race);
-    setRaceName(race.name); setRaceType(race.race_type); setRaceDate(race.race_date);
+    setRaceName(race.name); setRaceType(race.race_type); setRaceDate(isoToDisplayDate(race.race_date));
     setLocation(race.location || ''); setRegUrl(race.registration_url || '');
     setGoalFinishTime(race.goal_finish_time || '');
     if (race.race_type === 'Triathlon' && race.disciplines) {
@@ -292,6 +334,8 @@ export default function RacesScreen() {
       setTriRun(String(race.disciplines.find((d) => d.name === 'Run')?.distance_km ?? ''));
     } else if (race.race_type === 'CrossFit' && race.disciplines?.[0]) {
       setCrossfitFormat(race.disciplines[0].name);
+    } else if (race.race_type === 'HYROX' && race.disciplines?.[0]) {
+      setHyroxCategory(race.disciplines[0].name);
     } else if (race.race_type === 'Custom' && race.disciplines) {
       setCustomDisciplines(race.disciplines.map((d) => ({ name: d.name, distance: String(d.distance_km) })));
     } else {
@@ -332,6 +376,7 @@ export default function RacesScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <RivalTopNav active="today" />
       <ScrollView contentContainerStyle={styles.content}>
 
         <View style={styles.header}>
@@ -393,8 +438,8 @@ export default function RacesScreen() {
                 : activeTab === 'completed'
                 ? "No completed races yet. Get out there!"
                 : leagueMateIds.size === 0
-                ? "Join a league to see your friends' races here."
-                : "None of your league mates have added a race yet."}
+                ? "Join a team to see your friends' races here."
+                : "None of your teammates have added a race yet."}
             </Text>
           </View>
         )}
@@ -403,7 +448,7 @@ export default function RacesScreen() {
           const isOwn = race.user_id === userId;
           const days = daysUntil(race.race_date);
           const past = days < 0;
-          const ownerName = race.users?.display_name || race.users?.email?.split('@')[0];
+          const ownerName = race.users ? formatDisplayName(race.users) : undefined;
 
           return (
             <View key={race.id} style={[styles.raceCard, isOwn && styles.raceCardOwn, past && styles.raceCardCompleted]}>
@@ -618,13 +663,13 @@ export default function RacesScreen() {
                 </View>
                 <View style={styles.infoBox}>
                   <Text style={styles.infoBoxTitle}>🏋️ CrossFit Competition</Text>
-                  <Text style={styles.infoBoxText}>Multiple WODs over the event period. Add a registration link so your league can follow along.</Text>
+                  <Text style={styles.infoBoxText}>Multiple WODs over the event period. Add a registration link so your team can follow along.</Text>
                 </View>
               </>
             )}
 
-            <Text style={styles.modalLabel}>Race date (YYYY-MM-DD)</Text>
-            <TextInput style={styles.modalInput} placeholder="2026-10-18" placeholderTextColor="#555555" value={raceDate} onChangeText={setRaceDate} />
+            <Text style={styles.modalLabel}>Race date (DD/MM/YYYY)</Text>
+            <TextInput style={styles.modalInput} placeholder="18/10/2026" placeholderTextColor="#555555" value={raceDate} onChangeText={setRaceDate} keyboardType="numbers-and-punctuation" />
 
             <Text style={styles.modalLabel}>Location (optional)</Text>
             <TextInput style={styles.modalInput} placeholder="Auckland, NZ" placeholderTextColor="#555555" value={location} onChangeText={setLocation} />

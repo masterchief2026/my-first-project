@@ -3,17 +3,9 @@ import { StyleSheet, TouchableOpacity, View, Text, ScrollView, TextInput, Modal 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { supabase } from '../lib/supabase';
-
-const GYM_TYPES = new Set(['WeightTraining', 'CrossFit', 'Hyrox', 'HIIT', 'Workout']);
-
-// Groups indoor + outdoor variants of the same sport together
-const ACTIVITY_TYPE_GROUPS: Record<string, string[]> = {
-  Run:  ['Run', 'VirtualRun', 'TrailRun'],
-  Ride: ['Ride', 'VirtualRide', 'MountainBikeRide', 'GravelRide', 'Handcycle'],
-  Swim: ['Swim', 'IndoorSwim', 'OpenWaterSwim'],
-  Walk: ['Walk'],
-  Hike: ['Hike'],
-};
+import { displayToIsoDate } from '../lib/dateFormat';
+import { computeGoalProgress } from '../lib/goalProgress';
+import { RivalTopNav } from '../components/rival';
 
 type Goal = {
   id: string;
@@ -83,6 +75,13 @@ function getMondayStart(date: Date) {
 
 function getMonthStart(date: Date) {
   return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function dateToLocalStr(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 function formatDate(dateStr: string) {
@@ -229,32 +228,10 @@ export default function GoalsScreen() {
       .select('activity_type, distance_meters, elevation_meters, started_at')
       .eq('user_id', user.id);
 
-    const goalsWithProgress = goalsData.map((goal: any) => {
-      const start = new Date(goal.start_date);
-      const end = new Date(goal.end_date);
-      end.setHours(23, 59, 59, 999);
-
-      let relevant = (activities || []).filter((a: any) => {
-        const d = new Date(a.started_at);
-        return d >= start && d <= end;
-      });
-
-      if (goal.activity_filter) {
-        const group = new Set(ACTIVITY_TYPE_GROUPS[goal.activity_filter] ?? [goal.activity_filter]);
-        relevant = relevant.filter((a: any) => group.has(a.activity_type));
-      }
-
-      let progress = 0;
-      if (goal.goal_type === 'distance') {
-        progress = relevant.reduce((sum: number, a: any) => sum + (a.distance_meters || 0), 0) / 1000;
-      } else if (goal.goal_type === 'elevation') {
-        progress = relevant.reduce((sum: number, a: any) => sum + (a.elevation_meters || 0), 0);
-      } else if (goal.goal_type === 'gym_sessions') {
-        progress = relevant.filter((a: any) => GYM_TYPES.has(a.activity_type)).length;
-      }
-
-      return { ...goal, progress: Math.round(progress * 10) / 10 };
-    });
+    const goalsWithProgress = goalsData.map((goal: any) => ({
+      ...goal,
+      progress: computeGoalProgress(goal, activities || []),
+    }));
 
     setGoals(goalsWithProgress);
     setLoading(false);
@@ -274,14 +251,17 @@ export default function GoalsScreen() {
       return { start, end };
     }
     const start = now;
-    const end = customEndDate ? new Date(customEndDate) : now;
+    const customIso = customEndDate ? displayToIsoDate(customEndDate) : null;
+    const end = customIso
+      ? (() => { const [y, m, d] = customIso.split('-').map(Number); return new Date(y, m - 1, d); })()
+      : now;
     return { start, end };
   }
 
   async function saveGoal() {
     if (!targetValue || parseFloat(targetValue) <= 0) return;
     if (goals.length >= 3) return;
-    if (periodType === 'custom' && !customEndDate) return;
+    if (periodType === 'custom' && (!customEndDate || !displayToIsoDate(customEndDate))) return;
 
     setSaving(true);
     const { start, end } = getDateRange(periodType);
@@ -291,8 +271,8 @@ export default function GoalsScreen() {
       goal_type: goalType,
       target_value: parseFloat(targetValue),
       period_type: periodType,
-      start_date: start.toISOString().split('T')[0],
-      end_date: end.toISOString().split('T')[0],
+      start_date: dateToLocalStr(start),
+      end_date: dateToLocalStr(end),
       activity_filter: goalType === 'gym_sessions' ? null : activityFilter,
     });
 
@@ -322,6 +302,7 @@ export default function GoalsScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <RivalTopNav active="today" />
       <ScrollView contentContainerStyle={styles.content}>
 
         <View style={styles.header}>
@@ -476,13 +457,14 @@ export default function GoalsScreen() {
 
             {periodType === 'custom' && (
               <>
-                <Text style={styles.modalLabel}>End date (YYYY-MM-DD)</Text>
+                <Text style={styles.modalLabel}>End date (DD/MM/YYYY)</Text>
                 <TextInput
                   style={styles.modalInput}
-                  placeholder="2026-12-31"
+                  placeholder="31/12/2026"
                   placeholderTextColor="#666666"
                   value={customEndDate}
                   onChangeText={setCustomEndDate}
+                  keyboardType="numbers-and-punctuation"
                 />
               </>
             )}

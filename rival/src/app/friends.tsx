@@ -3,18 +3,16 @@ import { StyleSheet, TouchableOpacity, View, Text, TextInput, ScrollView, Activi
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { supabase } from '../lib/supabase';
+import { formatDisplayName, IdentityUser } from '../lib/identity';
+import { RivalTopNav } from '../components/rival';
 
-type UserResult = {
+type UserResult = IdentityUser & {
   id: string;
-  display_name: string | null;
-  email: string;
   isFollowing: boolean;
 };
 
-type Friend = {
+type Friend = IdentityUser & {
   id: string;
-  display_name: string | null;
-  email: string;
   weekly_score: number;
 };
 
@@ -62,7 +60,7 @@ export default function FriendsScreen() {
 
     const { data: usersData } = await supabase
       .from('users')
-      .select('id, display_name, email')
+      .select('id, display_name, email, username, display_style')
       .in('id', ids);
 
     if (!usersData) return;
@@ -110,8 +108,8 @@ export default function FriendsScreen() {
 
     const { data } = await supabase
       .from('users')
-      .select('id, display_name, email')
-      .or(`display_name.ilike.%${text}%,email.ilike.%${text}%`)
+      .select('id, display_name, email, username, display_style')
+      .or(`display_name.ilike.%${text}%,email.ilike.%${text}%,username.ilike.%${text}%`)
       .neq('id', currentUserId)
       .limit(10);
 
@@ -149,12 +147,13 @@ export default function FriendsScreen() {
     await loadFriends(currentUserId);
   }
 
-  function getDisplayName(u: { display_name: string | null; email: string }) {
-    return u.display_name || u.email.split('@')[0];
+  function getDisplayName(u: IdentityUser) {
+    return formatDisplayName(u);
   }
 
   return (
     <SafeAreaView style={styles.container}>
+      <RivalTopNav active="today" />
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
 
         <View style={styles.header}>
@@ -216,7 +215,7 @@ export default function FriendsScreen() {
               <Text style={styles.friendName}>{getDisplayName(friend)}</Text>
               <Text style={styles.friendSub}>This week</Text>
             </View>
-            <Text style={styles.friendScore}>{friend.weekly_score} pts</Text>
+            <Text style={styles.friendScore}>{friend.weekly_score} Effort</Text>
           </View>
         ))}
 

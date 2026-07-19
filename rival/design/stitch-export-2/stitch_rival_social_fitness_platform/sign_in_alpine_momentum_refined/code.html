@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>RIVAL | Sign In</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "secondary-fixed": "#e5e2e1",
+                    "on-secondary-container": "#bab8b7",
+                    "surface-container-high": "#2a2a2a",
+                    "secondary-fixed-dim": "#c8c6c5",
+                    "primary": "#ffb59e",
+                    "on-primary-fixed": "#390b00",
+                    "on-tertiary-container": "#00312b",
+                    "surface-mid": "#1C1C1C",
+                    "outline": "#a38c85",
+                    "on-surface": "#e5e2e1",
+                    "on-primary-container": "#541400",
+                    "surface": "#131313",
+                    "on-secondary": "#313030",
+                    "status-inspired": "#FFFFFF",
+                    "on-primary-fixed-variant": "#7a2f15",
+                    "surface-container-highest": "#353535",
+                    "text-primary": "#FFFFFF",
+                    "tertiary-container": "#09a493",
+                    "rank-elite": "#9F57D9",
+                    "on-error": "#690005",
+                    "surface-container": "#20201f",
+                    "inverse-primary": "#99462a",
+                    "surface-container-lowest": "#0e0e0e",
+                    "background": "#131313",
+                    "surface-dim": "#131313",
+                    "on-secondary-fixed-variant": "#474646",
+                    "text-secondary": "#A0A0A0",
+                    "primary-fixed": "#ffdbd0",
+                    "surface-variant": "#353535",
+                    "primary-container": "#d97757",
+                    "secondary": "#c8c6c5",
+                    "rank-rookie": "#B0B0B0",
+                    "secondary-container": "#4a4949",
+                    "error-container": "#93000a",
+                    "surface-low": "#131313",
+                    "outline-variant": "#55433d",
+                    "rank-pro": "#D97757",
+                    "on-tertiary-fixed-variant": "#005047",
+                    "on-surface-variant": "#dbc1b9",
+                    "on-secondary-fixed": "#1c1b1b",
+                    "tertiary": "#5edac7",
+                    "on-tertiary-fixed": "#00201c",
+                    "tertiary-fixed": "#7df7e3",
+                    "surface-bright": "#393939",
+                    "rank-unrivaled": "#FFD700",
+                    "error": "#ffb4ab",
+                    "inverse-surface": "#e5e2e1",
+                    "surface-container-low": "#1b1b1b",
+                    "on-error-container": "#ffdad6",
+                    "inverse-on-surface": "#313030",
+                    "surface-high": "#282828",
+                    "on-primary": "#5c1902",
+                    "surface-tint": "#ffb59e",
+                    "primary-fixed-dim": "#ffb59e",
+                    "on-background": "#e5e2e1",
+                    "tertiary-fixed-dim": "#5edac7",
+                    "on-tertiary": "#003731"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "section-margin": "2rem",
+                    "max-width": "1200px",
+                    "container-padding": "1.5rem",
+                    "gutter": "1rem",
+                    "stack-gap": "1rem"
+            },
+            "fontFamily": {
+                    "headline-lg": ["manrope"],
+                    "label-caps": ["manrope"],
+                    "headline-lg-mobile": ["manrope"],
+                    "body-md": ["manrope"],
+                    "display-hero": ["manrope"],
+                    "body-lg": ["manrope"],
+                    "metric-large": ["manrope"],
+                    "title-md": ["manrope"]
+            },
+            "fontSize": {
+                    "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                    "label-caps": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700"}],
+                    "headline-lg-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "700"}],
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "display-hero": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "800"}],
+                    "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                    "metric-large": ["32px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "300"}],
+                    "title-md": ["20px", {"lineHeight": "28px", "fontWeight": "600"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body {
+            font-family: 'Manrope', sans-serif;
+            background-color: #131313;
+        }
+        .glass-panel {
+            background: rgba(20, 20, 20, 0.65);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .btn-hover-effect {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .btn-hover-effect:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 20px rgba(217, 119, 87, 0.4);
+        }
+    </style>
+</head>
+<body class="dark h-screen w-full flex items-center justify-center overflow-hidden">
+<!-- Background Image -->
+<div class="fixed inset-0 z-0">
+<div class="w-full h-full bg-cover bg-center" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAdV_GKBo82fVxxQQkm-hmbf1Yk-vv3OAciY6DGD-1UXNQfz6_I_1mXypHimVAr0V_TPkyLVyHg_8HVvKs1IPd-26lr5qJ9LTzVlbM4zWIuYnt050Ff7eW48Mf3bowwWn4AmPUWvnVNYr2CPNVZ8eVQQDcmcJcGaGiP3nZ_sY_I2y7zrENTY-P3VjDKB6CDnH8MFHWFgaJVlB6xutkwvTwUIafM6rlZk5wtm54rdoxjdwbmy4UjXks4ysxxp-GP0KQQVAgF3CTHulM6');"></div>
+<div class="absolute inset-0 bg-black/30 bg-gradient-to-t from-background via-transparent to-transparent"></div>
+</div>
+<!-- Top App Bar (Shell Navigation Suppressed as per Task Logic for Transactional Page) -->
+<header class="fixed top-0 left-0 w-full z-50 flex justify-center items-center py-8">
+<div class="font-display-hero text-headline-lg font-extrabold text-text-primary tracking-tighter">RIVAL</div>
+</header>
+<!-- Main Canvas -->
+<main class="relative z-10 w-full max-w-md px-6 animate-in fade-in slide-in-from-bottom-4 duration-1000">
+<!-- Sign In Card -->
+<div class="glass-panel p-8 md:p-12 rounded-xl flex flex-col gap-stack-gap">
+<!-- Header Section -->
+<div class="text-center space-y-2 mb-4">
+<h1 class="font-headline-lg text-headline-lg text-text-primary">Welcome Back</h1>
+<p class="font-body-md text-text-secondary">Your effort is waiting.</p>
+</div>
+<!-- Global Messaging (Hidden by default, shown for example states) -->
+<div class="hidden" id="error-message">
+<div class="flex items-center gap-3 p-4 bg-error-container/20 border border-error-container rounded-lg">
+<span class="material-symbols-outlined text-error" data-icon="error">error</span>
+<p class="text-error font-body-md text-sm">Invalid credentials. Please try again.</p>
+</div>
+</div>
+<div class="hidden" id="success-message">
+<div class="flex items-center gap-3 p-4 bg-tertiary-container/10 border border-tertiary-container rounded-lg">
+<span class="material-symbols-outlined text-tertiary" data-icon="check_circle">check_circle</span>
+<p class="text-tertiary font-body-md text-sm">Reset-email-sent. Check your inbox.</p>
+</div>
+</div>
+<!-- Form -->
+<form class="flex flex-col gap-5" onsubmit="event.preventDefault();">
+<!-- Email Field -->
+<div class="flex flex-col gap-2">
+<label class="font-label-caps text-label-caps text-text-secondary uppercase" for="email">Email Address</label>
+<input class="w-full bg-surface-container-low border border-outline-variant text-text-primary px-4 py-3 rounded-lg focus:ring-1 focus:ring-primary-container focus:border-primary-container transition-all outline-none" id="email" placeholder="name@example.com" type="email"/>
+</div>
+<!-- Password Field -->
+<div class="flex flex-col gap-2 relative">
+<label class="font-label-caps text-label-caps text-text-secondary uppercase" for="password">Password</label>
+<div class="relative">
+<input class="w-full bg-surface-container-low border border-outline-variant text-text-primary px-4 py-3 rounded-lg focus:ring-1 focus:ring-primary-container focus:border-primary-container transition-all outline-none pr-12" id="password" placeholder="••••••••" type="password"/>
+<button class="absolute right-4 top-1/2 -translate-y-1/2 text-text-secondary hover:text-text-primary transition-colors" onclick="togglePassword()" type="button">
+<span class="material-symbols-outlined" data-icon="visibility" id="password-toggle-icon">visibility</span>
+</button>
+</div>
+</div>
+<!-- Footer Actions -->
+<div class="flex items-center justify-between mt-1">
+<label class="flex items-center gap-2 cursor-pointer group">
+<input class="w-4 h-4 rounded border-outline-variant bg-surface-container-low text-primary-container focus:ring-primary-container" type="checkbox"/>
+<span class="font-body-md text-sm text-text-secondary group-hover:text-text-primary transition-colors">Remember me</span>
+</label>
+<a class="font-body-md text-sm text-primary-container hover:text-primary transition-colors" href="#">Forgot password?</a>
+</div>
+<!-- Primary CTA -->
+<button class="w-full mt-4 bg-primary-container text-white py-4 rounded-lg font-title-md text-title-md btn-hover-effect" onclick="triggerState('error')" type="button">
+                    Sign In
+                </button>
+</form>
+<!-- Secondary Action -->
+<div class="mt-4 text-center">
+<p class="font-body-md text-sm text-text-secondary">
+                    Don't have an account? 
+                    <a class="text-text-primary font-semibold hover:underline decoration-primary-container underline-offset-4 transition-all" href="#" onclick="triggerState('success')">Join the Collective</a>
+</p>
+</div>
+</div>
+<!-- Footer Brand Utility -->
+<footer class="mt-8 text-center">
+<p class="font-label-caps text-label-caps text-text-secondary/50 tracking-widest uppercase">Premium Human Performance</p>
+</footer>
+</main>
+<script>
+        function togglePassword() {
+            const input = document.getElementById('password');
+            const icon = document.getElementById('password-toggle-icon');
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.textContent = 'visibility_off';
+            } else {
+                input.type = 'password';
+                icon.textContent = 'visibility';
+            }
+        }
+
+        // Logic to demonstrate states requested by user
+        function triggerState(type) {
+            const errorDiv = document.getElementById('error-message');
+            const successDiv = document.getElementById('success-message');
+            
+            errorDiv.classList.add('hidden');
+            successDiv.classList.add('hidden');
+
+            if (type === 'error') {
+                errorDiv.classList.remove('hidden');
+            } else if (type === 'success') {
+                successDiv.classList.remove('hidden');
+            }
+        }
+    </script>
+</body></html>

@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { supabase } from '../lib/supabase';
 import { LEVELS, getLevel } from '../lib/xp';
+import { RivalTopNav } from '../components/rival';
 
 export default function RanksScreen() {
   const [totalXp, setTotalXp] = useState(0);
@@ -26,6 +27,7 @@ export default function RanksScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <RivalTopNav active="today" />
       <ScrollView contentContainerStyle={styles.content}>
 
         <View style={styles.header}>
@@ -62,7 +64,7 @@ export default function RanksScreen() {
                       {lvl.name}
                     </Text>
                     <Text style={styles.xpReq}>
-                      {lvl.minXp.toLocaleString()} XP{!isLast ? ` – ${lvl.maxXp.toLocaleString()}` : '+'}
+                      {lvl.minXp.toLocaleString()} Effort{!isLast ? ` – ${lvl.maxXp.toLocaleString()}` : '+'}
                     </Text>
                   </View>
 

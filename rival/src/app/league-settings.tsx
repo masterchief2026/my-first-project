@@ -3,6 +3,7 @@ import { StyleSheet, TouchableOpacity, View, Text, TextInput, ScrollView, Alert,
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { supabase } from '../lib/supabase';
+import { formatDisplayName } from '../lib/identity';
 
 type Member = {
   user_id: string;
@@ -10,6 +11,8 @@ type Member = {
   users: {
     display_name: string | null;
     email: string;
+    username: string | null;
+    display_style: string | null;
   };
 };
 
@@ -25,6 +28,9 @@ export default function LeagueSettingsScreen() {
   const [saving, setSaving] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [isPrivate, setIsPrivate] = useState(true);
+  const [pendingRequests, setPendingRequests] = useState<Member[]>([]);
+  const [respondingTo, setRespondingTo] = useState<string | null>(null);
 
   useEffect(() => {
     load();
@@ -41,6 +47,7 @@ export default function LeagueSettingsScreen() {
       .select('role')
       .eq('league_id', id)
       .eq('user_id', user.id)
+      .eq('status', 'active')
       .single();
 
     if (membership?.role !== 'admin') {
@@ -50,7 +57,7 @@ export default function LeagueSettingsScreen() {
 
     const { data: league } = await supabase
       .from('leagues')
-      .select('name, created_by, logo_url')
+      .select('name, created_by, logo_url, is_private')
       .eq('id', id)
       .single();
 
@@ -59,15 +66,48 @@ export default function LeagueSettingsScreen() {
       setNewName(league.name);
       setCreatedBy(league.created_by);
       setLogoUrl(league.logo_url || null);
+      setIsPrivate(league.is_private !== false);
     }
 
     const { data: membersData } = await supabase
       .from('league_members')
-      .select('user_id, role, users(display_name, email)')
-      .eq('league_id', id);
+      .select('user_id, role, users(display_name, email, username, display_style)')
+      .eq('league_id', id)
+      .eq('status', 'active');
 
     if (membersData) setMembers(membersData as any);
+
+    const { data: pendingData } = await supabase
+      .from('league_members')
+      .select('user_id, role, users(display_name, email, username, display_style)')
+      .eq('league_id', id)
+      .eq('status', 'pending');
+
+    if (pendingData) setPendingRequests(pendingData as any);
     setLoading(false);
+  }
+
+  async function respondToRequest(userId: string, approve: boolean) {
+    setRespondingTo(userId);
+    if (approve) {
+      const { error } = await supabase.from('league_members').update({ status: 'active' }).eq('league_id', id).eq('user_id', userId);
+      if (error) {
+        Alert.alert("Couldn't approve", error.message);
+        setRespondingTo(null);
+        return;
+      }
+      const request = pendingRequests.find((m) => m.user_id === userId);
+      if (request) setMembers((prev) => [...prev, request]);
+    } else {
+      const { error } = await supabase.from('league_members').delete().eq('league_id', id).eq('user_id', userId);
+      if (error) {
+        Alert.alert("Couldn't decline", error.message);
+        setRespondingTo(null);
+        return;
+      }
+    }
+    setPendingRequests((prev) => prev.filter((m) => m.user_id !== userId));
+    setRespondingTo(null);
   }
 
   async function uploadLogo() {
@@ -116,36 +156,44 @@ export default function LeagueSettingsScreen() {
 
   async function kickMember(userId: string) {
     const member = members.find((m) => m.user_id === userId);
-    const name = member?.users?.display_name || member?.users?.email?.split('@')[0] || 'this member';
+    const name = member?.users ? formatDisplayName(member.users, 'this member') : 'this member';
 
     if (Platform.OS === 'web') {
-      if (!window.confirm(`Remove ${name} from the league?`)) return;
+      if (!window.confirm(`Remove ${name} from the team?`)) return;
     }
 
-    await supabase
+    const { error } = await supabase
       .from('league_members')
       .delete()
       .eq('league_id', id)
       .eq('user_id', userId);
 
+    if (error) {
+      Alert.alert("Couldn't remove member", error.message);
+      return;
+    }
     setMembers((prev) => prev.filter((m) => m.user_id !== userId));
   }
 
   async function toggleAdmin(userId: string, currentRole: string) {
     const newRole = currentRole === 'admin' ? 'member' : 'admin';
-    await supabase
+    const { error } = await supabase
       .from('league_members')
       .update({ role: newRole })
       .eq('league_id', id)
       .eq('user_id', userId);
 
+    if (error) {
+      Alert.alert("Couldn't update role", error.message);
+      return;
+    }
     setMembers((prev) =>
       prev.map((m) => m.user_id === userId ? { ...m, role: newRole } : m)
     );
   }
 
   function getDisplayName(member: Member) {
-    return member.users?.display_name || member.users?.email?.split('@')[0] || 'Athlete';
+    return formatDisplayName(member.users);
   }
 
   if (loading) {
@@ -168,10 +216,10 @@ export default function LeagueSettingsScreen() {
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.title}>League Settings</Text>
+        <Text style={styles.title}>Team Settings</Text>
 
         {/* Logo */}
-        <Text style={styles.sectionLabel}>League Logo</Text>
+        <Text style={styles.sectionLabel}>Team Logo</Text>
         <TouchableOpacity style={styles.logoCard} onPress={uploadLogo} disabled={uploadingLogo}>
           {logoUrl ? (
             <>
@@ -189,7 +237,7 @@ export default function LeagueSettingsScreen() {
         </TouchableOpacity>
 
         {/* Rename */}
-        <Text style={styles.sectionLabel}>League Name</Text>
+        <Text style={styles.sectionLabel}>Team Name</Text>
         <View style={styles.nameCard}>
           {editingName ? (
             <View style={styles.nameEditRow}>
@@ -214,6 +262,63 @@ export default function LeagueSettingsScreen() {
             </TouchableOpacity>
           )}
         </View>
+
+        {/* Visibility */}
+        <Text style={styles.sectionLabel}>Visibility</Text>
+        <View style={styles.visibilityCard}>
+          <View style={styles.visibilityRow}>
+            <View>
+              <Text style={styles.visibilityTitle}>{isPrivate ? '🔒 Private' : '🌍 Public'}</Text>
+              <Text style={styles.visibilityDesc}>
+                {isPrivate
+                  ? 'Only people with the invite code can join.'
+                  : 'Anyone can discover and join this team.'}
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.visibilityToggle, !isPrivate && styles.visibilityToggleOn]}
+              onPress={async () => {
+                const newVal = !isPrivate;
+                setIsPrivate(newVal);
+                await supabase.from('leagues').update({ is_private: newVal }).eq('id', id);
+              }}
+            >
+              <Text style={styles.visibilityToggleText}>{isPrivate ? 'Make Public' : 'Make Private'}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Join Requests */}
+        {pendingRequests.length > 0 && (
+          <>
+            <Text style={styles.sectionLabel}>Join Requests</Text>
+            <View style={[styles.membersCard, { marginBottom: 28 }]}>
+              {pendingRequests.map((request) => (
+                <View key={request.user_id} style={styles.memberRow}>
+                  <View style={styles.memberInfo}>
+                    <Text style={styles.memberName}>{formatDisplayName(request.users)}</Text>
+                  </View>
+                  <View style={styles.memberActions}>
+                    <TouchableOpacity
+                      style={styles.adminToggleBtn}
+                      onPress={() => respondToRequest(request.user_id, true)}
+                      disabled={respondingTo === request.user_id}
+                    >
+                      <Text style={styles.adminToggleText}>Approve</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.kickBtn}
+                      onPress={() => respondToRequest(request.user_id, false)}
+                      disabled={respondingTo === request.user_id}
+                    >
+                      <Text style={styles.kickText}>Decline</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </>
+        )}
 
         {/* Members */}
         <Text style={styles.sectionLabel}>Members</Text>
@@ -296,6 +401,13 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     marginBottom: 10,
   },
+  visibilityCard: { backgroundColor: '#1A1A1A', borderRadius: 14, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: '#2A2A2A' },
+  visibilityRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
+  visibilityTitle: { fontSize: 15, fontWeight: '700', color: '#FFFFFF', marginBottom: 4 },
+  visibilityDesc: { fontSize: 12, color: '#999999', flexShrink: 1 },
+  visibilityToggle: { backgroundColor: '#0D0D0D', borderRadius: 10, paddingVertical: 8, paddingHorizontal: 12, borderWidth: 1, borderColor: '#2A2A2A' },
+  visibilityToggleOn: { backgroundColor: '#0A1A0F', borderColor: '#8DC63F' },
+  visibilityToggleText: { fontSize: 12, fontWeight: '700', color: '#CCCCCC' },
   nameCard: {
     backgroundColor: '#111111',
     borderRadius: 12,

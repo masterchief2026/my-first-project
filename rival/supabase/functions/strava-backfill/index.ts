@@ -1,18 +1,12 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { resolveCanonicalActivityId, linkNewActivitySource } from '../_shared/activityDedup.ts'
+import { calculateEffortScore, loadMultipliers } from '../_shared/effortScore.ts'
+import { getFreshStravaToken } from '../_shared/stravaAuth.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
-
-function calculateEffortScore(activityType: string, movingTime: number, distance: number, multipliers: Record<string, number>): number {
-  const multiplier = multipliers[activityType] ?? 0.8
-  const minutes = movingTime / 60
-  const km = distance / 1000
-  let score = minutes * multiplier
-  if (km > 5) score += (km - 5) * 0.5
-  return Math.round(score * 10) / 10
 }
 
 serve(async (req) => {
@@ -57,40 +51,33 @@ serve(async (req) => {
       })
     }
 
-    // Refresh token if expired
-    let accessToken = connection.access_token
-    const expiresAt = new Date(connection.token_expires_at).getTime()
-    if (Date.now() > expiresAt) {
-      console.log('Token expired, refreshing...')
-      const refreshRes = await fetch('https://www.strava.com/oauth/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          client_id: Deno.env.get('STRAVA_CLIENT_ID'),
-          client_secret: Deno.env.get('STRAVA_CLIENT_SECRET'),
-          grant_type: 'refresh_token',
-          refresh_token: connection.refresh_token,
-        }),
+    const tokenResult = await getFreshStravaToken(supabase, connection, user.id)
+    if ('error' in tokenResult) {
+      return new Response(JSON.stringify({ error: tokenResult.error }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 401,
       })
-      const refreshData = await refreshRes.json()
-      if (refreshData.access_token) {
-        accessToken = refreshData.access_token
+    }
+    const accessToken = tokenResult.token
+
+    // Keep athlete name fresh for the "Connected to X's Strava" label
+    try {
+      const athleteRes = await fetch('https://www.strava.com/api/v3/athlete', {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      })
+      if (athleteRes.ok) {
+        const athlete = await athleteRes.json()
         await supabase
           .from('fitness_connections')
-          .update({
-            access_token: refreshData.access_token,
-            refresh_token: refreshData.refresh_token,
-            token_expires_at: new Date(refreshData.expires_at * 1000).toISOString(),
-          })
+          .update({ athlete_firstname: athlete.firstname ?? null, athlete_lastname: athlete.lastname ?? null })
           .eq('user_id', user.id)
           .eq('provider', 'strava')
       }
+    } catch (athleteErr) {
+      console.log('Athlete fetch failed:', athleteErr.message)
     }
 
-    // Load multipliers from DB
-    const { data: configRows } = await supabase.from('scoring_config').select('activity_type, multiplier')
-    const multipliers: Record<string, number> = {}
-    for (const row of configRows ?? []) multipliers[row.activity_type] = row.multiplier
+    const multipliers = await loadMultipliers(supabase)
 
     // Fetch last 30 activities from Strava
     const activitiesRes = await fetch(
@@ -99,14 +86,16 @@ serve(async (req) => {
     )
     const activities = await activitiesRes.json()
     console.log('Backfill v3 - detail photo fetch enabled')
-    console.log(`Fetched ${activities.length} activities`)
 
-    if (!Array.isArray(activities)) {
-      return new Response(JSON.stringify({ error: 'Strava error', details: activities }), {
+    if (!activitiesRes.ok || !Array.isArray(activities)) {
+      const status = activitiesRes.status === 401 ? 401 : 400
+      const error = status === 401 ? 'Strava authorization expired — please reconnect Strava' : 'Strava error'
+      return new Response(JSON.stringify({ error, details: activities }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400,
+        status,
       })
     }
+    console.log(`Fetched ${activities.length} activities`)
 
     let saved = 0
     for (const activity of activities) {
@@ -114,16 +103,30 @@ serve(async (req) => {
 
       console.log(`Activity ${activity.id}: name="${activity.name}"`)
 
-      const { data: existingRow } = await supabase
-        .from('activities')
-        .select('name_locked')
-        .eq('provider_activity_id', String(activity.id))
-        .maybeSingle()
+      const providerActivityId = String(activity.id)
+      // external_id reveals the ORIGINAL source of a Strava activity (e.g.
+      // "garmin_ping_123.fit" from a Garmin watch) — kept on activity_sources so
+      // a future direct Garmin/Health integration can match exactly, not fuzzily.
+      const sourceProvenance = {
+        external_id: activity.external_id ?? null,
+        upload_id: activity.upload_id ?? null,
+      }
 
-      const upsertPayload: Record<string, unknown> = {
-        user_id: user.id,
+      // Resolves same-source re-syncs AND cross-source duplicates to one canonical
+      // activities row — every importer must go through this, never a bespoke
+      // upsert keyed on provider_activity_id (see _shared/activityDedup.ts).
+      const canonicalId = await resolveCanonicalActivityId(supabase, {
+        userId: user.id,
         provider: 'strava',
-        provider_activity_id: String(activity.id),
+        providerActivityId,
+        activityType: activity.type,
+        startedAt: activity.start_date,
+        durationSeconds: activity.moving_time,
+        distanceMeters: activity.distance,
+        rawPayload: sourceProvenance,
+      })
+
+      const fields: Record<string, unknown> = {
         activity_type: activity.type,
         distance_meters: activity.distance,
         duration_seconds: activity.moving_time,
@@ -131,20 +134,39 @@ serve(async (req) => {
         started_at: activity.start_date,
         effort_score: effortScore,
         raw_effort_score: effortScore,
-      }
-      if (!existingRow?.name_locked) {
-        upsertPayload.name = activity.name
+        route_polyline: activity.map?.summary_polyline || null,
       }
 
-      const { error } = await supabase
-        .from('activities')
-        .upsert(upsertPayload, { onConflict: 'provider_activity_id', ignoreDuplicates: false })
+      let activityId: string | null = null
+      if (canonicalId) {
+        // Only touch `name` when Strava itself is the row's origin and it isn't
+        // locked — a cross-source match shouldn't let a Strava sync clobber a
+        // name set by whichever source created the row.
+        const { data: existingRow } = await supabase
+          .from('activities')
+          .select('name_locked, provider')
+          .eq('id', canonicalId)
+          .maybeSingle()
+        const updateFields: Record<string, unknown> = { ...fields }
+        if (existingRow?.provider === 'strava' && !existingRow?.name_locked) updateFields.name = activity.name
 
-      if (error) {
-        console.log(`Upsert error for ${activity.id}:`, JSON.stringify(error))
+        const { error } = await supabase.from('activities').update(updateFields).eq('id', canonicalId)
+        if (error) console.log(`Update error for ${activity.id}:`, JSON.stringify(error))
+        else activityId = canonicalId
+      } else {
+        const { data: inserted, error } = await supabase
+          .from('activities')
+          .insert({ user_id: user.id, provider: 'strava', provider_activity_id: providerActivityId, name: activity.name, ...fields })
+          .select('id')
+          .single()
+        if (error) console.log(`Insert error for ${activity.id}:`, JSON.stringify(error))
+        else if (inserted) {
+          await linkNewActivitySource(supabase, user.id, inserted.id, 'strava', providerActivityId, sourceProvenance)
+          activityId = inserted.id
+        }
       }
 
-      if (!error) {
+      if (activityId) {
         saved++
 
         // Try to fetch photo for this activity — skip if one already exists
@@ -153,7 +175,7 @@ serve(async (req) => {
           const { data: existing } = await supabase
             .from('activities')
             .select('photo_url')
-            .eq('provider_activity_id', String(activity.id))
+            .eq('id', activityId)
             .single()
 
           if (!existing?.photo_url) {
@@ -191,7 +213,7 @@ serve(async (req) => {
                   await supabase
                     .from('activities')
                     .update({ photo_url: urlData.publicUrl })
-                    .eq('provider_activity_id', String(activity.id))
+                    .eq('id', activityId)
 
                   console.log(`Photo saved for activity ${activity.id}`)
                 } else {
@@ -203,8 +225,6 @@ serve(async (req) => {
         } catch (photoErr) {
           console.log(`Photo fetch failed for activity ${activity.id}:`, photoErr.message)
         }
-      } else {
-        console.log('Error saving activity:', JSON.stringify(error))
       }
     }
 

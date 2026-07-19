@@ -3,6 +3,7 @@ import { StyleSheet, TouchableOpacity, View, Text, ScrollView, Platform, Activit
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { supabase } from '../lib/supabase';
+import { formatDuration } from '../lib/format';
 
 const SHARE_STYLES = [
   { id: 'cinematic',      label: '🎬 Cinematic',      desc: 'Golden hour · glowing route · sports ad' },
@@ -55,6 +56,9 @@ export default function AiShareScreen() {
   const [loadingCaption, setLoadingCaption] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [generatedUrl, setGeneratedUrl] = useState<string | null>(null);
+  // Composited (countdown-stamped) preview — shown before the user confirms the
+  // download, so nothing saves silently without them seeing the result first.
+  const [stampedPreviewUrl, setStampedPreviewUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [lifts, setLifts] = useState<Lift[]>([]);
   const [selectedLiftIdx, setSelectedLiftIdx] = useState<number | null>(null);
@@ -112,25 +116,24 @@ export default function AiShareScreen() {
       .gte('race_date', today.toISOString().slice(0, 10))
       .order('race_date', { ascending: true });
     setUpcomingRaces(data ?? []);
-    if (data && data.length > 0) setSelectedRaceIds(prev => (prev.length > 0 ? prev : [data[0].id]));
   }
 
   async function loadQuota() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
-    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const { count, data: rows } = await supabase
       .from('ai_generations')
       .select('created_at', { count: 'exact' })
       .eq('user_id', user.id)
-      .gte('created_at', weekAgo)
+      .gte('created_at', dayAgo)
       .order('created_at', { ascending: true });
     const used = count ?? 0;
-    const remaining = Math.max(0, 5 - used);
+    const remaining = Math.max(0, 2 - used);
     setQuotaRemaining(remaining);
     if (remaining === 0 && rows && rows.length > 0) {
-      const resetDate = new Date(new Date(rows[0].created_at).getTime() + 7 * 24 * 60 * 60 * 1000);
-      setQuotaResetAt(resetDate.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' }));
+      const resetDate = new Date(new Date(rows[0].created_at).getTime() + 24 * 60 * 60 * 1000);
+      setQuotaResetAt(resetDate.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }));
     }
   }
 
@@ -204,7 +207,7 @@ export default function AiShareScreen() {
         setPhotoPreview(dataUrl);
         setPhotoBase64(dataUrl);
         setSelectedPhotoUrl(null); // an uploaded photo overrides any existing selection
-        setGeneratedUrl(null);
+        setGeneratedUrl(null); setStampedPreviewUrl(null);
       };
       reader.readAsDataURL(file);
     };
@@ -215,7 +218,7 @@ export default function AiShareScreen() {
     setSelectedPhotoUrl(url);
     setPhotoPreview(url);
     setPhotoBase64(null); // use the existing photo by URL — no re-upload
-    setGeneratedUrl(null);
+    setGeneratedUrl(null); setStampedPreviewUrl(null);
   }
 
   async function generate() {
@@ -223,7 +226,7 @@ export default function AiShareScreen() {
     if (!activityId) return;
     setError(null);
     setGenerating(true);
-    setGeneratedUrl(null);
+    setGeneratedUrl(null); setStampedPreviewUrl(null);
     // The result lands in the photo preview frame at the top — bring it into view.
     scrollRef.current?.scrollTo({ y: 0, animated: true });
     try {
@@ -250,9 +253,9 @@ export default function AiShareScreen() {
         setQuotaRemaining(0);
         if (data.resetAt) {
           const resetDate = new Date(data.resetAt);
-          setQuotaResetAt(resetDate.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' }));
+          setQuotaResetAt(resetDate.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }));
         }
-        setError(data.error ?? 'Weekly limit reached');
+        setError(data.error ?? 'Daily limit reached');
         return;
       }
       if (!res.ok || data.error) { setError(data.error ?? 'Generation failed'); return; }
@@ -599,8 +602,12 @@ export default function AiShareScreen() {
       const durationMin = stats?.durationMin ?? (activity?.duration_seconds ? Math.round(activity.duration_seconds / 60) : null);
       const elev = stats?.elevationM ?? (activity?.elevation_meters ? Math.round(activity.elevation_meters) : null);
       const pace = stats?.pace ?? null;
-      const durationFormatted = durationMin != null
-        ? (durationMin < 60 ? `${durationMin}m` : `${Math.floor(durationMin / 60)}h ${durationMin % 60}m`)
+      // Clock format ("39:24", "1:23:45") — a bare "39m" under Time reads as metres
+      const stampSec = activity?.duration_seconds ?? (durationMin != null ? durationMin * 60 : null);
+      const durationFormatted = stampSec != null
+        ? (stampSec >= 3600
+            ? `${Math.floor(stampSec / 3600)}:${String(Math.floor((stampSec % 3600) / 60)).padStart(2, '0')}:${String(Math.round(stampSec % 60)).padStart(2, '0')}`
+            : `${Math.floor(stampSec / 60)}:${String(Math.round(stampSec % 60)).padStart(2, '0')}`)
         : null;
 
       // ── Stats — Strava-style: label small italic above, value large bold ──
@@ -737,8 +744,10 @@ export default function AiShareScreen() {
     }
   }
 
-  function generateStamp() {
-    if (!activity || Platform.OS !== 'web') return;
+  // Shared by generateStamp() so it draws identical,
+  // deterministic (non-AI) stats — no hallucination risk either way.
+  function getStampStats(): { activityLabel: string; stats: { label: string; value: string }[] } | null {
+    if (!activity) return null;
 
     const t = activity.activity_type.toLowerCase();
     const category =
@@ -754,8 +763,10 @@ export default function AiShareScreen() {
     const durationSec = activity.duration_seconds;
     const durationMin = durationSec ? Math.round(durationSec / 60) : null;
     const elevationM = activity.elevation_meters ? Math.round(activity.elevation_meters) : null;
-    const durationFormatted = durationMin != null
-      ? (durationMin < 60 ? `${durationMin}m` : `${Math.floor(durationMin / 60)}h ${durationMin % 60}m`)
+    const durationFormatted = durationSec != null
+      ? (durationSec >= 3600
+          ? `${Math.floor(durationSec / 3600)}:${String(Math.floor((durationSec % 3600) / 60)).padStart(2, '0')}:${String(Math.round(durationSec % 60)).padStart(2, '0')}`
+          : `${Math.floor(durationSec / 60)}:${String(Math.round(durationSec % 60)).padStart(2, '0')}`)
       : null;
     const mmss = (totalMin: number, unit: string) =>
       `${Math.floor(totalMin)}:${String(Math.round((totalMin % 1) * 60)).padStart(2, '0')}${unit}`;
@@ -791,6 +802,15 @@ export default function AiShareScreen() {
         ...(durationFormatted ? [{ label: 'Time', value: durationFormatted }] : []),
         ...(elevationM ? [{ label: 'Elevation', value: `${elevationM} m` }] : []),
       ];
+
+    return { activityLabel, stats };
+  }
+
+  function generateStamp() {
+    if (!activity || Platform.OS !== 'web') return;
+    const result = getStampStats();
+    if (!result) return;
+    const { activityLabel, stats } = result;
 
     const W = 480;
     const PAD = 36;
@@ -848,12 +868,97 @@ export default function AiShareScreen() {
     a.remove();
   }
 
+  // Composites the race countdown as a compact TOP banner onto the finished AI
+  // share image, flattened to one JPEG. Deliberately does NOT reuse the bottom-
+  // heavy countdown layout or redraw the RIVAL wordmark — the AI image already
+  // burns its own stats + RIVAL branding into the bottom third, so a second full
+  // block down there would double up and clash. Top banner, one race only
+  // (the hero one), stays purely additive instead of competing for the same
+  // corner. Does not touch the generate() prompt in any way.
+  async function stampCountdownOnGenerated() {
+    if (!generatedUrl || Platform.OS !== 'web') return;
+    const race = upcomingRaces.filter(r => selectedRaceIds.includes(r.id)).sort((a, b) => a.race_date.localeCompare(b.race_date))[0];
+    if (!race) return;
+
+    const img = new window.Image();
+    img.crossOrigin = 'anonymous';
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error('Could not load generated image'));
+      img.src = generatedUrl;
+    });
+
+    const W = img.naturalWidth || 1024;
+    const H = img.naturalHeight || 1536;
+    const canvas = document.createElement('canvas') as HTMLCanvasElement;
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
+    ctx.drawImage(img, 0, 0, W, H);
+
+    const days = daysUntil(race.race_date);
+    const fmtDate = new Date(race.race_date).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' }).toUpperCase();
+    const metaLine = [race.race_type?.trim() ? race.race_type.trim().toUpperCase() : null, fmtDate].filter(Boolean).join(' · ');
+    const daysLine = days === 0 ? "RACE DAY — LET'S GO" : `${days} ${days === 1 ? 'DAY' : 'DAYS'} TO ${race.name.toUpperCase()}`;
+
+    const scale = W / 1024;
+    const PAD_X = 28 * scale, PAD_Y = 18 * scale;
+    const DAYS_H = 30 * scale, META_H = 13 * scale, GAP = 6 * scale;
+
+    ctx.textAlign = 'left';
+    ctx.font = `900 ${DAYS_H}px -apple-system, BlinkMacSystemFont, sans-serif`;
+    const daysW = ctx.measureText(daysLine).width;
+    ctx.font = `600 ${META_H}px -apple-system, BlinkMacSystemFont, sans-serif`;
+    const metaW = metaLine ? ctx.measureText(metaLine).width : 0;
+    const pillW = Math.min(W - PAD_X * 2, Math.max(daysW, metaW) + PAD_X * 2);
+    const pillH = PAD_Y * 2 + DAYS_H + (metaLine ? GAP + META_H : 0);
+    const pillX = (W - pillW) / 2;
+    const pillY = 28 * scale;
+
+    // Rounded pill scrim — a small top banner, not a full-width takeover.
+    const r = 18 * scale;
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.beginPath();
+    ctx.moveTo(pillX + r, pillY);
+    ctx.arcTo(pillX + pillW, pillY, pillX + pillW, pillY + pillH, r);
+    ctx.arcTo(pillX + pillW, pillY + pillH, pillX, pillY + pillH, r);
+    ctx.arcTo(pillX, pillY + pillH, pillX, pillY, r);
+    ctx.arcTo(pillX, pillY, pillX + pillW, pillY, r);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.textAlign = 'center';
+    let ty = pillY + PAD_Y;
+    ctx.font = `900 ${DAYS_H}px -apple-system, BlinkMacSystemFont, sans-serif`;
+    ctx.fillStyle = '#FFFFFF';
+    ctx.shadowColor = 'rgba(0,0,0,0.7)'; ctx.shadowBlur = 6 * scale;
+    ctx.fillText(daysLine, pillX + pillW / 2, ty + DAYS_H * 0.82);
+    ty += DAYS_H + GAP;
+
+    if (metaLine) {
+      ctx.font = `600 ${META_H}px -apple-system, BlinkMacSystemFont, sans-serif`;
+      ctx.fillStyle = 'rgba(255,255,255,0.8)';
+      ctx.shadowColor = 'rgba(0,0,0,0.7)'; ctx.shadowBlur = 4 * scale;
+      ctx.fillText(metaLine, pillX + pillW / 2, ty + META_H);
+    }
+
+    setStampedPreviewUrl(canvas.toDataURL('image/jpeg', 0.92));
+  }
+
+  function downloadStampedPreview() {
+    if (!stampedPreviewUrl) return;
+    const a = document.createElement('a');
+    a.href = stampedPreviewUrl;
+    a.download = `rival-share-countdown-${Date.now()}.jpg`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+
   function daysUntil(dateStr: string): number {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const race = new Date(dateStr);
-    race.setHours(0, 0, 0, 0);
-    return Math.round((race.getTime() - today.getTime()) / 86400000);
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const race = new Date(y, m - 1, d);
+    const now = new Date(); now.setHours(0, 0, 0, 0);
+    return Math.ceil((race.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
   }
 
   function generateCountdownStamp() {
@@ -991,11 +1096,6 @@ export default function AiShareScreen() {
     else router.replace('/my-activities');
   }
 
-  function formatDuration(s: number) {
-    const m = Math.round(s / 60);
-    return m < 60 ? `${m} min` : `${Math.floor(m / 60)}h ${m % 60}m`;
-  }
-
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView ref={scrollRef} contentContainerStyle={styles.content}>
@@ -1030,7 +1130,7 @@ export default function AiShareScreen() {
                 <TouchableOpacity
                   key={l.idx}
                   style={[styles.liftChip, selectedLiftIdx === l.idx && styles.liftChipActive]}
-                  onPress={() => { setSelectedLiftIdx(l.idx); setGeneratedUrl(null); }}
+                  onPress={() => { setSelectedLiftIdx(l.idx); setGeneratedUrl(null); setStampedPreviewUrl(null); }}
                 >
                   <Text style={[styles.liftChipName, selectedLiftIdx === l.idx && styles.liftChipTextActive]}>{l.name}</Text>
                   <Text style={[styles.liftChipMeta, selectedLiftIdx === l.idx && styles.liftChipTextActive]}>
@@ -1070,7 +1170,7 @@ export default function AiShareScreen() {
           {photoPreview ? (
             <View style={styles.previewFrame}>
               <Image
-                source={{ uri: generatedUrl ?? photoPreview }}
+                source={{ uri: stampedPreviewUrl ?? generatedUrl ?? photoPreview }}
                 style={[styles.photoThumb, generatedUrl && styles.photoThumbResult]}
                 resizeMode="contain"
               />
@@ -1101,6 +1201,11 @@ export default function AiShareScreen() {
                   <Text style={styles.enhancePillText}>Enhancing to HD…</Text>
                 </View>
               )}
+              {error && !generating && (
+                <View style={styles.frameErrorOverlay}>
+                  <Text style={styles.frameErrorText}>{error}</Text>
+                </View>
+              )}
             </View>
           ) : (
             <>
@@ -1116,8 +1221,21 @@ export default function AiShareScreen() {
           </TouchableOpacity>
         )}
 
+        {/* Countdown-stamped preview — shown before saving so nothing downloads
+            silently; user explicitly confirms or discards it. */}
+        {stampedPreviewUrl && !generating && (
+          <View style={styles.resultActions}>
+            <TouchableOpacity style={styles.downloadBtn} onPress={downloadStampedPreview}>
+              <Text style={styles.downloadBtnText}>⬇ Save this version</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.regenerateBtn} onPress={() => setStampedPreviewUrl(null)}>
+              <Text style={styles.regenerateBtnText}>✕ Discard, go back to original</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Result actions — right under the frame where the result appears */}
-        {generatedUrl && !generating && (
+        {generatedUrl && !generating && !stampedPreviewUrl && (
           <View style={styles.resultActions}>
             <TouchableOpacity style={styles.downloadBtn} onPress={downloadImage}>
               <Text style={styles.downloadBtnText}>⬇ Save &amp; Share</Text>
@@ -1125,6 +1243,11 @@ export default function AiShareScreen() {
             <TouchableOpacity style={styles.regenerateBtn} onPress={() => generate()}>
               <Text style={styles.regenerateBtnText}>🔄 Not quite right? Regenerate</Text>
             </TouchableOpacity>
+            {selectedRaceIds.length > 0 && (
+              <TouchableOpacity style={styles.regenerateBtn} onPress={stampCountdownOnGenerated}>
+                <Text style={styles.regenerateBtnText}>⏳ Stamp race countdown on this image</Text>
+              </TouchableOpacity>
+            )}
             <Text style={styles.shareHint}>Save it, then post to Instagram, TikTok, anywhere.</Text>
           </View>
         )}
@@ -1136,7 +1259,7 @@ export default function AiShareScreen() {
             <TouchableOpacity
               key={s.id}
               style={[styles.styleCard, style.id === s.id && styles.styleCardActive]}
-              onPress={() => { setStyle(s); setGeneratedUrl(null); }}
+              onPress={() => { setStyle(s); setGeneratedUrl(null); setStampedPreviewUrl(null); }}
               disabled={generating}
             >
               <Text style={styles.styleLabel}>{s.label}</Text>
@@ -1160,8 +1283,6 @@ export default function AiShareScreen() {
           )}
         </View>
 
-        {error && <Text style={styles.errorText}>{error}</Text>}
-
         {/* Transparent stamp — no photo or AI needed, just the stats */}
         {activity && (
           <TouchableOpacity style={styles.stampBtn} onPress={generateStamp}>
@@ -1174,22 +1295,20 @@ export default function AiShareScreen() {
             (multi-select): one race = hero countdown, several = stacked rows. */}
         {upcomingRaces.length > 0 && (
           <>
-            {upcomingRaces.length > 1 && (
-              <View style={styles.liftRow}>
-                {upcomingRaces.map(r => (
-                  <TouchableOpacity
-                    key={r.id}
-                    style={[styles.liftChip, selectedRaceIds.includes(r.id) && styles.liftChipActive]}
-                    onPress={() => setSelectedRaceIds(prev =>
-                      prev.includes(r.id) ? prev.filter(id => id !== r.id) : [...prev, r.id]
-                    )}
-                  >
-                    <Text style={styles.liftChipName}>{r.name}</Text>
-                    <Text style={styles.liftChipMeta}>{daysUntil(r.race_date)} days</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
+            <View style={styles.liftRow}>
+              {upcomingRaces.map(r => (
+                <TouchableOpacity
+                  key={r.id}
+                  style={[styles.liftChip, selectedRaceIds.includes(r.id) && styles.liftChipActive]}
+                  onPress={() => setSelectedRaceIds(prev =>
+                    prev.includes(r.id) ? prev.filter(id => id !== r.id) : [...prev, r.id]
+                  )}
+                >
+                  <Text style={styles.liftChipName}>{r.name}</Text>
+                  <Text style={styles.liftChipMeta}>{daysUntil(r.race_date)} days</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
             <TouchableOpacity
               style={[styles.stampBtn, selectedRaceIds.length === 0 && styles.generateBtnDisabled]}
               onPress={generateCountdownStamp}
@@ -1213,8 +1332,8 @@ export default function AiShareScreen() {
         {quotaRemaining !== null && (
           <Text style={[styles.quotaText, quotaRemaining === 0 && styles.quotaTextEmpty]}>
             {quotaRemaining === 0
-              ? `Weekly limit reached${quotaResetAt ? ` — resets ${quotaResetAt}` : ''}`
-              : `${quotaRemaining} of 5 AI generations left this week`}
+              ? `Daily limit reached${quotaResetAt ? ` — resets ${quotaResetAt}` : ''}`
+              : `${quotaRemaining} of 2 AI generations left today`}
           </Text>
         )}
 
@@ -1288,6 +1407,8 @@ const styles = StyleSheet.create({
   captionClear: { color: '#666666', fontSize: 16, fontWeight: '700' },
 
   errorText: { color: '#f87171', fontSize: 13, textAlign: 'center', marginBottom: 12 },
+  frameErrorOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.72)', alignItems: 'center', justifyContent: 'center', padding: 24 },
+  frameErrorText: { color: '#f87171', fontSize: 15, fontWeight: '600', textAlign: 'center', lineHeight: 21 },
   quotaText: { fontSize: 12, color: '#666666', textAlign: 'center', marginBottom: 8 },
   quotaTextEmpty: { color: '#f87171' },
 
