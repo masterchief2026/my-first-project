@@ -5,7 +5,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { supabase } from '../lib/supabase';
 import { fetchAllActivities } from '../lib/fetchAllActivities';
 import { notify } from '../lib/notify';
-import { getDailyQuote, hashStr, QuoteTone } from '../lib/quotes';
+import { getDailyQuote, QuoteTone } from '../lib/quotes';
 import { getMondayOfWeek } from '../lib/streak';
 import { getLevel } from '../lib/xp';
 import { getSeasonStartISO, getCurrentSeasonYear, daysUntilSeasonEnd } from '../lib/season';
@@ -24,6 +24,8 @@ type WeeklyLeader = {
   // own story even when they're not #1 — not just the top 3.
   standings: WeeklyLeaderEntry[];
 };
+type MomentumTrainers = { leagueId: string; names: string[]; totalCount: number; selfTrained: boolean };
+type MomentumContent = { message: string; cta: string };
 
 // The card's whole point is answering "what do I need to do to move up" —
 // so the headline is always about the viewer's own rank relative to
@@ -42,13 +44,21 @@ function weeklyLeaderName(profile: { display_name?: string | null; email?: strin
   return parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1][0]}.` : parts[0];
 }
 
+// First name only — Team Momentum's "Sandy, Emma and 3 others" is a casual
+// nudge from people, not a formal standing, so it skips the last-initial
+// weeklyLeaderName uses for the leaderboard.
+function firstNameOnly(profile: { display_name?: string | null; email?: string | null } | undefined): string {
+  const raw = profile?.display_name || profile?.email?.split('@')[0] || 'Someone';
+  return raw.trim().split(/\s+/)[0];
+}
+
 function weeklyRankStory(standings: WeeklyLeaderEntry[], selfIndex: number): RankStory {
   const leader = standings[0];
   if (selfIndex === 0) {
     const second = standings[1];
     return second
-      ? { rankIcon: 'crown', rankLabel: null, before: 'Leading by ', gap: Math.round(leader.points - second.points), after: '' }
-      : { rankIcon: 'crown', rankLabel: null, before: "You're leading", gap: null, after: '' };
+      ? { rankIcon: 'medal', rankLabel: null, before: 'Leading by ', gap: Math.round(leader.points - second.points), after: '' }
+      : { rankIcon: 'medal', rankLabel: null, before: "You're leading", gap: null, after: '' };
   }
   if (selfIndex === 1) {
     const gap = Math.round(leader.points - standings[1].points);
@@ -61,6 +71,36 @@ function weeklyRankStory(standings: WeeklyLeaderEntry[], selfIndex: number): Ran
   const podiumCutoff = standings[2] || leader;
   const gap = Math.round(podiumCutoff.points - standings[selfIndex].points);
   return { rankIcon: null, rankLabel: `${selfIndex + 1}th`, before: '', gap, after: ' to reach the podium' };
+}
+// Team Momentum's status line — reuses the same weeklyLeader standings the
+// Weekly Leader card computes for this same team (leagues[0], the most
+// active one) instead of firing a second query. Priority: leading is the
+// most exciting thing that can be true, a specific gap is more motivating
+// than a headcount, and named teammates ("Sandy, Emma and 3 others") pull
+// harder than a raw count when you're not on the board yet. The "haven't
+// trained" case is framed as an invite ("Join them"), never a callout —
+// AGENTS.md's voice rule is encourage, never pressure or shame.
+function momentumStory(trainers: MomentumTrainers | null, weeklyLeader: WeeklyLeader | null, leagueId: string): MomentumContent {
+  if (weeklyLeader && weeklyLeader.leagueId === leagueId && weeklyLeader.standings.length > 0) {
+    const selfIndex = weeklyLeader.standings.findIndex((e) => e.isSelf);
+    if (selfIndex === 0) return { message: "You're leading this week — keep it going", cta: 'View Team' };
+    if (selfIndex > 0) {
+      const gap = Math.round(weeklyLeader.standings[0].points - weeklyLeader.standings[selfIndex].points);
+      return { message: `${gap} Effort behind the lead`, cta: 'Jump back in' };
+    }
+  }
+  if (trainers && trainers.leagueId === leagueId && trainers.names.length > 0) {
+    const { names, totalCount } = trainers;
+    const list =
+      totalCount === 1
+        ? names[0]
+        : totalCount === 2
+        ? `${names[0]} and ${names[1]}`
+        : `${names.slice(0, 2).join(', ')} and ${totalCount - 2} ${totalCount - 2 === 1 ? 'other' : 'others'}`;
+    if (trainers.selfTrained) return { message: `${list} trained today too — nice work`, cta: 'Jump back in' };
+    return { message: `${list} trained today`, cta: 'Join them' };
+  }
+  return { message: "Nobody's trained yet this week", cta: 'Be the First' };
 }
 type FeaturedGoal = {
   id: string;
@@ -106,30 +146,14 @@ function featuredGoalTitle(goal: { goal_type: 'distance' | 'elevation' | 'gym_se
 
 // Staged copy by raw progress (not time-based pace — see the "single 80km
 // session" conversation: this only ever claims "how much is left," never
-// anything about being ahead/behind schedule). Thresholds are even quarters,
-// simplest thing that reads as 4 distinct stages rather than a formula.
-// A few phrases per stage instead of one fixed line — same reasoning as
-// getDailyQuote: seeded by the goal id + calendar date, so it's stable
-// across reloads within a day but varies day to day, instead of showing the
-// exact same "Over halfway. Keep going." every single day for months.
-const FOCUS_STAGE_PHRASES = {
-  early: ['The work starts here.', 'Every {unit} counts.'],
-  halfway: ['Over halfway. Keep going.', 'Momentum is building.', "You're making progress."],
-  late: ['Finish what you started.', 'Keep pushing.'],
-  final: ['The finish is in sight.', 'One more push.'],
-} as const;
-
-function pickDaily(pool: readonly string[], seed: string): string {
-  return pool[hashStr(`${seed}-${new Date().toDateString()}`) % pool.length];
-}
-
-function focusProgressPhrase(pct: number, remaining: number, unit: string, seedId: string): string {
-  if (pct >= 1) return "You've hit your target!";
-  const stage = pct >= 0.9 ? 'final' : pct >= 0.65 ? 'late' : pct >= 0.4 ? 'halfway' : 'early';
-  const pool: readonly string[] = stage === 'early'
-    ? [`${Math.round(remaining * 10) / 10} ${unit} remaining`, ...FOCUS_STAGE_PHRASES.early]
-    : FOCUS_STAGE_PHRASES[stage];
-  return pickDaily(pool, `${seedId}-${stage}`).replace('{unit}', unit);
+// anything about being ahead/behind schedule).
+function focusProgressPhrase(pct: number): string {
+  if (pct >= 1) return 'YOU EARNED THIS';
+  if (pct >= 0.9) return 'So close';
+  if (pct >= 0.65) return 'Stay focused';
+  if (pct >= 0.5) return "You're over halfway";
+  if (pct >= 0.3) return 'Keep showing up';
+  return "Let's do this";
 }
 
 function heroValueFontSize(text: string): number {
@@ -162,15 +186,23 @@ export default function HomeScreen() {
   const [syncing, setSyncing] = useState(false);
   const [leagues, setLeagues] = useState<League[]>([]);
   const [weeklyLeader, setWeeklyLeader] = useState<WeeklyLeader | null>(null);
+  const [momentumTrainers, setMomentumTrainers] = useState<MomentumTrainers | null>(null);
   const [totalXp, setTotalXp] = useState(0);
   const [seasonActivityCount, setSeasonActivityCount] = useState(0);
   const [nextRace, setNextRace] = useState<NextRace>(null);
   const [totalDistanceKm, setTotalDistanceKm] = useState(0);
   const [totalElevationM, setTotalElevationM] = useState(0);
   const [totalTimeMinutes, setTotalTimeMinutes] = useState(0);
+  // Lifetime effort/activity counts — kept separate from totalXp (season-
+  // scoped, drives getLevel()) so the LEGACY card's four numbers are all the
+  // same timeframe without changing what powers the user's rank.
+  const [lifetimeXp, setLifetimeXp] = useState(0);
+  const [lifetimeActivityCount, setLifetimeActivityCount] = useState(0);
   const [featuredGoal, setFeaturedGoal] = useState<FeaturedGoal | null>(null);
   const [goalsCardHovered, setGoalsCardHovered] = useState(false);
   const [leaderCardHovered, setLeaderCardHovered] = useState(false);
+  const [momentumCardHovered, setMomentumCardHovered] = useState(false);
+  const [statsCardHovered, setStatsCardHovered] = useState(false);
   const [addActivityHovered, setAddActivityHovered] = useState(false);
   const [inspiredTimes, setInspiredTimes] = useState(0);
   const [quote, setQuote] = useState(() => getDailyQuote());
@@ -222,6 +254,8 @@ export default function HomeScreen() {
     setTotalDistanceKm(Math.round(activities.reduce((s, a) => s + (a.distance_meters || 0), 0) / 1000));
     setTotalElevationM(Math.round(activities.reduce((s, a) => s + (a.elevation_meters || 0), 0)));
     setTotalTimeMinutes(Math.round(activities.reduce((s, a) => s + (a.duration_seconds || 0), 0) / 60));
+    setLifetimeXp(activities.reduce((s, a) => s + (a.effort_score || 0), 0));
+    setLifetimeActivityCount(activities.length);
 
     const seasonStart = new Date(getSeasonStartISO());
     const seasonActivities = activities.filter(a => new Date(a.started_at) >= seasonStart);
@@ -285,10 +319,16 @@ export default function HomeScreen() {
       setInspiredTimes(0);
     }
 
-    // Per-league "new activity" teaser count — powers the Team Momentum card
+    // Per-league "new activity" teaser count — powers the Team Pulse card.
+    // Local calendar-day boundary (midnight in the viewer's own device
+    // timezone), not a rolling 24h window — a rolling window still calls
+    // yesterday-afternoon's workout "today" if it's under 24h old, which is
+    // exactly the mismatch a rolling window can't avoid. This runs
+    // client-side so it's automatically each viewer's own "today", no
+    // matter what country they're in.
     if (leagueIds.length > 0) {
-      const twoDaysAgo = new Date();
-      twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
 
       const { data: leagueMembersData } = await supabase
         .from('league_members')
@@ -305,9 +345,10 @@ export default function HomeScreen() {
       const allMemberIds = [...new Set((leagueMembersData || []).map((m: any) => m.user_id as string))];
       const { data: recentActivities } = await supabase
         .from('activities')
-        .select('user_id')
+        .select('user_id, started_at')
         .in('user_id', allMemberIds)
-        .gte('started_at', twoDaysAgo.toISOString());
+        .gte('started_at', startOfToday.toISOString())
+        .order('started_at', { ascending: false });
 
       const leagueListWithCounts = leagueList.map((l: League) => {
         const memberIds = new Set(memberIdsByLeague[l.id] || []);
@@ -318,6 +359,32 @@ export default function HomeScreen() {
       // only the top few show by default (mockup keeps this card compact).
       leagueListWithCounts.sort((a: League, b: League) => (b.recentCount ?? 0) - (a.recentCount ?? 0));
       setLeagues(leagueListWithCounts);
+
+      // Who's actually moved, not just how many — "Sandy, Emma and 3 others"
+      // reads as a nudge from people, not a stat. Most-recent-first, dedup'd,
+      // for the same top team the rest of Momentum/Weekly Leader focus on.
+      const hotLeague = leagueListWithCounts[0];
+      const hotMemberIds = new Set(memberIdsByLeague[hotLeague.id] || []);
+      const trainerIds: string[] = [];
+      let selfTrained = false;
+      (recentActivities || []).forEach((a: any) => {
+        if (a.user_id === uId) { selfTrained = true; return; }
+        if (hotMemberIds.has(a.user_id) && !trainerIds.includes(a.user_id)) {
+          trainerIds.push(a.user_id);
+        }
+      });
+      if (trainerIds.length > 0) {
+        const { data: trainerProfiles } = await supabase
+          .from('users')
+          .select('id, display_name, email')
+          .in('id', trainerIds);
+        const trainerProfileById: Record<string, any> = {};
+        (trainerProfiles || []).forEach((p: any) => { trainerProfileById[p.id] = p; });
+        const names = trainerIds.map((id) => firstNameOnly(trainerProfileById[id]));
+        setMomentumTrainers({ leagueId: hotLeague.id, names, totalCount: trainerIds.length, selfTrained });
+      } else {
+        setMomentumTrainers(null);
+      }
 
       // Weekly Leader: standings for your most-active team, this calendar
       // week (Monday-start, same boundary streak.ts uses). A single big
@@ -575,11 +642,12 @@ export default function HomeScreen() {
                             <RivalProgressBar pct={featuredGoal.pct} height={10} />
                             <Text style={styles.focusProgressPctOnBar}>{Math.round(featuredGoal.pct * 100)}%</Text>
                           </View>
-                          <Text style={[styles.gridCardMeta, styles.focusActiveMetaGap]} numberOfLines={1}>
-                            {[
-                              focusProgressPhrase(featuredGoal.pct, featuredGoal.target - featuredGoal.progress, featuredGoal.unit, featuredGoal.id),
-                              featuredGoal.daysLeft === 0 ? 'Last day' : `${featuredGoal.daysLeft} day${featuredGoal.daysLeft === 1 ? '' : 's'} left`,
-                            ].filter(Boolean).join('  •  ')}
+                          <Text style={[styles.gridCardMeta, styles.focusActiveMetaGap, { color: RivalColors.textPrimary }]} numberOfLines={2}>
+                            {focusProgressPhrase(featuredGoal.pct)}
+                            {'  •  '}
+                            <Text style={{ color: RivalColors.accentText }}>
+                              {featuredGoal.daysLeft === 0 ? 'Last day' : `${featuredGoal.daysLeft} day${featuredGoal.daysLeft === 1 ? '' : 's'} left`}
+                            </Text>
                           </Text>
                         </View>
 
@@ -671,13 +739,66 @@ export default function HomeScreen() {
 
                 // Not on the board yet (0 Effort this week) — no rank to
                 // brag or worry about, just who to catch and by how much.
+                // Same anatomy as the no-leader-at-all empty state (label,
+                // medal, big title, accent subtitle, link) instead of a
+                // plain paragraph — the leader already exists here, so the
+                // medal is a muted textSecondary, not gold, since it's not
+                // your achievement yet.
                 if (selfIndex === -1) {
+                  const leader = standings[0];
                   return (
                     <View style={{ flex: 1, paddingBottom: 24 }}>
-                      <View style={styles.goalsEmptyCentered}>
+                      <View style={styles.focusActiveTopGroup}>
                         <Text style={styles.focusLabel}>WEEKLY LEADER</Text>
-                        <Text style={styles.goalsEmptyTitle}>
-                          {standings[0].name} leads with {standings[0].points} Effort. Log a workout to get on the board.
+                      </View>
+
+                      {/* Fixed-offset block, not flex-sandwiched — the icon
+                          and title's position no longer depends on how many
+                          lines the subtitle below wraps to. Only the flex:1
+                          spacer after the subtitle absorbs that variance. */}
+                      <View style={[styles.focusActiveMidGroup, { marginTop: 56 }]}>
+                        <View style={styles.medalRing}>
+                          <RivalIcon name="medal" size={30} color={RivalColors.textSecondary} />
+                        </View>
+                        <Text style={[styles.leaderEmptyTitle, { marginTop: 10, textTransform: 'uppercase' }]} numberOfLines={1}>
+                          {leader.name} leads
+                        </Text>
+                      </View>
+                      <Text style={styles.leaderEmptySub} numberOfLines={2}>
+                        <Text
+                          style={[
+                            styles.pulseStoryNumber,
+                            { color: RivalColors.textPrimary },
+                            Platform.OS === 'web' ? ({ position: 'relative', top: 1.5 } as any) : {},
+                          ]}
+                        >
+                          {leader.points}
+                        </Text>{' '}
+                        Effort — can you catch them?
+                      </Text>
+
+                      <View style={{ flex: 1 }} />
+
+                      <View style={[styles.focusEmptyLinkRow, styles.focusEmptyLinkBottom]}>
+                        <TouchableOpacity onPress={() => router.push({ pathname: '/league', params: { id: weeklyLeader.leagueId } })}>
+                          <Text
+                            style={[
+                              styles.focusEmptyLink,
+                              leaderCardHovered && { color: RivalColors.textPrimary },
+                              Platform.OS === 'web' ? ({ transition: 'color 0.2s ease' } as any) : {},
+                            ]}
+                          >
+                            View Leaderboard
+                          </Text>
+                        </TouchableOpacity>
+                        <Text
+                          style={[
+                            styles.focusEmptyLink,
+                            leaderCardHovered && { color: RivalColors.textPrimary, transform: [{ translateX: 3 }] },
+                            Platform.OS === 'web' ? ({ transition: 'color 0.2s ease, transform 0.2s ease' } as any) : {},
+                          ]}
+                        >
+                          {' '}→
                         </Text>
                       </View>
                     </View>
@@ -697,7 +818,7 @@ export default function HomeScreen() {
                           <RivalIcon
                             name={story.rankIcon}
                             size={19}
-                            color={story.rankIcon === 'crown' ? RivalColors.accentText : RivalColors.textSecondary}
+                            color={selfIndex === 0 ? RivalColors.accentText : RivalColors.textSecondary}
                           />
                         ) : (
                           <Text style={styles.podiumRank}>{story.rankLabel}</Text>
@@ -736,7 +857,7 @@ export default function HomeScreen() {
                           >
                             {entry.name}
                           </Text>
-                          <Text style={[styles.podiumGap, i === 0 && styles.podiumGapFirst, entry.isSelf && styles.podiumGapSelf]}>
+                          <Text style={[styles.podiumGap, entry.isSelf && styles.podiumGapSelf, i === 0 && styles.podiumGapFirst]}>
                             {entry.points}
                           </Text>
                         </View>
@@ -755,7 +876,7 @@ export default function HomeScreen() {
                             Platform.OS === 'web' ? ({ transition: 'color 0.2s ease' } as any) : {},
                           ]}
                         >
-                          See Leaderboard
+                          View Leaderboard
                         </Text>
                       </TouchableOpacity>
                       <Text
@@ -772,109 +893,205 @@ export default function HomeScreen() {
                 );
               })() : (
                 <View style={{ flex: 1, paddingBottom: 24 }}>
-                  <View style={styles.goalsEmptyCentered}>
+                  <View style={styles.focusActiveTopGroup}>
                     <Text style={styles.focusLabel}>WEEKLY LEADER</Text>
-                    <Text style={styles.goalsEmptyTitle}>No leader yet. Be the first to earn Effort this week.</Text>
+                  </View>
+
+                  {/* Fixed-offset block — see the selfIndex === -1 branch
+                      above for why this doesn't use flex-sandwiched spacers. */}
+                  <View style={[styles.focusActiveMidGroup, { marginTop: 56 }]}>
+                    <View style={styles.medalRing}>
+                      <RivalIcon name="medal" size={30} color="#ECC654" />
+                    </View>
+                    <Text style={[styles.leaderEmptyTitle, { marginTop: 10 }]} numberOfLines={1}>LEAD THIS WEEK</Text>
+                  </View>
+                  <Text style={styles.leaderEmptySub} numberOfLines={2}>
+                    Earn the first Effort
+                  </Text>
+
+                  <View style={{ flex: 1 }} />
+
+                  <View style={[styles.focusEmptyLinkRow, styles.focusEmptyLinkBottom]}>
+                    <TouchableOpacity onPress={() => router.push('/add-workout')}>
+                      <Text
+                        style={[
+                          styles.focusEmptyLink,
+                          leaderCardHovered && { color: RivalColors.textPrimary },
+                          Platform.OS === 'web' ? ({ transition: 'color 0.2s ease' } as any) : {},
+                        ]}
+                      >
+                        Claim the Lead
+                      </Text>
+                    </TouchableOpacity>
+                    <Text
+                      style={[
+                        styles.focusEmptyLink,
+                        leaderCardHovered && { color: RivalColors.textPrimary, transform: [{ translateX: 3 }] },
+                        Platform.OS === 'web' ? ({ transition: 'color 0.2s ease, transform 0.2s ease' } as any) : {},
+                      ]}
+                    >
+                      {' '}→
+                    </Text>
                   </View>
                 </View>
               )}
             </RivalCard>
             </View>
 
-            {/* Team Momentum */}
-            <RivalCard glass style={gridCardStyle}>
-              <Text style={styles.gridCardTitle}>Team Momentum</Text>
+            {/* Team Momentum — same anatomy as Focus/Weekly Leader: a single
+                team (the most active one) instead of a flat directory, since
+                the Teams tab already covers "browse all your teams." The
+                status line reuses weeklyLeader's standings for this same
+                team when available, so it doesn't fire a second query. */}
+            <View
+              style={gridCardStyle}
+              {...(Platform.OS === 'web'
+                ? { onMouseEnter: () => setMomentumCardHovered(true), onMouseLeave: () => setMomentumCardHovered(false) } as any
+                : {})}
+            >
+            <RivalCard
+              glass
+              style={[
+                { flex: 1 },
+                momentumCardHovered && styles.gridCardHovered,
+                momentumCardHovered && { borderColor: 'rgba(255,255,255,0.22)' },
+              ]}
+            >
               {leagues.length === 0 ? (
-                <>
-                  <Text style={styles.gridCardEmptyText}>You're not in any teams yet.</Text>
-                  <TouchableOpacity style={styles.gridCardBtn} onPress={() => router.push('/create-league')}>
-                    <Text style={styles.gridCardBtnText}>+ Create a Team</Text>
-                  </TouchableOpacity>
-                  <View style={styles.teamEmptyLinks}>
-                    <TouchableOpacity onPress={() => router.push('/join-league')}>
-                      <Text style={styles.teamEmptyLink}>Join with code</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }} onPress={() => router.push('/discover-leagues')}>
-                      <RivalIcon name="search" size={13} color={RivalColors.textSecondary} />
-                      <Text style={styles.teamEmptyLink}>Discover</Text>
-                    </TouchableOpacity>
+                <View style={{ flex: 1, paddingBottom: 24 }}>
+                  <View style={styles.focusActiveTopGroup}>
+                    <Text style={styles.focusLabel}>TEAM PULSE</Text>
                   </View>
-                </>
-              ) : (
-                <>
-                  {/* Internally-scrolling instead of a "Show all" toggle — a
-                      fixed max height keeps the card's footprint consistent
-                      regardless of team count, and scrolling to see the rest
-                      is a lighter interaction than a tap-to-expand round trip. */}
-                  <ScrollView style={styles.momentumScroll} showsVerticalScrollIndicator={false} nestedScrollEnabled>
-                    {leagues.map((league) => (
-                      <TouchableOpacity
-                        key={league.id}
-                        style={styles.momentumRow}
-                        onPress={() => router.push({ pathname: '/league', params: { id: league.id } })}
-                      >
-                        {league.logo_url ? (
-                          <Image source={{ uri: league.logo_url }} style={styles.momentumLogo} />
-                        ) : (
-                          <View style={styles.momentumAvatar}>
-                            <Text style={styles.momentumAvatarText}>{league.name.slice(0, 2).toUpperCase()}</Text>
-                          </View>
-                        )}
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.momentumName} numberOfLines={1}>{league.name}</Text>
-                          {league.recentCount && league.recentCount > 0 ? (
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                              <RivalIcon name="fire" size={11} color={RivalColors.accentText} />
-                              <Text style={styles.momentumMeta}>
-                                {league.recentCount} new {league.recentCount === 1 ? 'activity' : 'activities'}
-                              </Text>
-                            </View>
-                          ) : (
-                            <Text style={styles.momentumMeta}>Quiet — go stir them up</Text>
-                          )}
+                  <View style={{ flex: 1 }} />
+                  <View style={styles.goalsEmptyCentered}>
+                    <Text style={styles.goalsEmptyTitle}>You're not in any teams yet.</Text>
+                  </View>
+                  <View style={{ flex: 1 }} />
+                  <View style={[styles.focusEmptyLinkRow, styles.focusEmptyLinkBottom]}>
+                    <TouchableOpacity onPress={() => router.push('/create-league')}>
+                      <Text style={styles.focusEmptyLink}>Create a Team</Text>
+                    </TouchableOpacity>
+                    <Text style={styles.focusEmptyLink}> →</Text>
+                  </View>
+                </View>
+              ) : (() => {
+                const hotTeam = leagues[0];
+                const story = momentumStory(momentumTrainers, weeklyLeader, hotTeam.id);
+
+                return (
+                  <View style={{ flex: 1, paddingBottom: 24 }}>
+                    <View style={styles.focusActiveTopGroup}>
+                      <Text style={styles.focusLabel}>TEAM PULSE</Text>
+                    </View>
+
+                    {/* Fixed-offset block — see Weekly Leader's selfIndex
+                        === -1 branch for why this doesn't use flex-
+                        sandwiched spacers. Crest/name position is now
+                        independent of how long the story line rolls. */}
+                    <View style={[styles.focusActiveMidGroup, { marginTop: 56 }]}>
+                      {hotTeam.logo_url ? (
+                        <Image source={{ uri: hotTeam.logo_url }} style={styles.momentumHeroLogo} />
+                      ) : (
+                        <View style={styles.momentumHeroAvatar}>
+                          <Text style={styles.momentumAvatarText}>{hotTeam.name.slice(0, 2).toUpperCase()}</Text>
                         </View>
-                        <Text style={styles.momentumArrow}>→</Text>
+                      )}
+                      <Text style={[styles.leaderEmptyTitle, { marginTop: 10, textTransform: 'uppercase' }]} numberOfLines={1}>{hotTeam.name}</Text>
+                    </View>
+                    <Text style={styles.leaderEmptySub} numberOfLines={2}>{story.message}</Text>
+
+                    <View style={{ flex: 1 }} />
+
+                    <View style={[styles.focusEmptyLinkRow, styles.focusEmptyLinkBottom]}>
+                      <TouchableOpacity onPress={() => router.push({ pathname: '/league', params: { id: hotTeam.id } })}>
+                        <Text
+                          style={[
+                            styles.focusEmptyLink,
+                            momentumCardHovered && { color: RivalColors.textPrimary },
+                            Platform.OS === 'web' ? ({ transition: 'color 0.2s ease' } as any) : {},
+                          ]}
+                        >
+                          {story.cta}
+                        </Text>
                       </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                  <View style={styles.momentumFooter}>
-                    <TouchableOpacity onPress={() => router.push('/discover-leagues')}>
-                      <Text style={styles.addTeamLink}>+ Add team</Text>
-                    </TouchableOpacity>
+                      <Text
+                        style={[
+                          styles.focusEmptyLink,
+                          momentumCardHovered && { color: RivalColors.textPrimary, transform: [{ translateX: 3 }] },
+                          Platform.OS === 'web' ? ({ transition: 'color 0.2s ease, transform 0.2s ease' } as any) : {},
+                        ]}
+                      >
+                        {' '}→
+                      </Text>
+                    </View>
                   </View>
-                </>
-              )}
+                );
+              })()}
             </RivalCard>
+            </View>
 
             {/* Stats Snapshot */}
-            <RivalCard glass style={gridCardStyle}>
-              <TouchableOpacity style={styles.snapshotTitleRow} onPress={() => router.push('/stats')}>
-                <Text style={styles.gridCardTitle}>STATS SNAPSHOT</Text>
-                <Text style={styles.snapshotSeeAll}>See all →</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.snapshotRow} onPress={() => router.push('/my-activities')}>
-                <View style={styles.snapshotDisc}><RivalIcon name="location" size={15} color={RivalColors.textPrimary} /></View>
-                <View><Text style={styles.gridCardLabel}>DISTANCE (KM)</Text><Text style={styles.snapshotValue}>{totalDistanceKm.toLocaleString()}</Text></View>
-              </TouchableOpacity>
-              <View style={styles.snapshotRow}>
-                <View style={styles.snapshotDisc}><RivalIcon name="elevation" size={15} color={RivalColors.textPrimary} /></View>
-                <View><Text style={styles.gridCardLabel}>CLIMBED (M)</Text><Text style={styles.snapshotValue}>{totalElevationM.toLocaleString()}</Text></View>
-              </View>
-              <TouchableOpacity style={styles.snapshotRow} onPress={() => router.push('/races')}>
-                <View style={styles.snapshotDisc}><RivalIcon name="race" size={15} color={RivalColors.textPrimary} /></View>
-                <View>
-                  <Text style={styles.gridCardLabel}>NEXT RACE</Text>
-                  <Text style={styles.snapshotValue}>{days !== null ? `${days} Days` : '—'}</Text>
-                </View>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.aiShareBox}
-                onPress={() => lastActivity ? router.push(`/ai-share?activityId=${lastActivity.id}`) : router.push('/my-activities')}
+            <View
+              style={gridCardStyle}
+              {...(Platform.OS === 'web'
+                ? { onMouseEnter: () => setStatsCardHovered(true), onMouseLeave: () => setStatsCardHovered(false) } as any
+                : {})}
+            >
+              <RivalCard
+                glass
+                style={[
+                  { flex: 1, position: 'relative', overflow: 'hidden' },
+                  statsCardHovered && styles.gridCardHovered,
+                  statsCardHovered && { borderColor: 'rgba(255,255,255,0.22)' },
+                ]}
               >
-                <View style={styles.snapshotDisc}><RivalIcon name="ai" size={15} color={RivalColors.textPrimary} /></View>
-                <View><Text style={styles.gridCardLabel}>AI SHARE</Text><Text style={styles.snapshotValue}>Generate Story</Text></View>
-              </TouchableOpacity>
-            </RivalCard>
+                <View
+                  style={[
+                    statsCardHovered && Platform.OS === 'web' ? ({ filter: 'blur(4px)', transition: 'filter 0.2s ease' } as any) : (Platform.OS === 'web' ? ({ transition: 'filter 0.2s ease' } as any) : {}),
+                  ]}
+                >
+                  <TouchableOpacity onPress={() => router.push('/stats')}>
+                    <Text style={[styles.focusLabel, { textAlign: 'center' }]}>LEGACY</Text>
+                    <Text style={[styles.focusGoalTitle, styles.focusActiveTitleGap, { textAlign: 'center' }]}>Everything you've Earned</Text>
+                  </TouchableOpacity>
+                  <View style={{ flex: 1, justifyContent: 'center', gap: 10, marginTop: 8 }}>
+                    <TouchableOpacity style={styles.snapshotRow} onPress={() => router.push('/stats')}>
+                      <View style={{ alignItems: 'center' }}>
+                        <Text style={[styles.snapshotHeroValue, styles.snapshotHeroValueLead]}>{Math.round(lifetimeXp).toLocaleString()}</Text>
+                        <Text style={styles.gridCardLabel}>EFFORT</Text>
+                      </View>
+                    </TouchableOpacity>
+                    <View style={styles.snapshotDivider} />
+                    <TouchableOpacity style={[styles.snapshotRow, { marginTop: 16 }]} onPress={() => router.push('/stats')}>
+                      <View style={{ alignItems: 'center' }}>
+                        <Text style={styles.snapshotHeroValue}>{totalDistanceKm.toLocaleString()}</Text>
+                        <Text style={styles.gridCardLabel}>DISTANCE</Text>
+                      </View>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.snapshotRow} onPress={() => router.push('/stats')}>
+                      <View style={{ alignItems: 'center' }}>
+                        <Text style={styles.snapshotHeroValue}>{totalElevationM.toLocaleString()}</Text>
+                        <Text style={styles.gridCardLabel}>CLIMBED</Text>
+                      </View>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.snapshotRow} onPress={() => router.push('/my-activities')}>
+                      <View style={{ alignItems: 'center' }}>
+                        <Text style={styles.snapshotHeroValue}>{lifetimeActivityCount.toLocaleString()}</Text>
+                        <Text style={styles.gridCardLabel}>ACTIVITIES</Text>
+                      </View>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+                {statsCardHovered && Platform.OS === 'web' && (
+                  <TouchableOpacity
+                    style={styles.snapshotHoverOverlay}
+                    onPress={() => router.push('/stats')}
+                  >
+                    <Text style={[styles.focusEmptyLink, { color: RivalColors.textPrimary }]}>View all →</Text>
+                  </TouchableOpacity>
+                )}
+              </RivalCard>
+            </View>
           </View>
 
           {/* Season Wrap strip */}
@@ -889,7 +1106,10 @@ export default function HomeScreen() {
               </TouchableOpacity>
             </View>
             <View style={styles.seasonWrapRow}>
-              <View><Text style={styles.gridCardLabel}>EFFORT</Text><Text style={styles.seasonWrapValue}>{Math.round(totalXp).toLocaleString()}</Text></View>
+              <View>
+                <Text style={styles.gridCardLabel}>NEXT RACE</Text>
+                <Text style={styles.seasonWrapValue}>{days !== null ? `${days} Days` : '—'}</Text>
+              </View>
               <View><Text style={styles.gridCardLabel}>ACTIVITIES</Text><Text style={styles.seasonWrapValue}>{seasonActivityCount}</Text></View>
               <View>
                 <Text style={styles.gridCardLabel}>IMPACT</Text>
@@ -918,6 +1138,13 @@ export default function HomeScreen() {
                 </Text>
               </View>
             </View>
+            <TouchableOpacity
+              style={styles.aiShareBox}
+              onPress={() => lastActivity ? router.push(`/ai-share?activityId=${lastActivity.id}`) : router.push('/my-activities')}
+            >
+              <View style={styles.snapshotDiscSm}><RivalIcon name="ai" size={12} color={RivalColors.textPrimary} /></View>
+              <View><Text style={styles.gridCardLabel}>AI SHARE</Text><Text style={styles.snapshotValue}>Generate Story</Text></View>
+            </TouchableOpacity>
           </RivalCard>
 
           {/* Strava connection — not in the Stitch mockup but a real, needed feature */}
@@ -1042,7 +1269,7 @@ const styles = StyleSheet.create({
   bannerSub: { fontSize: 12, color: RivalColors.textSecondary, marginTop: 2 },
 
   cardRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  gridCard: { flex: 1, minWidth: 230, gap: 8 },
+  gridCard: { flex: 1, minWidth: 230, minHeight: 320, gap: 8 },
   gridCardQuarter: { flexBasis: '22%', minWidth: 0 },
   // Same recipe as discover-leagues.tsx's team crest cards (gridCardHovered
   // there) — scale + lifted shadow, web-only (no hover concept natively).
@@ -1051,6 +1278,10 @@ const styles = StyleSheet.create({
   // The message is the hero here, not the "FOCUS" tag above it — normal
   // weight, not a heading, matching the reference's "message > title" note.
   goalsEmptyTitle: { ...RivalType.bodyMd, fontSize: 15, lineHeight: 19, color: RivalColors.textPrimary, textAlign: 'center' },
+  // Weekly Leader empty state title — same weight/scale as the populated
+  // card's "210 Effort" value, so the card doesn't feel lesser before you're on the board.
+  leaderEmptyTitle: { fontSize: 14, fontWeight: '500', lineHeight: 17, color: RivalColors.textPrimary, textAlign: 'center', letterSpacing: 3 },
+  leaderEmptySub: { fontSize: 11, fontWeight: '500', color: '#ffcabb', letterSpacing: 1, marginTop: 3, textAlign: 'center', lineHeight: 14 },
   // Shared between the empty and active Focus card states — same small
   // tracked label either way.
   focusLabel: { ...RivalType.labelCaps, fontSize: 10, letterSpacing: 1.5, color: 'rgba(255,255,255,0.7)' },
@@ -1062,7 +1293,6 @@ const styles = StyleSheet.create({
   focusEmptyLinkBottom: { alignSelf: 'center', marginTop: 0, marginBottom: 10 },
   focusEmptyLinkRow: { flexDirection: 'row' },
   gridCardLabel: { ...RivalType.labelCaps, fontSize: 10, color: RivalColors.textSecondary },
-  gridCardTitle: { fontSize: 15, fontWeight: '700', color: RivalColors.textPrimary },
   gridCardValue: { fontSize: 38, fontWeight: '300', color: RivalColors.accentText },
   gridCardValueSub: { fontSize: 14, color: RivalColors.textSecondary },
   focusProgressBarWrap: { width: '100%', justifyContent: 'center' },
@@ -1084,9 +1314,6 @@ const styles = StyleSheet.create({
   focusActiveBarGap: { marginTop: 4 },
   focusActiveMetaGap: { marginTop: 4 },
   gridCardMeta: { fontSize: 11, color: RivalColors.textSecondary },
-  gridCardBtn: { backgroundColor: RivalColors.accentFill, borderRadius: RivalRadius.full, paddingVertical: 10, alignItems: 'center', marginTop: 'auto' },
-  gridCardBtnText: { color: RivalColors.onAccentFill, fontWeight: '700', fontSize: 13 },
-  gridCardEmptyText: { fontSize: 13, color: RivalColors.textSecondary, lineHeight: 19 },
 
   pulseNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   pulseValueShrink: { fontSize: 28, lineHeight: 32 },
@@ -1097,39 +1324,33 @@ const styles = StyleSheet.create({
   // medal down, closer to evenly splitting the gap between the title above
   // and "210 Effort" below, without shifting the title, Effort, podium, or
   // link, all of which stay anchored to their existing flex positions.
-  pulseMedalNudgeDown: { transform: [{ translateY: 4 }] },
+  pulseMedalNudgeDown: { transform: [{ translateY: 1 }] },
   pulseStoryMessage: { fontSize: 15, fontWeight: '600', color: RivalColors.accentText, letterSpacing: 1.5, marginTop: 8, textAlign: 'center' },
   pulseStoryNumber: { fontSize: 16 },
   podiumWrap: { marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.1)', gap: 6 },
   podiumRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   podiumRank: { fontSize: 10, fontWeight: '700', color: RivalColors.textSecondary, width: 22 },
-  podiumName: { flex: 1, fontSize: 12, color: RivalColors.textPrimary },
-  podiumGap: { fontSize: 12, fontWeight: '600', color: RivalColors.textSecondary },
-  podiumNameFirst: { fontSize: 14 },
-  podiumGapFirst: { fontSize: 14 },
+  podiumName: { flex: 1, fontSize: 14, color: RivalColors.textPrimary },
+  podiumGap: { fontSize: 14, fontWeight: '600', color: RivalColors.textSecondary },
+  podiumNameFirst: { fontSize: 16 },
+  podiumGapFirst: { fontSize: 16, color: '#ECC654' },
   podiumNameSelf: { fontWeight: '700' },
   podiumGapSelf: { color: RivalColors.accentText },
   podiumFooterMeta: { fontSize: 11, color: RivalColors.textSecondary, marginTop: 0 },
 
-  // Fixed height, not flex — a ScrollView's content doesn't inherit the
-  // parent RivalCard's gap, so rows need their own marginBottom instead.
-  momentumScroll: { maxHeight: 230 },
-  momentumRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, paddingHorizontal: 10, marginBottom: 8, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 10 },
-  momentumLogo: { width: 30, height: 30, borderRadius: 15 },
-  momentumAvatar: { width: 30, height: 30, borderRadius: 15, backgroundColor: RivalColors.tertiaryContainer, alignItems: 'center', justifyContent: 'center' },
-  momentumAvatarText: { fontSize: 10, color: RivalColors.textPrimary, fontWeight: '700' },
-  momentumName: { fontSize: 13, fontWeight: '600', color: RivalColors.textPrimary },
-  momentumMeta: { fontSize: 11, color: RivalColors.accentText },
-  momentumArrow: { fontSize: 14, color: RivalColors.textSecondary },
-  momentumFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  addTeamLink: { fontSize: 12, fontWeight: '700', color: RivalColors.accentText, paddingTop: 6 },
-  teamEmptyLinks: { flexDirection: 'row', justifyContent: 'space-between', paddingTop: 4 },
-  teamEmptyLink: { fontSize: 12, fontWeight: '600', color: RivalColors.textSecondary },
+  // Hero crest for the single highlighted team — ~15% larger than the old
+  // list-row logo (30px) per the "make the crests shine" note.
+  momentumHeroLogo: { width: 56, height: 56, borderRadius: 28 },
+  momentumHeroAvatar: { width: 56, height: 56, borderRadius: 28, backgroundColor: RivalColors.tertiaryContainer, alignItems: 'center', justifyContent: 'center' },
+  medalRing: { width: 56, height: 56, borderRadius: 28, borderWidth: 1, borderColor: 'rgba(236,198,84,0.5)', alignItems: 'center', justifyContent: 'center' },
+  momentumAvatarText: { fontSize: 14, color: RivalColors.textPrimary, fontWeight: '700' },
 
-  snapshotTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  snapshotSeeAll: { fontSize: 11, fontWeight: '700', color: RivalColors.accentText },
-  snapshotRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  snapshotDisc: { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center' },
+  snapshotRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
+  snapshotDiscSm: { width: 26, height: 26, borderRadius: 13, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center' },
+  snapshotHeroValue: { fontSize: 17, fontWeight: '700', color: RivalColors.textPrimary },
+  snapshotDivider: { height: 1, width: '70%', alignSelf: 'center', backgroundColor: 'rgba(255,255,255,0.1)', marginVertical: -3 },
+  snapshotHoverOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
+  snapshotHeroValueLead: { fontSize: 25, color: RivalColors.accentText },
   snapshotIcon: { fontSize: 15 },
   snapshotValue: { fontSize: 16, fontWeight: '700', color: RivalColors.textPrimary },
   aiShareBox: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 10, padding: 10, marginTop: 'auto' },
