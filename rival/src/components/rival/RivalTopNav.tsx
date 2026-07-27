@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, Image, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, Image, StyleSheet, Platform } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { getLevel } from '../../lib/xp';
 import { getSeasonStartISO } from '../../lib/season';
-import { RivalColors, RivalType, RANK_LEVEL_COLORS } from '../../constants/rivalTheme';
+import { RivalColors, RivalType } from '../../constants/rivalTheme';
 
 // Shared persistent top navigation, matching the Stitch mockups. Drop it in at
 // the top of a screen (outside the ScrollView so it stays put) and pass the
@@ -23,7 +23,6 @@ export function RivalTopNav({ active }: { active?: Section }) {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [initial, setInitial] = useState('?');
   const [rankName, setRankName] = useState<string | null>(null);
-  const [rankColor, setRankColor] = useState<string>(RivalColors.accentText);
 
   useEffect(() => {
     (async () => {
@@ -42,9 +41,7 @@ export function RivalTopNav({ active }: { active?: Section }) {
       setInitial(name ? name[0].toUpperCase() : '?');
 
       const seasonEffort = (seasonActs || []).reduce((s, a) => s + (a.effort_score || 0), 0);
-      const lvl = getLevel(seasonEffort);
-      setRankName(lvl.name);
-      setRankColor(RANK_LEVEL_COLORS[lvl.level - 1] ?? RivalColors.accentText);
+      setRankName(getLevel(seasonEffort).name);
     })();
   }, []);
 
@@ -67,7 +64,23 @@ export function RivalTopNav({ active }: { active?: Section }) {
           {rankName && (
             <TouchableOpacity style={styles.rankBadge} onPress={() => router.push('/ranks')}>
               <Text style={styles.rankLabel}>RANK</Text>
-              <Text style={[styles.rankValue, { color: rankColor }]}>{rankName}</Text>
+              <Text
+                style={[
+                  styles.rankValue,
+                  { color: '#D8A81D', fontStyle: 'italic' },
+                  // Same gradient recipe as the hero number on home.tsx —
+                  // web-only (background-clip: text has no RN-native
+                  // equivalent), flat color above is the native fallback.
+                  ...(Platform.OS === 'web' ? [{
+                    backgroundImage: 'linear-gradient(180deg, #FFE48A, #D8A81D)',
+                    backgroundClip: 'text',
+                    WebkitBackgroundClip: 'text',
+                    color: 'transparent',
+                  } as any] : []),
+                ]}
+              >
+                {rankName}
+              </Text>
             </TouchableOpacity>
           )}
           <TouchableOpacity onPress={() => router.push('/profile')} style={styles.avatar}>
@@ -87,9 +100,12 @@ const styles = StyleSheet.create({
   bar: { width: '100%', backgroundColor: 'rgba(14,14,14,0.65)', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', maxWidth: 1200, marginHorizontal: 'auto', paddingHorizontal: 20, paddingVertical: 12 },
   logo: { ...RivalType.titleMd, color: RivalColors.accentText, letterSpacing: 4, fontWeight: '800' },
-  links: { flexDirection: 'row', gap: 20 },
-  link: { ...RivalType.bodyMd, fontSize: 14, color: RivalColors.textSecondary },
-  linkActive: { color: RivalColors.textPrimary, fontWeight: '700' },
+  links: { flexDirection: 'row', gap: 32 },
+  // Smaller, more letter-spacing, lighter weight — quieter and closer to an
+  // Apple-style minimal nav, without going all the way to "near-invisible"
+  // (this is core navigation people tap constantly, not a utility bar).
+  link: { ...RivalType.bodyMd, fontSize: 13, letterSpacing: 0.6, fontWeight: '400', color: RivalColors.textSecondary },
+  linkActive: { color: RivalColors.textPrimary, fontWeight: '600' },
   right: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   rankBadge: { alignItems: 'flex-end' },
   rankLabel: { ...RivalType.labelCaps, fontSize: 9, color: RivalColors.textSecondary },

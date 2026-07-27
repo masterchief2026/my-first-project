@@ -5,6 +5,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { supabase } from '../lib/supabase';
 import { formatDisplayName } from '../lib/identity';
 import { isoToDisplayDate, displayToIsoDate } from '../lib/dateFormat';
+import { formatGoalTimeMask } from '../lib/format';
 import { RivalTopNav } from '../components/rival';
 
 const RACE_TYPES = ['Run', 'Ride', 'Swim', 'Triathlon', 'HYROX', 'CrossFit', 'Other', 'Custom'];
@@ -678,7 +679,7 @@ export default function RacesScreen() {
             <TextInput style={styles.modalInput} placeholder="https://…" placeholderTextColor="#555555" value={regUrl} onChangeText={setRegUrl} autoCapitalize="none" />
 
             <Text style={styles.modalLabel}>Goal finish time (optional)</Text>
-            <TextInput style={styles.modalInput} placeholder="e.g. 1:45:00" placeholderTextColor="#555555" value={goalFinishTime} onChangeText={setGoalFinishTime} autoCapitalize="none" />
+            <TextInput style={styles.modalInput} placeholder="00:00:00" placeholderTextColor="#555555" value={goalFinishTime} onChangeText={v => setGoalFinishTime(formatGoalTimeMask(v))} keyboardType="number-pad" autoCapitalize="none" />
             <Text style={styles.goalTimeHint}>
               {goalFinishTime.trim()
                 ? `🎯 Aiming for ${goalFinishTime.trim()} — let's make it happen.`

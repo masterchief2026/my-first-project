@@ -10,6 +10,8 @@ export function RivalButton({
   disabled,
   loading,
   style,
+  onMouseEnter,
+  onMouseLeave,
 }: {
   label: string;
   onPress: () => void;
@@ -17,12 +19,18 @@ export function RivalButton({
   disabled?: boolean;
   loading?: boolean;
   style?: StyleProp<ViewStyle>;
+  // Web-only hover hooks — Pressable forwards unrecognized props straight to
+  // the underlying host element (same mechanism the hover cards elsewhere
+  // use via TouchableOpacity), so the caller can drive its own hover style.
+  onMouseEnter?: () => void;
+  onMouseLeave?: () => void;
 }) {
   const isDisabled = disabled || loading;
   return (
     <Pressable
       onPress={onPress}
       disabled={isDisabled}
+      {...({ onMouseEnter, onMouseLeave } as any)}
       style={({ pressed }) => [
         styles.base,
         variant === 'primary' && styles.primary,

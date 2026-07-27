@@ -6,7 +6,7 @@ import { supabase } from '../lib/supabase';
 import { formatDuration, formatDurationClock } from '../lib/format';
 import { calculateStreak } from '../lib/streak';
 import { computeActivityInsight, InsightTone } from '../lib/activityInsights';
-import { RivalTopNav, RivalIcon, activityIconName } from '../components/rival';
+import { RivalTopNav, RivalIcon, activityIconName, RivalFixedBackground } from '../components/rival';
 import { RivalColors, RivalRadius, RivalType } from '../constants/rivalTheme';
 
 type ExerciseEntry = {
@@ -50,6 +50,19 @@ const DISTANCE_SPORTS = new Set([
 // a stunted "0.4 km".
 const METERS_SPORTS = new Set(['Swim', 'Rowing']);
 
+// Water sports — any recorded "elevation" is GPS noise, never a real climb,
+// so the elevation tile is suppressed for these.
+const WATER_SPORTS = new Set(['Swim', 'Rowing', 'Kayaking', 'StandUpPaddling', 'Surfing']);
+
+// PB badge (~21px: 3+3 padding + 15px text) + the card's 14px stack gap —
+// how far the inline photo rides up to sit level with the badge.
+const PB_BADGE_OFFSET = 35;
+// Icon-button row (30px) + the card's 14px stack gap — how far the inline
+// photo extends DOWN past the stats row so its bottom lines up with the
+// insight/actions row's bottom. Negative marginBottom keeps the overhang out
+// of layout so the insight row doesn't get pushed down and chase it.
+const INSIGHT_ROW_OVERHANG = 44;
+
 const EFFORT_MULTIPLIERS: Record<string, number> = {
   Run: 1.2, Ride: 1.0, Swim: 1.5, WeightTraining: 0.8, Workout: 0.8,
   Hike: 0.7, Walk: 0.5, Yoga: 0.5, CrossFit: 1.3, AlpineSki: 0.9,
@@ -81,11 +94,11 @@ export default function MyActivitiesScreen() {
   const { width: windowWidth } = useWindowDimensions();
   // Two-up card grid only kicks in with room for it; below this everything stacks.
   const wide = windowWidth >= 760;
-  // Inline gallery placement needs real room beside the stat column — at the
-  // 760px breakpoint each 2-up card is only ~350-450px wide and a 140px inline
-  // thumbnail feels cramped. Only switch to inline once cards are genuinely
-  // spacious; narrower 2-up cards keep the gallery stacked below.
-  const veryWide = windowWidth >= 1300;
+  // Inline gallery placement needs real room beside the stat column, which
+  // only the widest cards have. In the 2-up grid (48% flexBasis + flexGrow),
+  // the only card that renders full-row is the LAST card of a week with an
+  // odd activity count — that's decidable at render time, no measuring needed.
+  const spaciousWindow = windowWidth >= 900;
   const [allActivities, setAllActivities] = useState<Activity[]>([]);
   const [thisWeekTotal, setThisWeekTotal] = useState(0);
   const [pbs, setPbs] = useState<Record<string, string>>({});
@@ -97,6 +110,11 @@ export default function MyActivitiesScreen() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
   const [mediaMap, setMediaMap] = useState<Record<string, MediaRow[]>>({});
+  const [enlargedPhoto, setEnlargedPhoto] = useState<string | null>(null);
+  // Effort badge height should track the stat column's height (not the photo's,
+  // which can stand taller) — measured directly since flex stretch can't single
+  // out two of three row siblings.
+  const [statColHeights, setStatColHeights] = useState<Record<string, number>>({});
   // Web-only hover tooltip for the ×N multiplier badge — `title` isn't reliably
   // forwarded to the DOM by react-native-web, so we render our own popup.
   const [hoveredMultiplierId, setHoveredMultiplierId] = useState<string | null>(null);
@@ -525,11 +543,9 @@ export default function MyActivitiesScreen() {
 
   return (
     <View style={styles.root}>
-      <ImageBackground
+      <RivalFixedBackground
         source={require('../../assets/images/backgrounds/optimized/handstand-airy-warehouse-gym.jpg')}
-        style={styles.bgFixed}
-        imageStyle={styles.bgImage}
-        resizeMode="cover"
+        focalPoint="50% 38%"
       />
       <View style={styles.scrim} />
       <SafeAreaView style={styles.container}>
@@ -741,6 +757,9 @@ export default function MyActivitiesScreen() {
                 const hasMedia = (mediaMap[activity.id]?.length ?? 0) > 0;
                 const hasExercises = (activity.exercises?.length ?? 0) > 0;
                 const hasDuration = activity.duration_seconds > 0;
+                const idx = group.activities.indexOf(activity);
+                const isFullRow = wide && group.activities.length % 2 === 1 && idx === group.activities.length - 1;
+                const cardIsSpacious = spaciousWindow && isFullRow;
                 return (
                   <View
                     key={activity.id}
@@ -798,118 +817,142 @@ export default function MyActivitiesScreen() {
                       </View>
                     )}
 
-                    {/* Stat mini-cards stacked on the left, Effort badge prominent on the right
-                        (Duration hidden when 0, matching Distance — was a blank-tile bug before).
+                    {/* Stat mini-cards + exercises stacked on the left, Effort badge +
+                        action icons on the right. The right column is measured to match
+                        the LEFT column's full height (stats + exercises together, not
+                        just stats) — a workout with a long exercise list previously left
+                        the Effort badge sized to the stats alone, floating with a gap
+                        above the exercise list beside it.
                         No labels — the values (date/duration/distance) are self-explanatory. */}
-                    <View style={styles.statsAndEffortRow}>
-                      <View style={styles.statColumn}>
-                        <View style={styles.statTile}>
-                          <Text style={styles.statTileValue}>{formatDate(activity.started_at)}</Text>
+                    {/* Spacious cards: everything tops-out together (no centring gap
+                        below the PB badge) and the Effort badge stretches to the full
+                        photo height so the space beside the photo doesn't sit empty. */}
+                    <View style={[styles.statsAndEffortRow, cardIsSpacious && hasMedia && styles.statsAndEffortRowSpacious]}>
+                      <View
+                        style={styles.statAndExerciseColumn}
+                        onLayout={(e) => {
+                          const h = e.nativeEvent.layout.height;
+                          setStatColHeights(prev => prev[activity.id] === h ? prev : { ...prev, [activity.id]: h });
+                        }}
+                      >
+                        <View style={styles.statColumn}>
+                          <View style={styles.statTile}>
+                            <Text style={styles.statTileValue}>{formatDate(activity.started_at)}</Text>
+                          </View>
+                          {hasDuration && (
+                            <View style={styles.statTile}>
+                              <Text style={styles.statTileValue}>{formatDurationClock(activity.duration_seconds)}</Text>
+                            </View>
+                          )}
+                          {distance && (
+                            <View style={styles.statTile}>
+                              <Text style={styles.statTileValue}>{distance}</Text>
+                            </View>
+                          )}
+                          {pace && (
+                            <View style={styles.statTile}>
+                              <Text style={styles.statTileValue}>{pace}</Text>
+                            </View>
+                          )}
+                          {/* ↑ marks the value as elevation gain — tiles have no labels,
+                              so a bare metres figure would read as distance. */}
+                          {(activity.elevation_meters || 0) > 0 && !WATER_SPORTS.has(activity.activity_type) && (
+                            <View style={styles.statTile}>
+                              <Text style={styles.statTileValue}>↑ {Math.round(activity.elevation_meters!)} m</Text>
+                            </View>
+                          )}
                         </View>
-                        {hasDuration && (
-                          <View style={styles.statTile}>
-                            <Text style={styles.statTileValue}>{formatDurationClock(activity.duration_seconds)}</Text>
-                          </View>
-                        )}
-                        {distance && (
-                          <View style={styles.statTile}>
-                            <Text style={styles.statTileValue}>{distance}</Text>
-                          </View>
-                        )}
-                        {pace && (
-                          <View style={styles.statTile}>
-                            <Text style={styles.statTileValue}>{pace}</Text>
+
+                        {hasExercises && (
+                          <View style={styles.exerciseBreakdown}>
+                            {activity.exercises!.map((ex, exi) => (
+                              <View key={exi} style={styles.exerciseRow}>
+                                <RivalIcon name="weights" size={13} color={RivalColors.accentText} />
+                                <Text style={styles.exerciseRowText}>{formatExerciseLine(ex)}</Text>
+                                {ex.prLift && (
+                                  <View style={styles.exercisePrTag}>
+                                    <RivalIcon name="fire" size={10} color={RivalColors.rankAnchors.unrivaled} />
+                                    <Text style={styles.exercisePrTagText}>PB</Text>
+                                  </View>
+                                )}
+                              </View>
+                            ))}
                           </View>
                         )}
                       </View>
 
-                      {/* On very wide cards, media fills the gap between stats and Effort
-                          instead of stacking below and leaving dead space beside a
-                          tall stat column. Narrower cards keep the gallery stacked below. */}
-                      {veryWide && hasMedia && (
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.galleryInline} contentContainerStyle={styles.galleryRow}>
+                      {/* On genuinely wide cards (measured, not assumed from window
+                          width), media fills the gap between stats and Effort instead
+                          of stacking below. Narrower cards keep the gallery below. */}
+                      {cardIsSpacious && hasMedia && (
+                        <ScrollView
+                          horizontal
+                          showsHorizontalScrollIndicator={false}
+                          // The lift lives on the CONTAINER, not the image — the
+                          // horizontal ScrollView clips children, so a negative margin
+                          // on the image just cuts its top off instead of raising it.
+                          // Photo spans from the PB-badge line down to the stat column's
+                          // bottom: statColHeight + offset tall, shifted up by offset.
+                          style={[styles.galleryInline, pbLabel && { marginTop: -PB_BADGE_OFFSET }, { marginBottom: -INSIGHT_ROW_OVERHANG }]}
+                          contentContainerStyle={styles.galleryRow}
+                        >
                           {mediaMap[activity.id].map((m) => (
                             m.media_type === 'video' ? (
                               <video
                                 key={m.id}
                                 src={m.media_url}
                                 controls
-                                style={{ width: 140, height: '100%', borderRadius: 10, backgroundColor: '#2A2A2A' } as any}
+                                style={{ width: 200, height: '100%', borderRadius: 10, backgroundColor: '#2A2A2A' } as any}
                               />
                             ) : (
-                              <Image
-                                key={m.id}
-                                source={{ uri: m.media_url }}
-                                style={styles.galleryPhotoInline}
-                                resizeMode="cover"
-                              />
+                              <TouchableOpacity key={m.id} onPress={() => setEnlargedPhoto(m.media_url)}>
+                                <Image
+                                  source={{ uri: m.media_url }}
+                                  style={[
+                                    styles.galleryPhotoInline,
+                                    statColHeights[activity.id]
+                                      ? { height: statColHeights[activity.id] + (pbLabel ? PB_BADGE_OFFSET : 0) + INSIGHT_ROW_OVERHANG }
+                                      : null,
+                                  ]}
+                                  resizeMode="cover"
+                                />
+                              </TouchableOpacity>
                             )
                           ))}
                         </ScrollView>
                       )}
 
-                      <View style={[styles.effortBadge, pbLabel && styles.effortBadgeBest]}>
-                        <Text style={[styles.points, pbLabel && { color: RivalColors.rankAnchors.unrivaled }]}>
+                      {/* Same height as the stat column always; on spacious cards it
+                          also grows WIDE to absorb the leftover space beside the photo,
+                          with the number scaled up to suit the larger canvas. */}
+                      <View
+                        style={[
+                          styles.effortBadge,
+                          pbLabel && styles.effortBadgeBest,
+                          statColHeights[activity.id] ? { height: statColHeights[activity.id] } : null,
+                          // Grows to use the free width but capped near-square
+                          // (slightly wider than tall) so it reads as a tile, not a bar.
+                          cardIsSpacious && hasMedia && { flexGrow: 1, maxWidth: Math.max(200, (statColHeights[activity.id] || 0) * 1.15) },
+                        ]}
+                      >
+                        <Text style={[styles.points, cardIsSpacious && hasMedia && styles.pointsLarge, pbLabel && { color: RivalColors.rankAnchors.unrivaled }]}>
                           {activity.effort_score}
                         </Text>
-                        <Text style={[styles.pointsUnit, pbLabel && { color: RivalColors.rankAnchors.unrivaled }]}>EFFORT</Text>
+                        <Text style={[styles.pointsUnit, cardIsSpacious && hasMedia && styles.pointsUnitLarge, pbLabel && { color: RivalColors.rankAnchors.unrivaled }]}>EFFORT</Text>
                       </View>
                     </View>
 
-                    {insight && (
-                      <View style={styles.insightRow}>
-                        <RivalIcon name={INSIGHT_ICON[insight.tone]} size={12} color={INSIGHT_COLOR[insight.tone]} />
-                        <Text style={[styles.insightText, { color: INSIGHT_COLOR[insight.tone] }]}>{insight.text}</Text>
-                      </View>
-                    )}
-
-                    {hasExercises && (
-                      <View style={styles.exerciseBreakdown}>
-                        {activity.exercises!.map((ex, exi) => (
-                          <View key={exi} style={styles.exerciseRow}>
-                            <RivalIcon name="weights" size={13} color={RivalColors.accentText} />
-                            <Text style={styles.exerciseRowText}>{formatExerciseLine(ex)}</Text>
-                            {ex.prLift && (
-                              <View style={styles.exercisePrTag}>
-                                <RivalIcon name="fire" size={10} color={RivalColors.rankAnchors.unrivaled} />
-                                <Text style={styles.exercisePrTagText}>PB</Text>
-                              </View>
-                            )}
-                          </View>
-                        ))}
-                      </View>
-                    )}
-
-                    {uploadErrorActivityId === activity.id && uploadError && (
-                      <Text style={styles.inlineUploadError}>⚠️ {uploadError}</Text>
-                    )}
-
-                    {/* Media gallery — only stacked here on narrow cards; wide cards
-                        show it inline in the stats row above instead. */}
-                    {hasMedia && !veryWide && (
-                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.galleryRow}>
-                        {mediaMap[activity.id].map((m) => (
-                          m.media_type === 'video' ? (
-                            <video
-                              key={m.id}
-                              src={m.media_url}
-                              controls
-                              style={{ width: 220, height: 220, borderRadius: 10, backgroundColor: '#2A2A2A' } as any}
-                            />
-                          ) : (
-                            <Image
-                              key={m.id}
-                              source={{ uri: m.media_url }}
-                              style={styles.galleryPhoto}
-                              resizeMode="cover"
-                            />
-                          )
-                        ))}
-                      </ScrollView>
-                    )}
-
-                    {/* Footer: actions (Effort badge now lives up top, beside the stats) */}
-                    <View style={styles.cardFooter}>
+                    {/* Insight (if any) always shares this row with the action icons,
+                        so the icons land in the same place whether or not an insight
+                        line is present — never stacked under Effort inside the taller
+                        stats row above. */}
+                    <View style={styles.insightFooterRow}>
+                      {insight ? (
+                        <View style={styles.insightRow}>
+                          <RivalIcon name={INSIGHT_ICON[insight.tone]} size={12} color={INSIGHT_COLOR[insight.tone]} />
+                          <Text style={[styles.insightText, { color: INSIGHT_COLOR[insight.tone] }]}>{insight.text}</Text>
+                        </View>
+                      ) : <View />}
                       <View style={styles.rightColBtnRow}>
                         <TouchableOpacity style={styles.cameraBtn} onPress={() => uploadPhoto(activity.id)} disabled={isUploading}>
                           <RivalIcon name={isUploading ? 'timer' : 'camera'} size={18} color={RivalColors.textSecondary} />
@@ -922,6 +965,35 @@ export default function MyActivitiesScreen() {
                         </TouchableOpacity>
                       </View>
                     </View>
+
+                    {uploadErrorActivityId === activity.id && uploadError && (
+                      <Text style={styles.inlineUploadError}>⚠️ {uploadError}</Text>
+                    )}
+
+                    {/* Media gallery — only stacked here on narrow cards; wide cards
+                        show it inline in the stats row above instead. */}
+                    {hasMedia && !cardIsSpacious && (
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.galleryRow}>
+                        {mediaMap[activity.id].map((m) => (
+                          m.media_type === 'video' ? (
+                            <video
+                              key={m.id}
+                              src={m.media_url}
+                              controls
+                              style={{ width: 220, height: 220, borderRadius: 10, backgroundColor: '#2A2A2A' } as any}
+                            />
+                          ) : (
+                            <TouchableOpacity key={m.id} onPress={() => setEnlargedPhoto(m.media_url)}>
+                              <Image
+                                source={{ uri: m.media_url }}
+                                style={styles.galleryPhoto}
+                                resizeMode="cover"
+                              />
+                            </TouchableOpacity>
+                          )
+                        ))}
+                      </ScrollView>
+                    )}
                   </View>
                 );
               })}
@@ -935,6 +1007,17 @@ export default function MyActivitiesScreen() {
           <RivalIcon name="add" size={18} color={RivalColors.onAccentFill} />
           <Text style={styles.fabText}>Add Activity</Text>
         </TouchableOpacity>
+
+        {/* Photo lightbox — click any card photo to view it full size; click
+            anywhere (or ✕) to dismiss. */}
+        {enlargedPhoto && (
+          <TouchableOpacity style={styles.lightbox} activeOpacity={1} onPress={() => setEnlargedPhoto(null)}>
+            <Image source={{ uri: enlargedPhoto }} style={styles.lightboxImage} resizeMode="contain" />
+            <TouchableOpacity style={styles.lightboxClose} onPress={() => setEnlargedPhoto(null)}>
+              <RivalIcon name="close" size={22} color={RivalColors.textPrimary} />
+            </TouchableOpacity>
+          </TouchableOpacity>
+        )}
       </SafeAreaView>
     </View>
   );
@@ -942,9 +1025,6 @@ export default function MyActivitiesScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: RivalColors.surfaceLow },
-  // Fixed to the viewport (not the content) so it always covers the full screen.
-  bgFixed: { position: 'fixed' as any, top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%' },
-  bgImage: { objectPosition: '50% 38%' } as any,
   scrim: { position: 'fixed' as any, top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(14,14,14,0.55)' },
   container: { flex: 1 },
   content: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 100, maxWidth: 900, width: '100%', alignSelf: 'center' },
@@ -1017,16 +1097,16 @@ const styles = StyleSheet.create({
   weekHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, gap: 10 },
   weekLabelPill: {
     paddingHorizontal: 16, paddingVertical: 12,
-    backgroundColor: 'rgba(20,20,20,0.65)', borderRadius: RivalRadius.DEFAULT,
+    backgroundColor: 'rgba(20,20,20,0.35)', borderRadius: RivalRadius.DEFAULT,
     borderLeftWidth: 3, borderLeftColor: RivalColors.accentFill,
   },
-  weekTotalPill: { paddingHorizontal: 16, paddingVertical: 12, backgroundColor: 'rgba(20,20,20,0.65)', borderRadius: RivalRadius.DEFAULT },
+  weekTotalPill: { paddingHorizontal: 16, paddingVertical: 12, backgroundColor: 'rgba(20,20,20,0.35)', borderRadius: RivalRadius.DEFAULT },
   weekLabel: { fontSize: 16, fontWeight: '700', color: RivalColors.textPrimary },
   weekTotal: { fontSize: 16, fontWeight: '800', color: RivalColors.accentText },
 
   list: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, alignItems: 'flex-start' },
 
-  activityCard: { flexBasis: '100%', backgroundColor: 'rgba(20,20,20,0.8)', borderRadius: RivalRadius.lg, padding: 18, borderWidth: 1, borderColor: 'rgba(163,140,133,0.15)', gap: 14 },
+  activityCard: { flexBasis: '100%', backgroundColor: 'rgba(20,20,20,0.35)', borderRadius: RivalRadius.lg, padding: 18, borderWidth: 1, borderColor: 'rgba(163,140,133,0.15)', gap: 14 },
   // Simple activities tile 2-up on wide screens; minWidth keeps them from getting cramped.
   cardHalf: { flexBasis: '48%', flexGrow: 1, minWidth: 300 },
   activityCardBest: { borderColor: `${RivalColors.rankAnchors.unrivaled}66`, borderWidth: 1.5 },
@@ -1050,12 +1130,21 @@ const styles = StyleSheet.create({
 
   // Compact pills that hug their content — no more stretched tiles with dead space.
   // Stat mini-cards stacked on the left, Effort badge prominent on the right.
-  statsAndEffortRow: { flexDirection: 'row', alignItems: 'stretch', gap: 12 },
-  statColumn: { flex: 1, gap: 8 },
+  // Centered, not stretched: the photo is its own element and may stand taller
+  // than the stat column and Effort badge — they keep their natural size and
+  // sit vertically centred beside it instead of inflating to match.
+  statsAndEffortRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  statsAndEffortRowSpacious: { alignItems: 'flex-start' },
+  statAndExerciseColumn: { flex: 1, gap: 10 },
+  statColumn: { gap: 8 },
   statTile: { backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: RivalRadius.DEFAULT, paddingHorizontal: 14, paddingVertical: 10 },
   statTileValue: { fontSize: 15, fontWeight: '700', color: RivalColors.textPrimary },
 
-  insightRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  insightRow: { flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 1 },
+  insightFooterRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  lightbox: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.88)', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
+  lightboxImage: { width: '92%', height: '92%' },
+  lightboxClose: { position: 'absolute', top: 24, right: 24, width: 44, height: 44, borderRadius: RivalRadius.full, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
   insightText: { fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8 },
   // Exercises as standout rows (icon + name/weight + PR tag) instead of plain bullet text.
   exerciseBreakdown: { gap: 6 },
@@ -1064,18 +1153,24 @@ const styles = StyleSheet.create({
   exercisePrTag: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: `${RivalColors.rankAnchors.unrivaled}22`, borderRadius: RivalRadius.sm, paddingHorizontal: 6, paddingVertical: 2 },
   exercisePrTagText: { fontSize: 10, fontWeight: '800', color: RivalColors.rankAnchors.unrivaled },
 
-  cardFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 12 },
   rightColBtnRow: { flexDirection: 'row', gap: 6 },
-  effortBadge: { backgroundColor: `${RivalColors.accentFill}22`, borderWidth: 1, borderColor: `${RivalColors.accentFill}55`, borderRadius: RivalRadius.md, paddingHorizontal: 20, alignItems: 'center', justifyContent: 'center', minWidth: 96 },
+  effortBadge: { backgroundColor: `${RivalColors.accentFill}22`, borderWidth: 1, borderColor: `${RivalColors.accentFill}55`, borderRadius: RivalRadius.md, paddingHorizontal: 20, paddingVertical: 26, alignItems: 'center', justifyContent: 'center', minWidth: 96 },
   effortBadgeBest: { backgroundColor: `${RivalColors.rankAnchors.unrivaled}22`, borderColor: `${RivalColors.rankAnchors.unrivaled}66` },
   points: { fontSize: 28, fontWeight: '800', color: RivalColors.accentText, lineHeight: 30 },
   pointsUnit: { fontSize: 10, fontWeight: '700', letterSpacing: 1, color: RivalColors.accentText, opacity: 0.85, marginTop: 2 },
+  pointsLarge: { fontSize: 44, lineHeight: 48 },
+  pointsUnitLarge: { fontSize: 13, letterSpacing: 2, marginTop: 4 },
   cameraBtn: { padding: 6, backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: RivalRadius.DEFAULT },
 
   galleryRow: { gap: 8 },
   galleryPhoto: { width: 220, height: 220, borderRadius: 10, backgroundColor: RivalColors.surfaceContainerHigh },
-  galleryInline: { flex: 1, minWidth: 100 },
-  galleryPhotoInline: { width: 140, height: '100%', borderRadius: 10, backgroundColor: RivalColors.surfaceContainerHigh },
+  // Hugs the photo width (no flex-grow) so the Effort badge can claim the
+  // remaining row width instead.
+  galleryInline: { flexGrow: 0, flexShrink: 0 },
+  // Fixed height sized to dominate the card body (the Effort badge and stat
+  // column stretch to match); width follows from the aspect ratio so the
+  // photo keeps its proportions (cover-crops inside the frame, never stretches).
+  galleryPhotoInline: { height: 320, aspectRatio: 0.8, borderRadius: 10, backgroundColor: RivalColors.surfaceContainerHigh },
 
   inlineUploadError: { color: RivalColors.error, fontSize: 12, fontWeight: '600' },
 

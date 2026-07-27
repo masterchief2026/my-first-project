@@ -1,25 +1,69 @@
 import { useEffect, useState } from 'react';
-import { StyleSheet, TouchableOpacity, View, Text, ScrollView, TextInput, Image, Alert } from 'react-native';
+import { StyleSheet, TouchableOpacity, View, Text, ScrollView, TextInput, Image, useWindowDimensions, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { supabase } from '../lib/supabase';
-import { RivalTopNav } from '../components/rival';
+import { RivalTopNav, RivalIcon, RivalFixedBackground } from '../components/rival';
+import type { RivalIconName } from '../components/rival/RivalIcon';
+import { RivalColors, RivalRadius, RivalType } from '../constants/rivalTheme';
 
 type MembershipState = 'none' | 'pending' | 'active';
 
-type PublicLeague = {
+type TeamRow = {
   id: string;
   name: string;
   logo_url: string | null;
   member_count: number;
   membership: MembershipState;
+  // Populated for "my teams" only — a reason to click, not just a headcount.
+  heroStat: { icon: 'fire' | 'trophy' | 'run' | 'chat'; text: string } | null;
+  lastActivityAt: string | null;
+  unreadCount: number;
+  // Most recent unread message's sender — a name to notice, not just a count.
+  unreadFrom: string | null;
+  // "Evidence of shared commitment" — since the team formed, not a rolling window.
+  together: { weeks: number; hours: number } | null;
+  pinned: boolean;
 };
 
+// Always the real name here, ignoring the user's own display-style
+// preference (which may be username-only elsewhere) — a teammate's actual
+// name is what makes this signal feel personal on the Teams grid.
+function realName(u: { display_name?: string | null; email?: string | null } | null | undefined, fallback = 'Someone'): string {
+  if (!u) return fallback;
+  return u.display_name || (u.email ? u.email.split('@')[0] : '') || fallback;
+}
+
+function ordinal(n: number): string {
+  const s = ['th', 'st', 'nd', 'rd'];
+  const v = n % 100;
+  return `${n}${s[(v - 20) % 10] || s[v] || s[0]}`;
+}
+
+function getMondayStart(date: Date) {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+}
+
+// Teams landing page (stitch-export-16 "My Teams" layout): your teams as big
+// hero cards up top, then a Discover section for public teams below, one
+// search box covering both. The mock's Nearby/Pro/Endurance filter chips and
+// live-session times are omitted — there's no location/schedule data to back
+// them, and fake chips don't earn their place.
 export default function DiscoverLeaguesScreen() {
-  const [leagues, setLeagues] = useState<PublicLeague[]>([]);
+  const { width: windowWidth } = useWindowDimensions();
+  const wide = windowWidth >= 760;
+
+  const [myTeams, setMyTeams] = useState<TeamRow[]>([]);
+  const [publicTeams, setPublicTeams] = useState<TeamRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [joining, setJoining] = useState<string | null>(null);
+  const [joinError, setJoinError] = useState<string | null>(null);
 
   useEffect(() => { load(); }, []);
 
@@ -27,148 +71,575 @@ export default function DiscoverLeaguesScreen() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    const { data: allLeagues } = await supabase
-      .from('leagues')
-      .select('id, name, logo_url')
-      .eq('is_private', false)
-      .order('name');
-
-    const { data: myMemberships } = await supabase
-      .from('league_members')
-      .select('league_id, status')
-      .eq('user_id', user.id);
-
-    const myMembershipMap = new Map((myMemberships || []).map((m: any) => [m.league_id, m.status as MembershipState]));
-
-    // Only active members count toward the visible member count — a pending
-    // request isn't a real member of the team yet.
-    const { data: memberCounts } = await supabase
-      .from('league_members')
-      .select('league_id')
-      .eq('status', 'active');
+    const [publicRes, membershipRes, activeMembersRes] = await Promise.all([
+      supabase.from('leagues').select('id, name, logo_url').eq('is_private', false).order('name'),
+      supabase.from('league_members').select('league_id, status, pinned, leagues(id, name, logo_url, created_at)').eq('user_id', user.id),
+      // Active membership rows across every league — doubles as both the
+      // public "member count" and, filtered to my teams below, the roster
+      // used to compute each team's hero stat.
+      supabase.from('league_members').select('league_id, user_id').eq('status', 'active'),
+    ]);
 
     const countMap: Record<string, number> = {};
-    (memberCounts || []).forEach((m: any) => {
+    const membersByLeague: Record<string, string[]> = {};
+    (activeMembersRes.data || []).forEach((m: any) => {
       countMap[m.league_id] = (countMap[m.league_id] || 0) + 1;
+      (membersByLeague[m.league_id] ??= []).push(m.user_id);
     });
 
-    setLeagues((allLeagues || []).map((l: any) => ({
-      id: l.id,
-      name: l.name,
-      logo_url: l.logo_url,
-      member_count: countMap[l.id] || 0,
-      membership: myMembershipMap.get(l.id) || 'none',
-    })));
+    const membershipMap = new Map((membershipRes.data || []).map((m: any) => [m.league_id, m.status as MembershipState]));
+
+    const myTeamRows = (membershipRes.data || []).filter((m: any) => m.status === 'active' && m.leagues);
+    const myTeamIds = myTeamRows.map((m: any) => m.leagues.id);
+    const teamCreatedAt: Record<string, string | null> = {};
+    myTeamRows.forEach((m: any) => { teamCreatedAt[m.leagues.id] = m.leagues.created_at ?? null; });
+
+    // Hero stat per team: reason to click, not just a headcount. Bounded to a
+    // 30-day window across only my teams' rosters (small, cheap) — enough to
+    // rank this week's Effort and flag a teammate's recent PB without a
+    // separate query per team.
+    const heroStatByLeague: Record<string, TeamRow['heroStat']> = {};
+    const lastActivityByLeague: Record<string, string | null> = {};
+    const unreadByLeague: Record<string, number> = {};
+    const unreadFromByLeague: Record<string, string | null> = {};
+    const togetherByLeague: Record<string, TeamRow['together']> = {};
+    if (myTeamIds.length > 0) {
+      const allMemberIds = Array.from(new Set(myTeamIds.flatMap((id: string) => membersByLeague[id] || [])));
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const weekStart = getMondayStart(new Date());
+
+      // Earliest of my teams' creation dates — the "together" query needs full
+      // history back to whichever team formed first, not just 30 days.
+      const createdDates = myTeamIds.map((id: string) => teamCreatedAt[id]).filter(Boolean) as string[];
+      const earliestCreatedAt = createdDates.length > 0
+        ? createdDates.reduce((min, d) => (new Date(d) < new Date(min) ? d : min))
+        : thirtyDaysAgo.toISOString();
+
+      const [activitiesRes, readsRes, messagesRes, togetherActivitiesRes, profilesRes] = await Promise.all([
+        allMemberIds.length > 0
+          ? supabase.from('activities')
+              .select('user_id, effort_score, exercises, started_at, activity_type')
+              .in('user_id', allMemberIds)
+              .gte('started_at', thirtyDaysAgo.toISOString())
+              .order('started_at', { ascending: false })
+              .limit(500)
+          : Promise.resolve({ data: [] }),
+        supabase.from('league_chat_reads').select('league_id, last_read_at').eq('user_id', user.id).in('league_id', myTeamIds),
+        supabase.from('league_messages').select('league_id, user_id, created_at').eq('kind', 'text').in('league_id', myTeamIds).order('created_at', { ascending: false }).limit(500),
+        // "Training together" duration, per team — bounded to the union of my
+        // teams' rosters since whichever formed first, capped at 3000 rows so
+        // a long-lived team can't blow up the query.
+        allMemberIds.length > 0
+          ? supabase.from('activities')
+              .select('user_id, duration_seconds, started_at')
+              .in('user_id', allMemberIds)
+              .gte('started_at', earliestCreatedAt)
+              .limit(3000)
+          : Promise.resolve({ data: [] }),
+        // Names for the hero-stat "{Name} logged a run" / unread-sender lines
+        // — a name is what makes the signal worth noticing, not just a count.
+        allMemberIds.length > 0
+          ? supabase.from('users').select('id, display_name, email, username, display_style').in('id', allMemberIds)
+          : Promise.resolve({ data: [] }),
+      ]);
+      const recentActivities = activitiesRes.data;
+      const profileById = new Map((profilesRes.data || []).map((p: any) => [p.id, p]));
+
+      myTeamIds.forEach((teamId: string) => {
+        const createdAt = teamCreatedAt[teamId];
+        if (!createdAt) { togetherByLeague[teamId] = null; return; }
+        const teamMemberIds = new Set(membersByLeague[teamId] || []);
+        const teamTogetherActivities = (togetherActivitiesRes.data || []).filter((a: any) =>
+          teamMemberIds.has(a.user_id) && new Date(a.started_at) >= new Date(createdAt)
+        );
+        if (teamTogetherActivities.length === 0) { togetherByLeague[teamId] = null; return; }
+        const weeks = Math.max(1, Math.floor((Date.now() - new Date(createdAt).getTime()) / (7 * 24 * 60 * 60 * 1000)));
+        const totalSeconds = teamTogetherActivities.reduce((s: number, a: any) => s + (a.duration_seconds || 0), 0);
+        togetherByLeague[teamId] = { weeks, hours: Math.round(totalSeconds / 3600) };
+      });
+
+      // Most recent unread message per team, named — "Emma" is worth noticing,
+      // a bare count isn't. Messages arrive newest-first, so the first unread
+      // one seen per league is the most recent.
+      const lastReadByLeague = new Map((readsRes.data || []).map((r: any) => [r.league_id, r.last_read_at]));
+      (messagesRes.data || []).forEach((m: any) => {
+        const lastRead = lastReadByLeague.get(m.league_id);
+        if (!lastRead || new Date(m.created_at) > new Date(lastRead)) {
+          unreadByLeague[m.league_id] = (unreadByLeague[m.league_id] || 0) + 1;
+          if (!unreadFromByLeague[m.league_id]) {
+            unreadFromByLeague[m.league_id] = realName(profileById.get(m.user_id));
+          }
+        }
+      });
+
+      myTeamIds.forEach((teamId: string) => {
+        const teamMemberIds = new Set(membersByLeague[teamId] || []);
+        const teamActivities = (recentActivities || []).filter((a: any) => teamMemberIds.has(a.user_id));
+
+        lastActivityByLeague[teamId] = teamActivities[0]?.started_at ?? null;
+
+        const pbThisWeek = teamActivities.some((a: any) =>
+          new Date(a.started_at).getTime() >= weekStart &&
+          (a.exercises || []).some((ex: any) => ex.prLift)
+        );
+        if (pbThisWeek) {
+          heroStatByLeague[teamId] = { icon: 'fire', text: 'New PB this week' };
+          return;
+        }
+
+        const weekActivities = teamActivities.filter((a: any) => new Date(a.started_at).getTime() >= weekStart);
+        if (teamMemberIds.size > 1 && weekActivities.length > 0) {
+          const effortByUser = new Map<string, number>();
+          weekActivities.forEach((a: any) => {
+            effortByUser.set(a.user_id, (effortByUser.get(a.user_id) || 0) + (a.effort_score || 0));
+          });
+          const ranked = Array.from(teamMemberIds).sort((a, b) => (effortByUser.get(b) || 0) - (effortByUser.get(a) || 0));
+          const myRank = ranked.indexOf(user.id) + 1;
+          if (myRank > 0) {
+            heroStatByLeague[teamId] = { icon: 'trophy', text: `You're ${ordinal(myRank)} this week` };
+            return;
+          }
+        }
+
+        // Named, not counted — "Emma logged a Run" is memorable, "1 activity
+        // this week" is forgettable. Most recent activity this week wins.
+        const mostRecent = weekActivities[0];
+        if (mostRecent) {
+          const name = realName(profileById.get(mostRecent.user_id));
+          const typeLabel = (mostRecent.activity_type || 'a session').replace(/([a-z])([A-Z])/g, '$1 $2');
+          heroStatByLeague[teamId] = { icon: 'run', text: `${name} logged ${typeLabel}` };
+        } else {
+          heroStatByLeague[teamId] = null;
+        }
+      });
+    }
+
+    const sortedMyTeams = myTeamRows
+      .map((m: any) => ({
+        id: m.leagues.id,
+        name: m.leagues.name,
+        logo_url: m.leagues.logo_url,
+        member_count: countMap[m.leagues.id] || 0,
+        membership: 'active' as MembershipState,
+        heroStat: heroStatByLeague[m.leagues.id] || null,
+        lastActivityAt: lastActivityByLeague[m.leagues.id] || null,
+        unreadCount: unreadByLeague[m.leagues.id] || 0,
+        unreadFrom: unreadFromByLeague[m.leagues.id] || null,
+        together: togetherByLeague[m.leagues.id] || null,
+        pinned: !!m.pinned,
+      }))
+      // A manually pinned team always wins; otherwise most recently active
+      // first — "who am I training with today", not alphabetical.
+      .sort((a, b) => {
+        if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+        return new Date(b.lastActivityAt || 0).getTime() - new Date(a.lastActivityAt || 0).getTime();
+      });
+
+    setMyTeams(sortedMyTeams);
+
+    setPublicTeams(
+      (publicRes.data || [])
+        .filter((l: any) => membershipMap.get(l.id) !== 'active')
+        .map((l: any) => ({
+          id: l.id,
+          name: l.name,
+          logo_url: l.logo_url,
+          member_count: countMap[l.id] || 0,
+          membership: membershipMap.get(l.id) || 'none',
+          heroStat: null,
+          lastActivityAt: null,
+          unreadCount: 0,
+          unreadFrom: null,
+          together: null,
+          pinned: false,
+        }))
+    );
     setLoading(false);
+  }
+
+  const MAX_PINNED = 3;
+
+  // Manually pin up to 3 teams to the top of the grid, overriding the
+  // automatic "most recently active" order. Unpinning is done by tapping an
+  // already-pinned team again; a 4th pin attempt is a no-op rather than
+  // bumping an existing pin — explicit unpin first, no surprise evictions.
+  async function togglePin(leagueId: string) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const wasPinned = myTeams.find(t => t.id === leagueId)?.pinned;
+    const pinnedCount = myTeams.filter(t => t.pinned).length;
+    if (!wasPinned && pinnedCount >= MAX_PINNED) return;
+
+    // Optimistic — flip locally before the round-trip so the tap feels instant.
+    setMyTeams(prev => prev
+      .map(t => (t.id === leagueId ? { ...t, pinned: !wasPinned } : t))
+      .sort((a, b) => {
+        if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+        return new Date(b.lastActivityAt || 0).getTime() - new Date(a.lastActivityAt || 0).getTime();
+      }));
+
+    await supabase.from('league_members').update({ pinned: !wasPinned }).eq('user_id', user.id).eq('league_id', leagueId);
   }
 
   async function join(leagueId: string) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
     setJoining(leagueId);
+    setJoinError(null);
     const { error } = await supabase.from('league_members').insert({ league_id: leagueId, user_id: user.id, role: 'member', status: 'pending' });
     setJoining(null);
     if (error) {
-      Alert.alert('Could not send request', error.message);
+      setJoinError(error.message);
       return;
     }
-    setLeagues(prev => prev.map(l => l.id === leagueId ? { ...l, membership: 'pending' } : l));
+    setPublicTeams(prev => prev.map(l => l.id === leagueId ? { ...l, membership: 'pending' } : l));
   }
 
-  const filtered = leagues.filter(l => l.name.toLowerCase().includes(search.toLowerCase()));
+  const q = search.trim().toLowerCase();
+  const filteredMine = myTeams.filter(l => l.name.toLowerCase().includes(q));
+  const filteredPublic = publicTeams.filter(l => l.name.toLowerCase().includes(q));
+
+  function memberLabel(n: number) {
+    return `${n} ${n === 1 ? 'member' : 'members'}`;
+  }
+
+  // Deterministic fallback glyph when a team has no crest yet — cheap
+  // per-card visual variety without a database column to back it.
+  const FALLBACK_ICONS = ['bolt', 'medal', 'fire', 'star', 'location'] as const;
+  function fallbackIcon(id: string) {
+    let hash = 0;
+    for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+    return FALLBACK_ICONS[hash % FALLBACK_ICONS.length];
+  }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.root}>
+      <RivalFixedBackground
+        source={require('../../assets/images/backgrounds/optimized/coastal-cliff-hikers-group.jpg')}
+        focalPoint="43% 42%"
+      />
+      <View style={styles.scrim} />
+      <SafeAreaView style={styles.container}>
       <RivalTopNav active="teams" />
       <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Text style={styles.back}>← Back</Text>
-          </TouchableOpacity>
+
+        {/* Search + entry points */}
+        <View style={[styles.toolRow, wide && styles.toolRowWide]}>
+          <View style={styles.searchBox}>
+            <RivalIcon name="search" size={18} color={RivalColors.textSecondary} />
+            <TextInput
+              style={styles.searchInput}
+              value={search}
+              onChangeText={setSearch}
+              placeholder="Search teams…"
+              placeholderTextColor={RivalColors.textSecondary}
+            />
+          </View>
+          <View style={styles.actionBtns}>
+            <TouchableOpacity style={styles.actionBtn} onPress={() => router.push('/create-league')}>
+              <RivalIcon name="add" size={16} color={RivalColors.onAccentFill} />
+              <Text style={styles.actionBtnText}>Create Team</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionBtnGhost} onPress={() => router.push('/join-league')}>
+              <RivalIcon name="key" size={16} color={RivalColors.accentText} />
+              <Text style={styles.actionBtnGhostText}>Invite code</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-
-        <Text style={styles.title}>Discover Teams</Text>
-        <Text style={styles.subtitle}>Request to join a public team and compete with new rivals.</Text>
-
-        <TextInput
-          style={styles.search}
-          value={search}
-          onChangeText={setSearch}
-          placeholder="Search teams…"
-          placeholderTextColor="#555"
-        />
 
         {loading && <Text style={styles.loading}>Loading…</Text>}
 
-        {!loading && filtered.length === 0 && (
-          <View style={styles.empty}>
-            <Text style={styles.emptyIcon}>🏟️</Text>
-            <Text style={styles.emptyText}>No public teams found.</Text>
-            <Text style={styles.emptySub}>Create one and make it public from Settings.</Text>
-          </View>
-        )}
-
-        {filtered.map(league => (
-          <View key={league.id} style={styles.leagueCard}>
-            <View style={styles.leagueLeft}>
-              {league.logo_url ? (
-                <Image source={{ uri: league.logo_url }} style={styles.leagueLogo} />
-              ) : (
-                <View style={styles.leagueLogoFallback}><Text style={styles.leagueLogoFallbackText}>🏟️</Text></View>
-              )}
-              <View>
-                <Text style={styles.leagueName}>{league.name}</Text>
-                <Text style={styles.leagueMeta}>{league.member_count} {league.member_count === 1 ? 'member' : 'members'}</Text>
-              </View>
-            </View>
-            {league.membership === 'active' ? (
-              <TouchableOpacity onPress={() => router.push({ pathname: '/league', params: { id: league.id } })}>
-                <Text style={styles.viewBtn}>View →</Text>
-              </TouchableOpacity>
-            ) : league.membership === 'pending' ? (
-              <View style={styles.pendingPill}>
-                <Text style={styles.pendingPillText}>Requested</Text>
+        {/* ——— My Teams ——— */}
+        {!loading && (
+          <>
+            <Text style={[styles.sectionTitle, styles.sectionTitleCentered]}>My Teams</Text>
+            {filteredMine.length === 0 ? (
+              <View style={styles.emptyBox}>
+                <RivalIcon name="groups" size={30} color={RivalColors.textSecondary} />
+                <Text style={styles.emptyText}>{q ? 'No teams match your search.' : "You're not on a team yet."}</Text>
+                {!q && <Text style={styles.emptySub}>Create one, or join a public team below.</Text>}
               </View>
             ) : (
-              <TouchableOpacity
-                style={[styles.joinBtn, joining === league.id && styles.joinBtnDisabled]}
-                onPress={() => join(league.id)}
-                disabled={joining === league.id}
-              >
-                <Text style={styles.joinBtnText}>{joining === league.id ? 'Sending…' : 'Request to join'}</Text>
-              </TouchableOpacity>
+              <View style={[styles.teamGrid, wide && styles.teamGridWide]}>
+                {filteredMine.map(team => (
+                  <TeamGridCard
+                    key={team.id}
+                    team={team}
+                    wide={wide}
+                    members={memberLabel(team.member_count)}
+                    fallbackIconName={fallbackIcon(team.id)}
+                    onPress={() => router.push({ pathname: '/league', params: { id: team.id } })}
+                    onTogglePin={() => togglePin(team.id)}
+                  />
+                ))}
+                <TouchableOpacity
+                  style={[styles.joinCard, wide && styles.gridCardWide]}
+                  onPress={() => router.push('/join-league')}
+                  activeOpacity={0.85}
+                >
+                  <View style={styles.joinCardIcon}>
+                    <RivalIcon name="add" size={26} color={RivalColors.textPrimary} />
+                  </View>
+                  <Text style={styles.joinCardTitle}>Join a New Team</Text>
+                  <Text style={styles.joinCardSub}>Enter a code or browse public squads</Text>
+                </TouchableOpacity>
+              </View>
             )}
-          </View>
-        ))}
+
+            {/* ——— Discover ——— */}
+            <Text style={[styles.sectionTitle, styles.sectionTitleCentered]}>Discover</Text>
+            <Text style={styles.sectionSub}>Public teams open to join requests.</Text>
+
+            {joinError && <Text style={styles.joinError}>⚠️ {joinError}</Text>}
+
+            {filteredPublic.length === 0 ? (
+              <View style={styles.emptyBox}>
+                <RivalIcon name="globe" size={30} color={RivalColors.textSecondary} />
+                <Text style={styles.emptyText}>{q ? 'No public teams match your search.' : 'No public teams right now.'}</Text>
+                {!q && <Text style={styles.emptySub}>Create one and make it public from Team Settings.</Text>}
+              </View>
+            ) : (
+              <View style={[styles.discoverList, wide && styles.discoverListWide]}>
+                {filteredPublic.map(team => (
+                  <View key={team.id} style={[styles.discoverCard, wide && styles.discoverCardHalf]}>
+                    <View style={styles.discoverLeft}>
+                      {team.logo_url ? (
+                        <Image source={{ uri: team.logo_url }} style={styles.discoverLogo} />
+                      ) : (
+                        <View style={styles.discoverLogoFallback}>
+                          <RivalIcon name="groups" size={22} color={RivalColors.accentText} />
+                        </View>
+                      )}
+                      <View style={styles.discoverInfo}>
+                        <Text style={styles.discoverName} numberOfLines={1}>{team.name}</Text>
+                        <Text style={styles.discoverMeta}>{memberLabel(team.member_count)}</Text>
+                      </View>
+                    </View>
+                    {team.membership === 'pending' ? (
+                      <View style={styles.pendingPill}>
+                        <Text style={styles.pendingPillText}>Requested</Text>
+                      </View>
+                    ) : (
+                      <TouchableOpacity
+                        style={[styles.joinBtn, joining === team.id && styles.joinBtnDisabled]}
+                        onPress={() => join(team.id)}
+                        disabled={joining === team.id}
+                      >
+                        <Text style={styles.joinBtnText}>{joining === team.id ? 'Sending…' : 'Request to join'}</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                ))}
+              </View>
+            )}
+          </>
+        )}
       </ScrollView>
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
+  );
+}
+
+// Uniform "My Teams" grid card (stitch-export-19 layout): fixed-size card
+// with a crest slot, a status pill (hero stat or member count), the team
+// name, a 2-up members/training metric row, and an earned-hours footer — one
+// named, memorable signal per card ("Emma logged a Run") rather than a stack
+// of counts.
+function TeamGridCard({
+  team, wide, members, fallbackIconName, onPress, onTogglePin,
+}: {
+  team: TeamRow;
+  wide: boolean;
+  members: string;
+  fallbackIconName: RivalIconName;
+  onPress: () => void;
+  onTogglePin: () => void;
+}) {
+  const earnedHours = team.together?.hours ?? 0;
+  const pillText = team.heroStat?.text ?? `${members}`;
+  const pillIcon = team.heroStat?.icon ?? 'groups';
+
+  // Web-only reveal: the crest is the resting state, everything else fades
+  // in on hover. Native has no hover concept, so it always shows content.
+  const [hovered, setHovered] = useState(false);
+  const showContent = Platform.OS !== 'web' || hovered;
+  const hoverHandlers = Platform.OS === 'web'
+    ? { onMouseEnter: () => setHovered(true), onMouseLeave: () => setHovered(false) }
+    : {};
+
+  return (
+    <TouchableOpacity
+      style={[styles.gridCard, wide && styles.gridCardWide, team.pinned && styles.gridCardPinned, hovered && styles.gridCardHovered]}
+      onPress={onPress}
+      activeOpacity={0.85}
+      {...(hoverHandlers as any)}
+    >
+      {team.logo_url ? (
+        <>
+          <Image source={{ uri: team.logo_url }} style={styles.gridCardBg} resizeMode="cover" />
+          {showContent && <View style={styles.gridCardBgScrim} />}
+        </>
+      ) : (
+        !showContent && (
+          <View style={styles.gridCrestResting}>
+            <RivalIcon name={fallbackIconName} size={44} color={RivalColors.accentText} />
+          </View>
+        )
+      )}
+
+      {/* Resting-state CTA — only for genuinely unread chat, which actually
+          clears (opening the team's Chat tab marks it read). heroStat
+          ("New PB this week" etc.) has no read/dismiss state of its own, so
+          it can't drive this — it'd never go away. */}
+      {!showContent && !!team.unreadFrom && (
+        <View style={styles.restingNotifDot}>
+          <RivalIcon name="notifications" size={13} color="#1A1A1A" />
+        </View>
+      )}
+
+      {showContent && (
+        <>
+          {team.pinned && (
+            <View style={styles.pinnedRibbon}>
+              <Text style={styles.pinnedRibbonText}>PINNED</Text>
+            </View>
+          )}
+          <View style={styles.gridCardTop}>
+            {!team.logo_url && (
+              <View style={styles.gridCrestFallback}>
+                <RivalIcon name={fallbackIconName} size={26} color={RivalColors.accentText} />
+              </View>
+            )}
+            <View style={[styles.gridTopRight, !team.logo_url && { marginLeft: 'auto' }]}>
+              <TouchableOpacity
+                style={styles.pinBtnGrid}
+                onPress={(e) => { e.stopPropagation?.(); onTogglePin(); }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <RivalIcon name="pin" size={14} color={team.pinned ? RivalColors.accentText : RivalColors.textSecondary} />
+              </TouchableOpacity>
+              {!!team.unreadFrom && (
+                <View style={styles.unreadBadge}>
+                  <RivalIcon name="chat" size={11} color={RivalColors.onAccentFill} />
+                  <Text style={styles.unreadBadgeText} numberOfLines={1}>
+                    {team.unreadFrom}{team.unreadCount > 1 ? ` +${team.unreadCount - 1}` : ''}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+
+          <View style={styles.gridCenterBlock}>
+            <View style={styles.pillRow}>
+              <RivalIcon name={pillIcon} size={12} color={RivalColors.accentText} />
+              <Text style={styles.pillText} numberOfLines={1}>{pillText.toUpperCase()}</Text>
+            </View>
+            <Text style={styles.gridName} numberOfLines={2}>{team.name.toUpperCase()}</Text>
+          </View>
+
+          <View style={styles.gridFooter}>
+            <View>
+              <Text style={styles.footerLabel}>MEMBERS</Text>
+              <Text style={styles.footerValue}>{team.member_count}</Text>
+            </View>
+            <View style={{ alignItems: 'flex-end' }}>
+              <Text style={styles.footerLabel}>EARNED</Text>
+              <Text style={styles.footerEarned}>{earnedHours}h</Text>
+            </View>
+          </View>
+        </>
+      )}
+    </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#111111' },
-  content: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 40 },
-  header: { marginBottom: 16 },
-  back: { color: '#E91E8C', fontSize: 16 },
-  title: { fontSize: 32, fontWeight: '900', color: '#FFFFFF', marginBottom: 6 },
-  subtitle: { fontSize: 14, color: '#999999', marginBottom: 20 },
-  search: { backgroundColor: '#1A1A1A', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, color: '#FFFFFF', fontSize: 14, borderWidth: 1, borderColor: '#2A2A2A', marginBottom: 20 },
-  loading: { color: '#999999', textAlign: 'center', marginTop: 40 },
-  empty: { alignItems: 'center', marginTop: 60, gap: 8 },
-  emptyIcon: { fontSize: 40 },
-  emptyText: { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
-  emptySub: { fontSize: 13, color: '#666666', textAlign: 'center' },
-  leagueCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#1A1A1A', borderRadius: 14, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: '#2A2A2A' },
-  leagueLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
-  leagueLogo: { width: 44, height: 44, borderRadius: 10 },
-  leagueLogoFallback: { width: 44, height: 44, borderRadius: 10, backgroundColor: '#2A2A2A', alignItems: 'center', justifyContent: 'center' },
-  leagueLogoFallbackText: { fontSize: 22 },
-  leagueName: { fontSize: 15, fontWeight: '700', color: '#FFFFFF' },
-  leagueMeta: { fontSize: 12, color: '#999999', marginTop: 2 },
-  viewBtn: { color: '#E91E8C', fontWeight: '700', fontSize: 14 },
-  joinBtn: { backgroundColor: '#8DC63F', borderRadius: 10, paddingVertical: 8, paddingHorizontal: 16 },
+  root: { flex: 1, backgroundColor: RivalColors.surfaceLow },
+  scrim: { position: 'fixed' as any, top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(14,14,14,0.55)' },
+  container: { flex: 1, backgroundColor: 'transparent' },
+  content: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 60, maxWidth: 1200, width: '100%', alignSelf: 'center' },
+
+  toolRow: { gap: 12, marginBottom: 28 },
+  toolRowWide: { flexDirection: 'row', alignItems: 'center' },
+  searchBox: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', borderRadius: RivalRadius.full, paddingHorizontal: 16, height: 44 },
+  searchInput: { flex: 1, color: RivalColors.textPrimary, fontSize: 14, height: '100%' },
+  actionBtns: { flexDirection: 'row', gap: 8 },
+  actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: RivalColors.accentFill, borderRadius: RivalRadius.full, paddingHorizontal: 16, height: 44 },
+  actionBtnText: { color: RivalColors.onAccentFill, fontSize: 14, fontWeight: '700' },
+  actionBtnGhost: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: `${RivalColors.accentFill}66`, borderRadius: RivalRadius.full, paddingHorizontal: 16, height: 44 },
+  actionBtnGhostText: { color: RivalColors.accentText, fontSize: 14, fontWeight: '700' },
+
+  loading: { color: RivalColors.textSecondary, textAlign: 'center', marginTop: 40 },
+
+  sectionTitle: { ...RivalType.titleMd, color: RivalColors.textPrimary, marginBottom: 4, marginTop: 8 },
+  sectionTitleCentered: { textAlign: 'center', fontSize: 22, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
+  sectionSub: { fontSize: 13, color: RivalColors.textSecondary, marginBottom: 14, textAlign: 'center' },
+
+  emptyBox: { alignItems: 'center', gap: 8, paddingVertical: 36, marginBottom: 24, backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: RivalRadius.lg, borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)' },
+  emptyText: { fontSize: 15, fontWeight: '700', color: RivalColors.textPrimary },
+  emptySub: { fontSize: 13, color: RivalColors.textSecondary },
+
+  // My Teams grid cards (stitch-export-19 layout) — uniform size, no photo
+  // background, crest slot + status pill + name + metrics + footer.
+  teamGrid: { gap: 14, marginBottom: 28, marginTop: 10 },
+  teamGridWide: { flexDirection: 'row', flexWrap: 'wrap' },
+  gridCard: { borderRadius: RivalRadius.lg, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', backgroundColor: 'rgba(255,255,255,0.04)', padding: 18, minHeight: 260, position: 'relative', overflow: 'hidden', ...(Platform.OS === 'web' ? { transitionProperty: 'transform, box-shadow', transitionDuration: '150ms', transitionTimingFunction: 'ease' } as any : {}) },
+  gridCardHovered: { transform: [{ scale: 1.03 }], ...(Platform.OS === 'web' ? { boxShadow: '0 12px 28px rgba(0,0,0,0.35)' } as any : {}) },
+  // flexGrow: 0 keeps every card the same size regardless of row count — a
+  // team's crest photo (background-cover) was cropping badly when a
+  // near-empty row let flexGrow stretch a card much wider than tall.
+  gridCardWide: { flexBasis: '31%', flexGrow: 0, minWidth: 280 },
+  gridCardPinned: { borderColor: `${RivalColors.accentFill}66`, backgroundColor: 'rgba(217,119,87,0.06)' },
+  gridCardBg: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%' },
+  gridCardBgScrim: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(10,10,10,0.55)' },
+  pinnedRibbon: { position: 'absolute', top: 0, right: 0, backgroundColor: RivalColors.accentFill, paddingHorizontal: 10, paddingVertical: 3, borderBottomLeftRadius: RivalRadius.DEFAULT, zIndex: 1 },
+  pinnedRibbonText: { color: RivalColors.onAccentFill, fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
+  gridCardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 },
+  gridCrestFallback: { width: 48, height: 48, borderRadius: RivalRadius.DEFAULT, backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center' },
+  // Resting (un-hovered) state for teams with no crest — a big centered
+  // glyph fills the card the same way a crest photo would.
+  gridCrestResting: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
+  restingNotifDot: { position: 'absolute', top: 10, right: 10, width: 26, height: 26, borderRadius: RivalRadius.full, backgroundColor: '#FFC93C', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(0,0,0,0.35)' },
+  gridTopRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  pinBtnGrid: { width: 26, height: 26, borderRadius: RivalRadius.full, backgroundColor: 'rgba(255,255,255,0.06)', alignItems: 'center', justifyContent: 'center' },
+  unreadBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: RivalRadius.full, paddingHorizontal: 9, paddingVertical: 4, maxWidth: 120 },
+  unreadBadgeText: { color: RivalColors.onAccentFill, fontSize: 11, fontWeight: '800' },
+  // A single frosted panel anchored to the bottom of the card — keeps the
+  // crest artwork clear up top instead of text sitting dead-center on it.
+  // Fills the space between the top row and the footer, so the team name
+  // sits centered in the card regardless of content height.
+  gridCenterBlock: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 8 },
+  pillRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  pillText: { fontSize: 11, fontWeight: '700', color: RivalColors.accentText, letterSpacing: 0.5 },
+  // Letter-spacing borrowed from the RIVAL wordmark itself (RivalTopNav) —
+  // makes the team name read as a title, not just bold body text.
+  gridName: { fontSize: 20, fontWeight: '800', letterSpacing: 1, color: RivalColors.textPrimary, textAlign: 'center' },
+  gridFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 18, paddingTop: 14, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.1)' },
+  footerLabel: { fontSize: 10, fontWeight: '700', color: RivalColors.textSecondary, letterSpacing: 0.5, marginBottom: 3 },
+  footerEarned: { fontSize: 26, fontWeight: '800', color: RivalColors.accentText },
+  footerValue: { fontSize: 26, fontWeight: '800', color: RivalColors.textPrimary },
+
+  joinCard: { borderRadius: RivalRadius.lg, borderWidth: 2, borderStyle: 'dashed', borderColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center', gap: 10, padding: 24, minHeight: 260 },
+  joinCardIcon: { width: 52, height: 52, borderRadius: RivalRadius.full, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center' },
+  joinCardTitle: { fontSize: 16, fontWeight: '700', color: RivalColors.textPrimary },
+  joinCardSub: { fontSize: 12, color: RivalColors.textSecondary, textAlign: 'center' },
+
+  // Discover cards
+  joinError: { color: '#ffb4ab', fontSize: 13, marginBottom: 10 },
+  discoverList: { gap: 10, marginTop: 4 },
+  discoverListWide: { flexDirection: 'row', flexWrap: 'wrap' },
+  discoverCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: RivalRadius.md, padding: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
+  discoverCardHalf: { flexBasis: '48%', flexGrow: 1, minWidth: 300 },
+  discoverLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flexShrink: 1 },
+  discoverInfo: { flexShrink: 1 },
+  discoverLogo: { width: 44, height: 44, borderRadius: RivalRadius.DEFAULT },
+  discoverLogoFallback: { width: 44, height: 44, borderRadius: RivalRadius.DEFAULT, backgroundColor: `${RivalColors.accentFill}22`, alignItems: 'center', justifyContent: 'center' },
+  discoverName: { fontSize: 15, fontWeight: '700', color: RivalColors.textPrimary },
+  discoverMeta: { fontSize: 12, color: RivalColors.textSecondary, marginTop: 2 },
+  joinBtn: { backgroundColor: RivalColors.accentFill, borderRadius: RivalRadius.full, paddingVertical: 8, paddingHorizontal: 14 },
   joinBtnDisabled: { opacity: 0.5 },
-  joinBtnText: { color: '#000000', fontWeight: '800', fontSize: 13 },
-  pendingPill: { backgroundColor: '#2A2A2A', borderRadius: 10, paddingVertical: 8, paddingHorizontal: 14 },
-  pendingPillText: { color: '#999999', fontWeight: '700', fontSize: 13 },
+  joinBtnText: { color: RivalColors.onAccentFill, fontWeight: '800', fontSize: 13 },
+  pendingPill: { backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: RivalRadius.full, paddingVertical: 8, paddingHorizontal: 14 },
+  pendingPillText: { color: RivalColors.textSecondary, fontWeight: '700', fontSize: 13 },
 });

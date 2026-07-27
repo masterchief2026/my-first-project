@@ -5,7 +5,8 @@ import { router, useFocusEffect } from 'expo-router';
 import { supabase } from '../lib/supabase';
 import { displayToIsoDate } from '../lib/dateFormat';
 import { computeGoalProgress } from '../lib/goalProgress';
-import { RivalTopNav } from '../components/rival';
+import { RivalTopNav, RivalIcon } from '../components/rival';
+import { RivalColors, RivalRadius } from '../constants/rivalTheme';
 
 type Goal = {
   id: string;
@@ -16,6 +17,7 @@ type Goal = {
   end_date: string;
   activity_filter: string | null;
   progress: number;
+  pinned: boolean;
 };
 
 const GOAL_LABELS: Record<string, string> = {
@@ -104,6 +106,24 @@ const ZERO_MESSAGES = [
   "Your future self will thank you.",
   "Go get those endorphins!",
 ];
+
+// A week/month goal whose end_date has passed without being hit — the DB row
+// itself never renews (see saveGoal), so without this it just silently
+// disappears from "active" everywhere (home.tsx's featured-goal card, this
+// list) with no record of it ever existing. Brand voice: never frame it as
+// failure — "missed"/"expired" reads as shame, not encouragement.
+function isGoalEnded(goal: Goal): boolean {
+  if (goal.period_type === 'custom') return false; // one-off deadline, not a recurring period — no natural "try again"
+  const end = new Date(goal.end_date + 'T23:59:59');
+  return end.getTime() < Date.now() && goal.progress < goal.target_value;
+}
+
+function endedMessage(goal: Goal): string {
+  const unit = GOAL_UNITS[goal.goal_type];
+  const remaining = Math.round((goal.target_value - goal.progress) * 10) / 10;
+  const period = goal.period_type === 'week' ? 'this week' : 'this month';
+  return `You were ${remaining} ${unit} away from finishing your previous goal. Let's try again ${period} — you got this.`;
+}
 
 function getEncouragement(progress: number, target: number, unit: string, goalId: string): string | null {
   const pct = progress / target;
@@ -292,6 +312,39 @@ export default function GoalsScreen() {
     setGoals((prev) => prev.filter((g) => g.id !== id));
   }
 
+  // Exactly one pinned goal at a time — pinning this one unpins whichever
+  // else was pinned, in the same round trip. This is what home.tsx's Today
+  // card reads to decide which goal to feature, ahead of the nearest-
+  // deadline auto-pick fallback.
+  async function togglePin(goal: Goal) {
+    const nextPinned = !goal.pinned;
+    setGoals((prev) => prev.map((g) => ({ ...g, pinned: g.id === goal.id ? nextPinned : false })));
+    if (nextPinned) {
+      const { error: unpinError } = await supabase.from('goals').update({ pinned: false }).eq('user_id', userId).neq('id', goal.id);
+      if (unpinError) { load(); return; }
+    }
+    const { error } = await supabase.from('goals').update({ pinned: nextPinned }).eq('id', goal.id);
+    if (error) load();
+  }
+
+  // Replaces an ended goal with a fresh one for the current week/month —
+  // same type/target/filter, reset progress. Replaces rather than stacking
+  // a 4th row, since it's the same slot picking back up, not a new goal.
+  async function tryAgainGoal(goal: Goal) {
+    const { start, end } = getDateRange(goal.period_type as 'week' | 'month');
+    await supabase.from('goals').insert({
+      user_id: userId,
+      goal_type: goal.goal_type,
+      target_value: goal.target_value,
+      period_type: goal.period_type,
+      start_date: dateToLocalStr(start),
+      end_date: dateToLocalStr(end),
+      activity_filter: goal.activity_filter,
+    });
+    await supabase.from('goals').delete().eq('id', goal.id);
+    load();
+  }
+
   function periodLabel(goal: Goal) {
     if (goal.period_type === 'week') return 'This week';
     if (goal.period_type === 'month') return 'This month';
@@ -324,6 +377,7 @@ export default function GoalsScreen() {
           const color = GOAL_BAR_COLOR[goal.goal_type];
           const unit = GOAL_UNITS[goal.goal_type];
           const done = goal.progress >= goal.target_value;
+          const ended = !done && isGoalEnded(goal);
           const encouragement = getEncouragement(goal.progress, goal.target_value, unit, goal.id);
           return (
             <View
@@ -345,12 +399,18 @@ export default function GoalsScreen() {
                     </Text>
                   </View>
                 </View>
-                <TouchableOpacity onPress={() => deleteGoal(goal.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <View style={styles.deleteBtn}>
-                    <Text style={styles.deleteBtnText}>✕</Text>
-                  </View>
-                </TouchableOpacity>
+                <View style={styles.goalHeaderActions}>
+                  <TouchableOpacity onPress={() => togglePin(goal)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <RivalIcon name="pin" size={18} color={goal.pinned ? RivalColors.accentText : RivalColors.textSecondary} />
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => deleteGoal(goal.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <View style={styles.deleteBtn}>
+                      <Text style={styles.deleteBtnText}>✕</Text>
+                    </View>
+                  </TouchableOpacity>
+                </View>
               </View>
+              {goal.pinned && <Text style={styles.pinnedLabel}>Pinned to Today</Text>}
 
               {done && (
                 <View style={styles.celebrationBanner}>
@@ -372,8 +432,17 @@ export default function GoalsScreen() {
                 unit={unit}
               />
 
-              {!done && encouragement && (
+              {!done && !ended && encouragement && (
                 <Text style={styles.encouragement}>{encouragement}</Text>
+              )}
+
+              {ended && (
+                <View style={styles.endedBlock}>
+                  <Text style={styles.encouragement}>{endedMessage(goal)}</Text>
+                  <TouchableOpacity style={styles.tryAgainBtn} onPress={() => tryAgainGoal(goal)}>
+                    <Text style={styles.tryAgainBtnText}>Try again {goal.period_type === 'week' ? 'this week' : 'this month'}</Text>
+                  </TouchableOpacity>
+                </View>
               )}
             </View>
           );
@@ -514,6 +583,8 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   goalTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  goalHeaderActions: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  pinnedLabel: { fontSize: 11, fontWeight: '700', color: RivalColors.accentText, marginTop: -8, marginBottom: 10 },
   typeBadge: {
     paddingHorizontal: 10,
     paddingVertical: 5,
@@ -558,6 +629,12 @@ const styles = StyleSheet.create({
     marginTop: 10,
     fontStyle: 'italic',
   },
+  endedBlock: { marginTop: 10, gap: 10 },
+  tryAgainBtn: {
+    backgroundColor: RivalColors.accentFill, borderRadius: RivalRadius.full,
+    paddingVertical: 10, alignItems: 'center',
+  },
+  tryAgainBtnText: { fontSize: 14, fontWeight: '700', color: RivalColors.onAccentFill },
   goalProgress: { flexDirection: 'row', alignItems: 'baseline', marginBottom: 20 },
   progressCurrent: { fontSize: 28, fontWeight: '900', color: '#FFFFFF' },
   progressSep: { color: '#666666', fontSize: 16 },

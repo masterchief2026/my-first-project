@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { StyleSheet, TouchableOpacity, View, Text, TextInput, Platform, ImageBackground } from 'react-native';
+import { StyleSheet, TouchableOpacity, View, Text, TextInput, Platform, Image as RNImage } from 'react-native';
+import { Asset } from 'expo-asset';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { supabase } from '../lib/supabase';
@@ -100,13 +101,32 @@ export default function SignInScreen() {
     setResetSent(true);
   }
 
+  // react-native-web's ImageBackground renders its background-image on an
+  // inner div that hardcodes centered positioning — the imageStyle/style prop
+  // never reaches it, so a custom focal point is silently a no-op there. A
+  // real DOM <img> with object-position behaves correctly instead.
+  // react-native-web's <Image> has no public resolveAssetSource (that's a
+  // native-RN-only static) — expo-asset's Asset.fromModule is the documented
+  // cross-platform way to turn a require()'d module id into a usable URI.
+  const bgUri = Platform.OS === 'web'
+    ? Asset.fromModule(require('../../assets/images/backgrounds/optimized/2-3-trail-runners-moving-along-a.jpg')).uri
+    : undefined;
+
   return (
-    <ImageBackground
-      source={require('../../assets/images/backgrounds/optimized/2-3-trail-runners-moving-along-a.jpg')}
-      style={styles.bg}
-      imageStyle={{ objectPosition: '62% center' } as any}
-      resizeMode="cover"
-    >
+    <View style={styles.bg}>
+      {Platform.OS === 'web' ? (
+        // @ts-ignore — intentional escape hatch to a real DOM element; RN Web's renderer is react-dom
+        <img
+          src={bgUri}
+          style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: '62% center', display: 'block' }}
+        />
+      ) : (
+        <RNImage
+          source={require('../../assets/images/backgrounds/optimized/2-3-trail-runners-moving-along-a.jpg')}
+          style={StyleSheet.absoluteFill}
+          resizeMode="cover"
+        />
+      )}
       <View style={styles.scrim} />
       <SafeAreaView style={styles.container}>
         <View style={styles.content}>
@@ -193,13 +213,14 @@ export default function SignInScreen() {
 
         </View>
       </SafeAreaView>
-    </ImageBackground>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   bg: {
     flex: 1,
+    position: 'relative',
   },
   scrim: {
     position: 'absolute',

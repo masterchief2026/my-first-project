@@ -128,7 +128,6 @@ export const QUOTES: Quote[] = [
   { text: "You are what you repeatedly do, not what you occasionally intend.", category: 'identity', tone: 'blunt' },
   { text: "Talk doesn't build identity. Reps do.", category: 'identity', tone: 'blunt' },
   { text: "Who you become is decided in ordinary moments, not big speeches.", category: 'identity', tone: 'blunt' },
-  { text: "Your identity isn't a mood. It's a pattern.", category: 'identity', tone: 'blunt' },
   { text: "Stop deciding who you are. Start proving it.", category: 'identity', tone: 'blunt' },
 
   // ── RECOVERY ──────────────────────────────────────────────────
@@ -203,6 +202,22 @@ export function getQuote(tone?: QuoteTone): Quote {
   const pool = tone ? WEIGHTED_POOL.filter((q) => q.tone === tone) : WEIGHTED_POOL;
   const source = pool.length > 0 ? pool : WEIGHTED_POOL;
   return source[Math.floor(Math.random() * source.length)];
+}
+
+// Seeded by the calendar date (not the clock) — every reload on the same day
+// lands on the same line instead of reshuffling on every page refresh, but
+// it still rotates once the date changes. Users are in different timezones,
+// so this is deliberately the device's local date, not a server day.
+export function hashStr(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+export function getDailyQuote(tone?: QuoteTone): Quote {
+  const pool = tone ? WEIGHTED_POOL.filter((q) => q.tone === tone) : WEIGHTED_POOL;
+  const source = pool.length > 0 ? pool : WEIGHTED_POOL;
+  const todayKey = new Date().toDateString();
+  return source[hashStr(todayKey) % source.length];
 }
 
 // Future use: context-aware serving

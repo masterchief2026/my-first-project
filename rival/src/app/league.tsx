@@ -13,7 +13,7 @@ import { RivalColors } from '../constants/rivalTheme';
 import { ACTIVITY_ICONS } from '../constants/activityIcons';
 import { formatDuration } from '../lib/format';
 import { computeActivityInsight, ActivityInsight, InsightActivity, InsightTone } from '../lib/activityInsights';
-import { RivalIcon } from '../components/rival';
+import { RivalIcon, RivalFixedBackground, RivalTopNav, RivalProgressBar } from '../components/rival';
 
 const INSIGHT_ICON: Record<InsightTone, 'trophy' | 'fire' | 'trendUp'> = {
   record: 'trophy',
@@ -90,6 +90,9 @@ type League = {
   created_at: string;
   logo_url: string | null;
   race_id: string | null;
+  goal_metric: Challenge['metric'] | null;
+  goal_target: number | null;
+  goal_target_date: string | null;
 };
 
 // Journeys: a league with a race attached is a shared destination — see
@@ -148,7 +151,7 @@ const CHALLENGE_METRICS: Array<{ value: Challenge['metric']; label: string }> = 
   { value: 'distance', label: 'Distance (km)' },
   { value: 'elevation', label: 'Elevation (m)' },
   { value: 'duration', label: 'Time (hours)' },
-  { value: 'activities', label: '# Activities' },
+  { value: 'activities', label: 'Activities Logged' },
 ];
 // Two reactions, words not emoji: Respect is everyday acknowledgment
 // ("I saw the work"); Inspired is rare and means someone's effort actually
@@ -169,6 +172,10 @@ export default function LeagueScreen() {
   const [league, setLeague] = useState<League | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [journeyRace, setJourneyRace] = useState<JourneyRace | null>(null);
+  // Team Target: cumulative team-wide goal — see leagues_team_goal.sql. Summed
+  // across every active member's activities since the team was created,
+  // mutually exclusive with journeyRace (enforced by a DB check constraint).
+  const [goalProgress, setGoalProgress] = useState(0);
   const [editingGoal, setEditingGoal] = useState(false);
   const [goalDraft, setGoalDraft] = useState('');
   const [currentUserId, setCurrentUserId] = useState('');
@@ -228,6 +235,7 @@ export default function LeagueScreen() {
   const [lvlChallenges, setLvlChallenges] = useState<LeagueVsChallenge[]>([]);
   const [lvlProgress, setLvlProgress] = useState<Record<string, { challenger: number; opponent: number }>>({});
   const [showLvlModal, setShowLvlModal] = useState(false);
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [allLeaguesForPicker, setAllLeaguesForPicker] = useState<Array<{ id: string; name: string; logo_url: string | null }>>([]);
   const [lvlTargetLeague, setLvlTargetLeague] = useState<string | null>(null);
   const [lvlMetric, setLvlMetric] = useState<Challenge['metric']>('xp');
@@ -290,19 +298,16 @@ export default function LeagueScreen() {
     setEditingGoal(false);
   }
 
-  async function leaveTeam() {
+  function leaveTeam() {
     if (!currentUserId) return;
-    const confirmed = Platform.OS === 'web'
-      ? window.confirm(`Leave ${league?.name ?? 'this team'}? You'll need an invite (or to request to join again) to come back.`)
-      : true;
-    if (!confirmed) return;
-    const { error, count } = await supabase
-      .from('league_members')
-      .delete({ count: 'exact' })
-      .eq('league_id', id)
-      .eq('user_id', currentUserId);
-    if (error || !count) {
-      notify("Couldn't leave team", error?.message || 'Nothing was removed — you may not have permission to leave this team.');
+    setShowLeaveConfirm(true);
+  }
+
+  async function confirmLeaveTeam() {
+    setShowLeaveConfirm(false);
+    const { error } = await supabase.rpc('leave_league', { p_league_id: id });
+    if (error) {
+      notify("Couldn't leave team", error.message);
       return;
     }
     router.replace('/home');
@@ -340,6 +345,15 @@ export default function LeagueScreen() {
     if (user && membersData) {
       const adminCheck = membersData.find((m: any) => m.user_id === user.id);
       setIsAdmin(adminCheck?.role === 'admin');
+    }
+
+    if (leagueData?.goal_metric && membersData) {
+      const progress = await computeTeamGoalProgress(
+        membersData.map((m: any) => m.user_id),
+        leagueData.goal_metric,
+        leagueData.created_at,
+      );
+      setGoalProgress(progress);
     }
 
     if (membersData) {
@@ -776,6 +790,28 @@ export default function LeagueScreen() {
       setRsvpMap(map);
     }
     setSessionsLoading(false);
+  }
+
+  // Sums one metric across every active member since the team formed —
+  // same per-metric scoring as computeChallengeProgress below, just summed
+  // across the whole roster instead of two challengers.
+  async function computeTeamGoalProgress(memberIds: string[], metric: Challenge['metric'], sinceIso: string): Promise<number> {
+    if (memberIds.length === 0) return 0;
+    const { data } = await supabase
+      .from('activities')
+      .select('effort_score, distance_meters, elevation_meters, duration_seconds')
+      .in('user_id', memberIds)
+      .gte('started_at', sinceIso);
+
+    let total = 0;
+    (data || []).forEach((a: any) => {
+      if (metric === 'xp') total += a.effort_score || 0;
+      else if (metric === 'distance') total += (a.distance_meters || 0) / 1000;
+      else if (metric === 'elevation') total += a.elevation_meters || 0;
+      else if (metric === 'duration') total += (a.duration_seconds || 0) / 3600;
+      else total += 1;
+    });
+    return Math.round(total * 10) / 10;
   }
 
   async function computeChallengeProgress(challenge: Challenge): Promise<{ challenger: number; opponent: number }> {
@@ -1386,6 +1422,23 @@ export default function LeagueScreen() {
           </View>
         )}
 
+        {league.goal_metric && league.goal_target && league.goal_target_date && (
+          <View style={styles.journeyBanner}>
+            <RivalIcon name="target" size={22} color={RivalColors.accentText} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.journeyBannerTitle}>
+                {CHALLENGE_METRICS.find(m => m.value === league.goal_metric)?.label}: {goalProgress.toLocaleString()} / {league.goal_target.toLocaleString()}
+              </Text>
+              <Text style={styles.journeyBannerSub}>
+                {(() => { const d = daysUntilRace(league.goal_target_date!); return d === 0 ? 'Due today' : d > 0 ? `${d} days left — everyone's effort counts toward this together.` : 'Target date passed.'; })()}
+              </Text>
+              <View style={{ marginTop: 8 }}>
+                <RivalProgressBar pct={league.goal_target ? goalProgress / league.goal_target : 0} />
+              </View>
+            </View>
+          </View>
+        )}
+
         {seasonDaysLeft <= 30 && seasonDaysLeft > 0 && (
           <View style={styles.seasonBanner}>
             <Text style={styles.seasonBannerIcon}>⏳</Text>
@@ -1599,35 +1652,17 @@ export default function LeagueScreen() {
       {/* Fixed viewport-covering background — decoupled from content height on
           purpose (matches the mockup's own `position: fixed; inset: 0`), so a
           long feed scrolling taller than one screen never outgrows the photo. */}
-      <ImageBackground
+      <RivalFixedBackground
         source={require('../../assets/images/backgrounds/optimized/ridge-runners-hazy-backlit.jpg')}
-        style={styles.bgFixed}
-        imageStyle={{ objectPosition: '55% 65%' } as any}
-        resizeMode="cover"
+        focalPoint="55% 65%"
       />
       <View style={styles.scrim} />
       <SafeAreaView style={styles.container}>
-      {wide && (
-        <View style={styles.deskNavBar}>
-          <View style={styles.deskNavRow}>
-            <TouchableOpacity onPress={() => router.replace('/home')}>
-              <Text style={styles.deskLogo}>RIVAL</Text>
-            </TouchableOpacity>
-            <View style={styles.deskNavLinks}>
-              <TouchableOpacity onPress={() => router.replace('/home')}>
-                <Text style={[styles.deskNavLink, styles.deskNavLinkActive]}>Teams</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => router.push('/my-activities')}>
-                <Text style={styles.deskNavLink}>Activity</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => router.push('/profile')}>
-                <Text style={styles.deskNavLink}>Profile</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={{ width: 64 }} />
-          </View>
-        </View>
-      )}
+      {/* Shared persistent nav, matching every other screen — this page had
+          grown its own bespoke desktop-only nav bar (different logo styling,
+          wrong Teams link pointing at /home, no avatar/rank, hidden on
+          mobile) instead of the one every other screen uses. */}
+      <RivalTopNav active="teams" />
       <View style={wide ? styles.bodyRow : styles.bodyFill}>
         {wide && (
           <View style={styles.sidebar}>
@@ -2369,13 +2404,39 @@ export default function LeagueScreen() {
         </TouchableOpacity>
       )}
       </SafeAreaView>
+
+      {/* window.confirm renders as the browser's own "localhost says" dialog
+          — reads as Chrome chrome, not the app. A plain conditional overlay
+          (same fix as RivalFixedBackground/create-league's modal) gives a
+          confirmation that actually looks like RIVAL. */}
+      {showLeaveConfirm && (
+        <View style={styles.leaveConfirmOverlay}>
+          <View style={styles.leaveConfirmCard}>
+            <Text style={styles.leaveConfirmTitle}>
+              {members.length <= 1 ? 'Delete this team?' : 'Leave team?'}
+            </Text>
+            <Text style={styles.leaveConfirmBody}>
+              {members.length <= 1
+                ? `You're the last member of ${league?.name ?? 'this team'}. Leaving will permanently delete it — chat, feed, and challenge history included. This can't be undone.`
+                : `Leave ${league?.name ?? 'this team'}? You'll need an invite (or to request to join again) to come back.`}
+            </Text>
+            <View style={styles.leaveConfirmActions}>
+              <TouchableOpacity style={styles.editCancelButton} onPress={() => setShowLeaveConfirm(false)}>
+                <Text style={styles.editCancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.leaveConfirmDangerBtn} onPress={confirmLeaveTeam}>
+                <Text style={styles.leaveConfirmDangerBtnText}>{members.length <= 1 ? 'Delete Team' : 'Leave Team'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   bg: { flex: 1 },
-  bgFixed: { position: 'fixed' as any, top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%' },
   scrim: { position: 'fixed' as any, top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(14,14,14,0.55)' },
   container: { flex: 1 },
   flatContainer: { flex: 1, backgroundColor: RivalColors.surfaceLow },
@@ -2572,12 +2633,6 @@ const styles = StyleSheet.create({
   leaveTeamText: { color: RivalColors.error, fontSize: 15, fontWeight: '700' },
 
   // ── Desktop Team Hub shell (Stitch 3-column layout) ──
-  deskNavBar: { width: '100%', backgroundColor: 'rgba(14,14,14,0.65)', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' },
-  deskNavRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', maxWidth: 1400, marginHorizontal: 'auto', paddingHorizontal: 24, paddingVertical: 12 },
-  deskLogo: { fontSize: 20, fontWeight: '800', color: RivalColors.accentText, letterSpacing: 4 },
-  deskNavLinks: { flexDirection: 'row', gap: 24 },
-  deskNavLink: { fontSize: 14, color: RivalColors.textSecondary },
-  deskNavLinkActive: { color: RivalColors.textPrimary, fontWeight: '700' },
   bodyRow: { flex: 1, flexDirection: 'row', width: '100%', maxWidth: 1400, marginHorizontal: 'auto', gap: 14, paddingHorizontal: 16, paddingTop: 16 },
   bodyFill: { flex: 1 },
   sidebar: { width: 200, flexGrow: 0, flexShrink: 0, paddingBottom: 24, gap: 6 },
@@ -2677,4 +2732,12 @@ const styles = StyleSheet.create({
   chatInput: { flex: 1, backgroundColor: RivalColors.surfaceHigh, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, color: RivalColors.textPrimary, fontSize: 14, borderWidth: 1, borderColor: RivalColors.surfaceContainerHigh },
   chatSendBtn: { backgroundColor: RivalColors.accentFill, borderRadius: 12, paddingHorizontal: 18, justifyContent: 'center' },
   chatSendBtnText: { color: RivalColors.textPrimary, fontWeight: '700', fontSize: 14 },
+
+  leaveConfirmOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', alignItems: 'center', justifyContent: 'center', padding: 20, ...(Platform.OS === 'web' ? { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1000 } as any : {}) },
+  leaveConfirmCard: { backgroundColor: RivalColors.surfaceHigh, borderRadius: 16, padding: 24, width: '100%', maxWidth: 420, borderWidth: 1, borderColor: RivalColors.surfaceContainerHigh },
+  leaveConfirmTitle: { fontSize: 18, fontWeight: '800', color: RivalColors.textPrimary, marginBottom: 10 },
+  leaveConfirmBody: { fontSize: 14, color: RivalColors.textSecondary, lineHeight: 20 },
+  leaveConfirmActions: { flexDirection: 'row', gap: 12, marginTop: 24 },
+  leaveConfirmDangerBtn: { flex: 1, paddingVertical: 12, borderRadius: 10, alignItems: 'center', backgroundColor: RivalColors.error },
+  leaveConfirmDangerBtnText: { color: RivalColors.surfaceLowest, fontWeight: '800', fontSize: 14 },
 });

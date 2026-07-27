@@ -5,6 +5,20 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { supabase } from '../lib/supabase';
 import { formatDisplayName } from '../lib/identity';
 
+// A crest (and the name baked into it) can change once every 6 months —
+// often enough to fix a bad first attempt or reflect a real team change,
+// rare enough that it still reads as an identity, not a disposable cosmetic.
+// Mirrors the same check in supabase/functions/generate-team-crest/index.ts.
+function nextCrestEligibleAt(generatedAt: string): Date {
+  const d = new Date(generatedAt);
+  d.setMonth(d.getMonth() + 6);
+  return d;
+}
+function crestOnCooldown(generatedAt: string | null): boolean {
+  if (!generatedAt) return false;
+  return Date.now() < nextCrestEligibleAt(generatedAt).getTime();
+}
+
 type Member = {
   user_id: string;
   role: string;
@@ -27,7 +41,9 @@ export default function LeagueSettingsScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
-  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [crestGeneratedAt, setCrestGeneratedAt] = useState<string | null>(null);
+  const [generatingCrest, setGeneratingCrest] = useState(false);
+  const [crestError, setCrestError] = useState('');
   const [isPrivate, setIsPrivate] = useState(true);
   const [pendingRequests, setPendingRequests] = useState<Member[]>([]);
   const [respondingTo, setRespondingTo] = useState<string | null>(null);
@@ -57,7 +73,7 @@ export default function LeagueSettingsScreen() {
 
     const { data: league } = await supabase
       .from('leagues')
-      .select('name, created_by, logo_url, is_private')
+      .select('name, created_by, logo_url, is_private, crest_generated_at')
       .eq('id', id)
       .single();
 
@@ -67,6 +83,7 @@ export default function LeagueSettingsScreen() {
       setCreatedBy(league.created_by);
       setLogoUrl(league.logo_url || null);
       setIsPrivate(league.is_private !== false);
+      setCrestGeneratedAt(league.crest_generated_at || null);
     }
 
     const { data: membersData } = await supabase
@@ -110,34 +127,25 @@ export default function LeagueSettingsScreen() {
     setRespondingTo(null);
   }
 
-  async function uploadLogo() {
-    if (Platform.OS !== 'web') return;
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.onchange = async () => {
-      const file = input.files?.[0];
-      if (!file) return;
-      setUploadingLogo(true);
-      try {
-        const ext = file.name.split('.').pop() || 'jpg';
-        const path = `leagues/${id}/logo.${ext}`;
-        const { error: storageErr } = await supabase.storage
-          .from('avatars')
-          .upload(path, file, { contentType: file.type, upsert: true });
-        if (!storageErr) {
-          const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path);
-          await supabase.from('leagues').update({ logo_url: urlData.publicUrl }).eq('id', id);
-          setLogoUrl(urlData.publicUrl);
-        }
-      } finally {
-        setUploadingLogo(false);
-      }
-    };
-    input.click();
+  async function generateCrest() {
+    setGeneratingCrest(true);
+    setCrestError('');
+    const { data, error } = await supabase.functions.invoke('generate-team-crest', { body: { leagueId: id } });
+    if (error || data?.error) {
+      setCrestError(data?.error || error?.message || 'Crest generation failed');
+      setGeneratingCrest(false);
+      return;
+    }
+    setLogoUrl(data.url);
+    setCrestGeneratedAt(new Date().toISOString());
+    setGeneratingCrest(false);
   }
 
   async function saveName() {
+    if (crestOnCooldown(crestGeneratedAt)) {
+      setEditingName(false);
+      return;
+    }
     if (!newName.trim() || newName === leagueName) {
       setEditingName(false);
       return;
@@ -218,23 +226,36 @@ export default function LeagueSettingsScreen() {
 
         <Text style={styles.title}>Team Settings</Text>
 
-        {/* Logo */}
-        <Text style={styles.sectionLabel}>Team Logo</Text>
-        <TouchableOpacity style={styles.logoCard} onPress={uploadLogo} disabled={uploadingLogo}>
+        {/* Crest — AI-generated only, so every team page shares one look
+            instead of a mix of AI art and whatever photo someone had on
+            hand. logoCard here is just a preview; the only action is
+            generateCrest below. */}
+        <Text style={styles.sectionLabel}>Team Crest</Text>
+        <View style={styles.logoCard}>
           {logoUrl ? (
-            <>
-              <Image source={{ uri: logoUrl }} style={styles.logoImage} />
-              <View style={styles.logoEditBadge}>
-                <Text style={styles.logoEditText}>{uploadingLogo ? '⏳' : '📷 Change logo'}</Text>
-              </View>
-            </>
+            <Image source={{ uri: logoUrl }} style={styles.logoImage} />
           ) : (
             <View style={styles.logoPlaceholder}>
               <Text style={styles.logoPlaceholderIcon}>🏟️</Text>
-              <Text style={styles.logoPlaceholderHint}>{uploadingLogo ? 'Uploading…' : 'Tap to upload a logo'}</Text>
+              <Text style={styles.logoPlaceholderHint}>No crest yet</Text>
             </View>
           )}
+        </View>
+
+        <TouchableOpacity
+          style={[styles.crestBtn, (generatingCrest || crestOnCooldown(crestGeneratedAt)) && styles.crestBtnDisabled]}
+          onPress={generateCrest}
+          disabled={generatingCrest || crestOnCooldown(crestGeneratedAt)}
+        >
+          <Text style={styles.crestBtnText}>
+            {generatingCrest
+              ? 'Generating…'
+              : crestOnCooldown(crestGeneratedAt)
+                ? `Next crest available ${nextCrestEligibleAt(crestGeneratedAt!).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}`
+                : crestGeneratedAt ? '✨ Regenerate AI Crest' : '✨ Generate AI Crest'}
+          </Text>
         </TouchableOpacity>
+        {crestError ? <Text style={styles.crestErrorText}>{crestError}</Text> : null}
 
         {/* Rename */}
         <Text style={styles.sectionLabel}>Team Name</Text>
@@ -255,6 +276,11 @@ export default function LeagueSettingsScreen() {
                 <Text style={styles.cancelText}>Cancel</Text>
               </TouchableOpacity>
             </View>
+          ) : crestOnCooldown(crestGeneratedAt) ? (
+            <View style={styles.nameRow}>
+              <Text style={styles.nameText}>{leagueName}</Text>
+              <Text style={styles.editHintLocked}>🔒 Locked</Text>
+            </View>
           ) : (
             <TouchableOpacity style={styles.nameRow} onPress={() => setEditingName(true)}>
               <Text style={styles.nameText}>{leagueName}</Text>
@@ -262,6 +288,9 @@ export default function LeagueSettingsScreen() {
             </TouchableOpacity>
           )}
         </View>
+        {crestOnCooldown(crestGeneratedAt) ? (
+          <Text style={styles.nameLockedHint}>Your AI crest has this name built into the artwork, so the name is locked until your next crest is available.</Text>
+        ) : null}
 
         {/* Visibility */}
         <Text style={styles.sectionLabel}>Visibility</Text>
@@ -430,6 +459,16 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#E91E8C',
   },
+  editHintLocked: {
+    fontSize: 13,
+    color: '#666666',
+  },
+  nameLockedHint: {
+    fontSize: 12,
+    color: '#666666',
+    marginTop: -20,
+    marginBottom: 20,
+  },
   nameEditRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -467,8 +506,10 @@ const styles = StyleSheet.create({
   logoPlaceholder: { paddingVertical: 32, alignItems: 'center', gap: 8 },
   logoPlaceholderIcon: { fontSize: 36 },
   logoPlaceholderHint: { fontSize: 13, color: '#666666' },
-  logoEditBadge: { paddingVertical: 10, alignItems: 'center', width: '100%', borderTopWidth: 1, borderTopColor: '#2A2A2A' },
-  logoEditText: { color: '#E91E8C', fontSize: 13, fontWeight: '600' },
+  crestBtn: { marginTop: 10, paddingVertical: 12, borderRadius: 10, alignItems: 'center', backgroundColor: '#E91E8C' },
+  crestBtnDisabled: { backgroundColor: '#2A2A2A' },
+  crestBtnText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
+  crestErrorText: { color: '#FF6B6B', fontSize: 13, marginTop: 6 },
   membersCard: {
     backgroundColor: '#111111',
     borderRadius: 12,

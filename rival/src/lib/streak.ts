@@ -1,4 +1,4 @@
-function getMondayOfWeek(date: Date): Date {
+export function getMondayOfWeek(date: Date): Date {
   const d = new Date(date);
   const day = d.getDay();
   const diff = day === 0 ? -6 : 1 - day;

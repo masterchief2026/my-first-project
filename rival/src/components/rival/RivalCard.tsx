@@ -16,7 +16,7 @@ const styles = StyleSheet.create({
     padding: RivalSpacing.stackGap,
   },
   glass: {
-    backgroundColor: 'rgba(20, 20, 20, 0.55)',
+    backgroundColor: 'rgba(20, 20, 20, 0.35)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
   },

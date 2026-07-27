@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+                  "primary-fixed": "#ffdbd0",
+                  "on-secondary-fixed": "#1c1b1b",
+                  "secondary-fixed": "#e5e2e1",
+                  "rank-pro": "#D97757",
+                  "text-secondary": "#A0A0A0",
+                  "rank-rookie": "#B0B0B0",
+                  "secondary-container": "#4a4949",
+                  "surface-tint": "#ffb59e",
+                  "outline": "#a38c85",
+                  "on-secondary-fixed-variant": "#474646",
+                  "surface-container-high": "#2a2a2a",
+                  "surface-low": "#131313",
+                  "primary-fixed-dim": "#ffb59e",
+                  "on-primary-container": "#541400",
+                  "error": "#ffb4ab",
+                  "on-background": "#e5e2e1",
+                  "rank-elite": "#9F57D9",
+                  "tertiary-fixed": "#7df7e3",
+                  "surface-variant": "#353535",
+                  "on-secondary-container": "#bab8b7",
+                  "rank-unrivaled": "#FFD700",
+                  "tertiary-container": "#09a493",
+                  "primary": "#ffb59e",
+                  "on-tertiary": "#003731",
+                  "surface-bright": "#323232",
+                  "on-secondary": "#313030",
+                  "outline-variant": "#55433d",
+                  "text-primary": "#FFFFFF",
+                  "surface-high": "#282828",
+                  "inverse-surface": "#e5e2e1",
+                  "tertiary": "#5edac7",
+                  "on-tertiary-fixed": "#00201c",
+                  "on-surface-variant": "#dbc1b9",
+                  "inverse-primary": "#99462a",
+                  "on-primary-fixed": "#390b00",
+                  "secondary-fixed-dim": "#c8c6c5",
+                  "error-container": "#93000a",
+                  "on-tertiary-container": "#00312b",
+                  "status-inspired": "#FFFFFF",
+                  "on-tertiary-fixed-variant": "#005047",
+                  "on-primary": "#5c1902",
+                  "surface-container-highest": "#353535",
+                  "background": "#131313",
+                  "surface-mid": "#1C1C1C",
+                  "secondary": "#c8c6c5",
+                  "inverse-on-surface": "#313030",
+                  "surface-container-low": "#1b1b1b",
+                  "on-surface": "#e5e2e1",
+                  "primary-container": "#d97757",
+                  "tertiary-fixed-dim": "#5edac7",
+                  "surface": "#131313",
+                  "on-primary-fixed-variant": "#7a2f15",
+                  "on-error-container": "#ffdad6",
+                  "on-error": "#690005",
+                  "surface-container": "#20201f",
+                  "surface-container-lowest": "#0e0e0e",
+                  "surface-dim": "#131313"
+          },
+          "borderRadius": {
+                  "DEFAULT": "0.25rem",
+                  "lg": "0.5rem",
+                  "xl": "0.75rem",
+                  "full": "9999px"
+          },
+          "spacing": {
+                  "section-margin": "2rem",
+                  "gutter": "1rem",
+                  "stack-gap": "1rem",
+                  "max-width": "1200px",
+                  "container-padding": "1.5rem"
+          },
+          "fontFamily": {
+                  "display-hero": ["Manrope", "sans-serif"],
+                  "title-md": ["Manrope", "sans-serif"],
+                  "label-caps": ["Manrope", "sans-serif"],
+                  "headline-lg": ["Manrope", "sans-serif"],
+                  "body-lg": ["Manrope", "sans-serif"],
+                  "metric-large": ["Manrope", "sans-serif"],
+                  "headline-lg-mobile": ["Manrope", "sans-serif"],
+                  "body-md": ["Manrope", "sans-serif"]
+          },
+          "fontSize": {
+                  "display-hero": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "800"}],
+                  "title-md": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                  "label-caps": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700"}],
+                  "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                  "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                  "metric-large": ["120px", {"lineHeight": "110px", "letterSpacing": "-0.04em", "fontWeight": "800"}],
+                  "headline-lg-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "700"}],
+                  "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}]
+          }
+        },
+      },
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    }
+    .glass-monolith {
+      background: rgba(255, 255, 255, 0.03);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .fade-in { animation: fadeIn 1.2s ease-out forwards; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    .hero-bg-overlay {
+      background: linear-gradient(to bottom, rgba(19, 19, 19, 0.4) 0%, rgba(19, 19, 19, 0) 40%, rgba(19, 19, 19, 0) 60%, rgba(19, 19, 19, 0.9) 100%);
+    }
+  </style>
+</head>
+<body class="bg-background text-on-background overflow-hidden font-body-md">
+<!-- Top Navigation Shell -->
+<header class="fixed top-0 w-full z-50 bg-gradient-to-b from-surface-low to-transparent">
+<div class="flex justify-between items-center px-container-padding py-4 w-full max-w-max-width mx-auto">
+<div class="font-display-hero text-primary uppercase tracking-tighter text-headline-lg-mobile md:text-headline-lg">REFINE</div>
+<nav class="hidden md:flex gap-8">
+<a class="text-primary font-bold border-b-2 border-primary hover:opacity-80 transition-opacity" href="#">Home</a>
+<a class="text-on-surface-variant hover:text-on-surface transition-colors" href="#">Events</a>
+<a class="text-on-surface-variant hover:text-on-surface transition-colors" href="#">Ranks</a>
+<a class="text-on-surface-variant hover:text-on-surface transition-colors" href="#">Profile</a>
+</nav>
+<div class="flex gap-4 items-center">
+<button class="hover:opacity-80 transition-opacity scale-95 active:scale-90 transition-transform">
+<span class="material-symbols-outlined text-primary">notifications</span>
+</button>
+<button class="hover:opacity-80 transition-opacity scale-95 active:scale-90 transition-transform">
+<span class="material-symbols-outlined text-primary">person</span>
+</button>
+</div>
+</div>
+</header>
+<!-- The Monolith Immersive Content -->
+<main class="relative h-screen w-full flex flex-col items-center justify-center">
+<!-- Background Image -->
+<div class="absolute inset-0 z-0">
+<img alt="" class="w-full h-full object-cover grayscale-[20%] brightness-[0.6]" src="https://lh3.googleusercontent.com/aida/AP1WRLtOXQdgBl7LPBAGyBuEorNPI1ELVxsScbF6WIAaiGWtU6Ni6kJraUF0_WpZ2_aUn2r4kDfbY5Qqmr7yfFs2hUC-gsOjtUo6KvwrKQ4ULBwX7PbV7L_CwTg_ue9Az70D7hduffXzz_bDx3uttt06OIM903ZJsEBvpw16NlILvl-CoUrLsnu3wj5JKk6ssiR0bySpXshJjAk6QoYfvHioN8Ihw4sVFBOJoAKMZ5BiwyC9Mi7db2jggN5l8tY"/>
+<div class="absolute inset-0 hero-bg-overlay"></div>
+</div>
+<!-- Centered Monolith Container -->
+<div class="relative z-10 flex flex-col items-center fade-in px-4">
+<div class="glass-monolith p-12 md:p-16 rounded-3xl text-center shadow-2xl">
+<div class="font-metric-large text-primary-fixed leading-none">
+          105
+        </div>
+<div class="mt-2 font-label-caps text-label-caps tracking-[0.2em] text-on-surface-variant">
+          DAYS REMAINING
+        </div>
+</div>
+<div class="mt-12 text-center">
+<h1 class="font-display-hero text-display-hero uppercase tracking-[0.5em] text-on-surface drop-shadow-lg">
+          IRONMAN FLORIDA
+        </h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant mt-4 max-w-lg mx-auto opacity-80">
+          The path of solitary determination. Your transformation is 62% complete.
+        </p>
+</div>
+</div>
+<!-- Bottom Mission Progress & Navigation -->
+<div class="absolute bottom-32 w-full max-w-xl px-container-padding z-10 fade-in" style="animation-delay: 0.3s;">
+<div class="flex justify-between items-end mb-3">
+<span class="font-label-caps text-label-caps tracking-widest text-on-surface">MISSION PROGRESS: 62%</span>
+<span class="font-label-caps text-label-caps text-on-surface-variant">STAGE 4: ENDURANCE ARCH</span>
+</div>
+<div class="w-full h-2 bg-surface-container rounded-full overflow-hidden">
+<div class="h-full bg-rank-pro w-[62%] shadow-[0_0_15px_rgba(217,119,87,0.5)] transition-all duration-1000 ease-in-out"></div>
+</div>
+<div class="flex justify-between mt-4">
+<div class="flex gap-4">
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-primary text-[16px]">distance</span>
+<span class="font-label-caps text-label-caps">1.2K KM LEFT</span>
+</div>
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-primary text-[16px]">local_fire_department</span>
+<span class="font-label-caps text-label-caps">42K CAL TO BURN</span>
+</div>
+</div>
+<button class="bg-primary-container text-on-primary-container px-6 py-2 rounded-lg font-label-caps text-label-caps hover:opacity-90 transition-all active:scale-95">
+          RESUME PROTOCOL
+        </button>
+</div>
+</div>
+</main>
+<!-- Mobile Bottom Nav Shell -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-6 pt-2 bg-surface-low/95 backdrop-blur-md border-t border-surface-variant/30 shadow-lg rounded-t-xl">
+<a class="flex flex-col items-center justify-center bg-primary-container/20 text-primary rounded-xl p-2 transition-all duration-200" href="#">
+<span class="material-symbols-outlined">home</span>
+<span class="font-label-caps text-label-caps mt-1">Home</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant p-2 hover:text-primary-fixed-dim transition-colors active:scale-95" href="#">
+<span class="material-symbols-outlined">event</span>
+<span class="font-label-caps text-label-caps mt-1">Events</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant p-2 hover:text-primary-fixed-dim transition-colors active:scale-95" href="#">
+<span class="material-symbols-outlined">workspace_premium</span>
+<span class="font-label-caps text-label-caps mt-1">Ranks</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant p-2 hover:text-primary-fixed-dim transition-colors active:scale-95" href="#">
+<span class="material-symbols-outlined">person</span>
+<span class="font-label-caps text-label-caps mt-1">Profile</span>
+</a>
+</nav>
+<!-- Atmospheric Background Interaction -->
+<script>
+    document.addEventListener('mousemove', (e) => {
+      const monolith = document.querySelector('.glass-monolith');
+      if (monolith) {
+        const xAxis = (window.innerWidth / 2 - e.pageX) / 50;
+        const yAxis = (window.innerHeight / 2 - e.pageY) / 50;
+        monolith.style.transform = `rotateY(${xAxis}deg) rotateX(${yAxis}deg)`;
+      }
+    });
+
+    // Reset transform when mouse leaves
+    document.addEventListener('mouseleave', () => {
+      const monolith = document.querySelector('.glass-monolith');
+      if (monolith) {
+        monolith.style.transform = `rotateY(0deg) rotateX(0deg)`;
+      }
+    });
+  </script>
+</body></html>

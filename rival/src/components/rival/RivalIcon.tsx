@@ -10,6 +10,12 @@ const ICONS = {
   // Navigation / interface
   back: 'arrow-back',
   forward: 'arrow-forward',
+  // Calendar month/year nav — chevron family (not arrow-back/forward above,
+  // which are line-arrows and don't visually match the double-chevron).
+  monthBack: 'keyboard-arrow-left',
+  monthForward: 'keyboard-arrow-right',
+  yearBack: 'keyboard-double-arrow-left',
+  yearForward: 'keyboard-double-arrow-right',
   chevronRight: 'chevron-right',
   edit: 'edit',
   close: 'close',
@@ -25,9 +31,16 @@ const ICONS = {
   logout: 'logout',
   delete: 'delete-outline',
   link: 'link',
+  openInNew: 'open-in-new',
   apps: 'apps',
   person: 'person',
+  groups: 'groups',
   flag: 'flag',
+  key: 'vpn-key',
+  globe: 'public',
+  chat: 'chat-bubble',
+  pin: 'push-pin',
+  star: 'star',
 
   // Add Workout / logging
   scan: 'document-scanner',

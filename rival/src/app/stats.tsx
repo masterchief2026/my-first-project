@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { StyleSheet, TouchableOpacity, View, Text, ScrollView, Image } from 'react-native';
+import { StyleSheet, TouchableOpacity, View, Text, ScrollView, Image, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { supabase } from '../lib/supabase';
@@ -174,7 +174,22 @@ export default function StatsScreen() {
               <Text style={styles.rankAvatarText}>{displayName ? displayName[0].toUpperCase() : '?'}</Text>
             )}
           </View>
-          <Text style={[styles.rankName, { color: rankColor }]}>{lvl.name}</Text>
+          <Text
+            style={[
+              styles.rankName,
+              { color: '#D8A81D' },
+              // Same gradient recipe as the hero number / nav / season wrap
+              // rank text — web-only, flat gold above is the native fallback.
+              ...(Platform.OS === 'web' ? [{
+                backgroundImage: 'linear-gradient(180deg, #FFE48A, #D8A81D)',
+                backgroundClip: 'text',
+                WebkitBackgroundClip: 'text',
+                color: 'transparent',
+              } as any] : []),
+            ]}
+          >
+            {lvl.name}
+          </Text>
           <View style={[styles.levelPill, { backgroundColor: rankColor + '22', borderColor: rankColor + '55' }]}>
             <Text style={[styles.levelPillText, { color: rankColor }]}>Level {lvl.level} · {Math.round(seasonPoints)} Effort</Text>
           </View>

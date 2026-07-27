@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { supabase } from '../lib/supabase';
 import { CANONICAL_LIFTS, matchCanonicalLift } from './scan-workout';
-import { RivalIcon, RivalTopNav } from '../components/rival';
+import { RivalIcon, RivalTopNav, RivalFixedBackground } from '../components/rival';
 import { RivalColors, RivalRadius, RivalType } from '../constants/rivalTheme';
 
 type Entry = { id: string; exercise_name: string; weight_kg: number; reps: number | null; performed_at: string };
@@ -175,11 +175,9 @@ export default function LiftsScreen() {
       {/* Full-bleed background layer — decoupled from content so it always
           reaches the bottom of the screen. Focal point biased right to keep the
           lifter centred in the frame. */}
-      <ImageBackground
+      <RivalFixedBackground
         source={require('../../assets/images/backgrounds/optimized/deadlift-rival-plates-box.jpg')}
-        style={styles.bgFixed}
-        imageStyle={styles.bgImage}
-        resizeMode="cover"
+        focalPoint="55% 45%"
       />
       <View style={styles.scrim} />
       <SafeAreaView style={styles.safe}>
@@ -403,12 +401,7 @@ const styles = StyleSheet.create({
   // Bias the crop toward the lifter (right of frame) so she stays centred at
   // any width — objectPosition is resolution-independent, so this holds on a
   // half-width window too.
-  // Fixed to the viewport (not the content) so it always covers the full screen,
-  // no black gap at the bottom regardless of scroll/content height. Scrim dims it.
-  bgFixed: { position: 'fixed' as any, top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%' },
   scrim: { position: 'fixed' as any, top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(14,14,14,0.5)' },
-  // Focal point kept near centre so the lifter reads balanced at any width.
-  bgImage: { objectPosition: '55% 45%' } as any,
   content: { flexGrow: 1, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 32, maxWidth: 1100, width: '100%', alignSelf: 'center' },
   heroWrap: { flex: 1, justifyContent: 'center', width: '100%' },
 

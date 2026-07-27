@@ -1,9 +1,9 @@
 import { useEffect } from 'react';
-import { StyleSheet, TouchableOpacity, View, Text, ImageBackground } from 'react-native';
+import { StyleSheet, TouchableOpacity, View, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { supabase } from '../lib/supabase';
-import { RivalButton } from '../components/rival';
+import { RivalButton, RivalFixedBackground } from '../components/rival';
 import { RivalColors, RivalType } from '../constants/rivalTheme';
 
 export default function WelcomeScreen() {
@@ -16,11 +16,10 @@ export default function WelcomeScreen() {
   }, []);
 
   return (
-    <ImageBackground
-      source={require('../../assets/images/backgrounds/optimized/a-small-group-of-diverse-athletes-2.jpg')}
-      style={styles.bg}
-      resizeMode="cover"
-    >
+    <View style={styles.root}>
+      <RivalFixedBackground
+        source={require('../../assets/images/backgrounds/optimized/a-small-group-of-diverse-athletes-2.jpg')}
+      />
       <View style={styles.scrim} />
       <SafeAreaView style={styles.container}>
         <View style={styles.content}>
@@ -45,16 +44,17 @@ export default function WelcomeScreen() {
 
         </View>
       </SafeAreaView>
-    </ImageBackground>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  bg: {
+  root: {
     flex: 1,
+    backgroundColor: RivalColors.surfaceLow,
   },
   scrim: {
-    position: 'absolute',
+    position: 'fixed' as any,
     top: 0, left: 0, right: 0, bottom: 0,
     backgroundColor: 'rgba(14,14,14,0.4)',
   },

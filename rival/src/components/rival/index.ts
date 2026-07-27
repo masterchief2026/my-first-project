@@ -7,4 +7,5 @@ export { RivalEmptyState } from './RivalEmptyState';
 export { RivalAvatar } from './RivalAvatar';
 export { RivalIcon, activityIconName } from './RivalIcon';
 export { RivalTopNav } from './RivalTopNav';
+export { RivalFixedBackground } from './RivalFixedBackground';
 export type { RivalIconName } from './RivalIcon';
