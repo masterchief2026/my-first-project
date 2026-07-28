@@ -103,6 +103,8 @@ const styles = StyleSheet.create({
     ...RivalType.headlineLg,
     color: RivalColors.textPrimary,
     textAlign: 'center',
+    textTransform: 'uppercase',
+    letterSpacing: 2,
   },
   buttons: {
     gap: 4,
