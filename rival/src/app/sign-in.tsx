@@ -261,6 +261,8 @@ const styles = StyleSheet.create({
   title: {
     ...RivalType.headlineLgMobile,
     color: RivalColors.textPrimary,
+    textTransform: 'uppercase',
+    letterSpacing: 2,
   },
   subtitle: {
     ...RivalType.bodyMd,
