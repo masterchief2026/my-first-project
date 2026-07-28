@@ -1,7 +1,7 @@
 {
   "name": "RIVAL",
   "short_name": "RIVAL",
-  "description": "Fitness is better when it's shared.",
+  "description": "Fitness is better shared.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0e0e0e",

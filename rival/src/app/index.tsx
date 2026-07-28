@@ -66,12 +66,7 @@ export default function WelcomeScreen() {
           <Text style={styles.logo}>RIVAL</Text>
 
           <View style={styles.hero}>
-            {/* Tagline matches the locked Stitch mockup this photo came from —
-                not a new copy decision, just carrying the pair through. */}
-            <Text style={styles.tagline}>Fitness is better when it's shared</Text>
-            <Text style={styles.sub}>
-              Every workout earns Effort. Every week has a winner.
-            </Text>
+            <Text style={styles.tagline}>Fitness is better shared</Text>
           </View>
 
           <View style={styles.buttons}>
@@ -123,11 +118,6 @@ const styles = StyleSheet.create({
   tagline: {
     ...RivalType.headlineLg,
     color: RivalColors.textPrimary,
-    textAlign: 'center',
-  },
-  sub: {
-    ...RivalType.bodyMd,
-    color: RivalColors.onSurfaceVariant,
     textAlign: 'center',
   },
   buttons: {
