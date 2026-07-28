@@ -27,15 +27,30 @@ export default function WelcomeScreen() {
     if (Platform.OS !== 'web') return;
     const html = document.documentElement;
     const { body } = document;
-    const prev = { htmlOverflow: html.style.overflow, bodyOverflow: body.style.overflow, bodyMinHeight: body.style.minHeight };
+    const prev = {
+      htmlOverflow: html.style.overflow,
+      bodyOverflow: body.style.overflow,
+      bodyMinHeight: body.style.minHeight,
+      htmlOverscroll: (html.style as any).overscrollBehaviorY,
+      bodyOverscroll: (body.style as any).overscrollBehaviorY,
+    };
     html.style.overflow = 'auto';
     body.style.overflow = 'auto';
     body.style.minHeight = 'calc(100% + 1px)';
+    // Without this, pulling down triggers the native rubber-band bounce, which
+    // yanks the whole (fixed-position) page down and exposes empty space above the
+    // background photo — worse than the bar we're trying to fix. We only need the
+    // page to register as "scrollable" for Safari's chrome-collapse heuristic, not
+    // to actually let anyone scroll or bounce it.
+    (html.style as any).overscrollBehaviorY = 'none';
+    (body.style as any).overscrollBehaviorY = 'none';
     window.scrollTo(0, 1);
     return () => {
       html.style.overflow = prev.htmlOverflow;
       body.style.overflow = prev.bodyOverflow;
       body.style.minHeight = prev.bodyMinHeight;
+      (html.style as any).overscrollBehaviorY = prev.htmlOverscroll;
+      (body.style as any).overscrollBehaviorY = prev.bodyOverscroll;
     };
   }, []);
 
