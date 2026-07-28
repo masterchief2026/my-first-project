@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { StyleSheet, TouchableOpacity, View, Text } from 'react-native';
+import { StyleSheet, TouchableOpacity, View, Text, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { supabase } from '../lib/supabase';
@@ -13,6 +13,30 @@ export default function WelcomeScreen() {
         router.replace('/home');
       }
     });
+  }, []);
+
+  // react-native-web locks the real <body> to overflow:hidden (it manages scrolling
+  // itself, per-screen, via internal ScrollViews) — but that also stops iOS Safari
+  // from ever seeing this outermost document as scrollable, so it keeps its fully
+  // opaque toolbar permanently instead of the translucent/collapsed chrome it uses
+  // on genuinely scrollable pages. This is the very first screen anyone sees, so:
+  // temporarily let the real document scroll a hair and nudge it, then restore
+  // react-native-web's normal behavior on the way out so every other screen's own
+  // ScrollView-based scrolling is unaffected.
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const html = document.documentElement;
+    const { body } = document;
+    const prev = { htmlOverflow: html.style.overflow, bodyOverflow: body.style.overflow, bodyMinHeight: body.style.minHeight };
+    html.style.overflow = 'auto';
+    body.style.overflow = 'auto';
+    body.style.minHeight = 'calc(100% + 1px)';
+    window.scrollTo(0, 1);
+    return () => {
+      html.style.overflow = prev.htmlOverflow;
+      body.style.overflow = prev.bodyOverflow;
+      body.style.minHeight = prev.bodyMinHeight;
+    };
   }, []);
 
   return (
