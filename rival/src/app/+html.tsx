@@ -23,6 +23,14 @@ export default function Root({ children }: { children: React.ReactNode }) {
         <link rel="manifest" href="/manifest.json" />
 
         <ScrollViewStyleReset />
+
+        {/* The document's own backdrop. Without this it stays the browser default
+            (white), which shows through as a bright band in the home-indicator safe
+            area when launched from the Home Screen, and flashes white on load. Must
+            come after ScrollViewStyleReset so it wins over Expo's injected reset. */}
+        <style dangerouslySetInnerHTML={{ __html: `
+          html, body, #root { background-color: #0e0e0e; }
+        ` }} />
       </head>
       <body>{children}</body>
     </html>
