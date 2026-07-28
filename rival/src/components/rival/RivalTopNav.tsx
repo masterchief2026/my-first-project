@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, Image, StyleSheet, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, Image, StyleSheet, Platform, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { getLevel } from '../../lib/xp';
@@ -21,6 +21,12 @@ const LINKS: Array<{ key: Section; label: string; route: string }> = [
 ];
 
 export function RivalTopNav({ active }: { active?: Section }) {
+  const { width } = useWindowDimensions();
+  // Below this, the absolutely-centered links row (built for desktop, where the
+  // logo and the RANK/bell/avatar cluster are far apart) collides with the right
+  // cluster instead of sitting in genuine empty space. Drop to a second in-flow
+  // row instead of overlapping text on top of text.
+  const narrow = width < 640;
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [initial, setInitial] = useState('?');
   const [displayName, setDisplayName] = useState('');
@@ -62,13 +68,15 @@ export function RivalTopNav({ active }: { active?: Section }) {
           <Text style={styles.logo}>RIVAL</Text>
         </TouchableOpacity>
 
-        <View style={[styles.links, Platform.OS === 'web' && (styles.linksCentered as any)]}>
-          {LINKS.map((l) => (
-            <TouchableOpacity key={l.key} onPress={() => router.push(l.route as any)}>
-              <Text style={[styles.link, active === l.key && styles.linkActive]}>{l.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        {!narrow && (
+          <View style={[styles.links, Platform.OS === 'web' && (styles.linksCentered as any)]}>
+            {LINKS.map((l) => (
+              <TouchableOpacity key={l.key} onPress={() => router.push(l.route as any)}>
+                <Text style={[styles.link, active === l.key && styles.linkActive]}>{l.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
 
         <View style={styles.right}>
           {rankName && (
@@ -197,6 +205,15 @@ export function RivalTopNav({ active }: { active?: Section }) {
           </View>
         </View>
       </View>
+      {narrow && (
+        <View style={styles.linksRowNarrow}>
+          {LINKS.map((l) => (
+            <TouchableOpacity key={l.key} onPress={() => router.push(l.route as any)}>
+              <Text style={[styles.link, active === l.key && styles.linkActive]}>{l.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
     </View>
   );
 }
@@ -215,6 +232,10 @@ const styles = StyleSheet.create({
   // this is web-only; native keeps the old (slightly off-center) flow,
   // which is an acceptable fallback since this app runs primarily on web.
   linksCentered: { position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)' },
+  // Second in-flow row below the logo/rank/avatar row, only rendered under the
+  // `narrow` breakpoint above — keeps nav links reachable without overlapping
+  // the right-side cluster the way the absolutely-centered desktop row would.
+  linksRowNarrow: { flexDirection: 'row', justifyContent: 'center', gap: 28, paddingBottom: 10, paddingTop: 2 },
   // Smaller, more letter-spacing, lighter weight — quieter and closer to an
   // Apple-style minimal nav, without going all the way to "near-invisible"
   // (this is core navigation people tap constantly, not a utility bar).
