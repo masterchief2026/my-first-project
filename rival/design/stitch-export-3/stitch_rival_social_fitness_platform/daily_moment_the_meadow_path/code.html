@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>RIVAL - Daily Moment</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+                  "secondary-container": "#4a4949",
+                  "rank-pro": "#D97757",
+                  "surface-high": "#282828",
+                  "surface-bright": "#393939",
+                  "on-secondary-fixed": "#1c1b1b",
+                  "surface-variant": "#353535",
+                  "on-primary": "#5c1902",
+                  "surface-container": "#20201f",
+                  "on-tertiary-fixed-variant": "#005047",
+                  "on-background": "#e5e2e1",
+                  "on-primary-fixed": "#390b00",
+                  "primary-container": "#d97757",
+                  "tertiary-container": "#09a493",
+                  "surface-dim": "#131313",
+                  "on-secondary": "#313030",
+                  "error-container": "#93000a",
+                  "status-inspired": "#FFFFFF",
+                  "on-secondary-container": "#bab8b7",
+                  "on-error": "#690005",
+                  "text-secondary": "#A0A0A0",
+                  "rank-unrivaled": "#FFD700",
+                  "on-primary-fixed-variant": "#7a2f15",
+                  "on-primary-container": "#541400",
+                  "outline-variant": "#55433d",
+                  "primary-fixed-dim": "#ffb59e",
+                  "background": "#131313",
+                  "tertiary-fixed": "#7df7e3",
+                  "secondary-fixed": "#e5e2e1",
+                  "surface-container-highest": "#353535",
+                  "on-secondary-fixed-variant": "#474646",
+                  "surface-container-high": "#2a2a2a",
+                  "on-surface": "#e5e2e1",
+                  "inverse-on-surface": "#313030",
+                  "on-tertiary": "#003731",
+                  "tertiary": "#5edac7",
+                  "tertiary-fixed-dim": "#5edac7",
+                  "inverse-primary": "#99462a",
+                  "surface-container-low": "#1b1b1b",
+                  "on-surface-variant": "#dbc1b9",
+                  "surface-mid": "#1C1C1C",
+                  "inverse-surface": "#e5e2e1",
+                  "error": "#ffb4ab",
+                  "surface-tint": "#ffb59e",
+                  "on-tertiary-container": "#00312b",
+                  "secondary": "#c8c6c5",
+                  "surface": "#131313",
+                  "primary-fixed": "#ffdbd0",
+                  "text-primary": "#FFFFFF",
+                  "secondary-fixed-dim": "#c8c6c5",
+                  "outline": "#a38c85",
+                  "primary": "#ffb59e",
+                  "surface-container-lowest": "#0e0e0e",
+                  "rank-rookie": "#B0B0B0",
+                  "on-tertiary-fixed": "#00201c",
+                  "on-error-container": "#ffdad6",
+                  "surface-low": "#131313",
+                  "rank-elite": "#9F57D9"
+          },
+          "borderRadius": {
+                  "DEFAULT": "0.25rem",
+                  "lg": "0.5rem",
+                  "xl": "0.75rem",
+                  "full": "9999px"
+          },
+          "spacing": {
+                  "container-padding": "1.5rem",
+                  "gutter": "1rem",
+                  "section-margin": "2rem",
+                  "stack-gap": "1rem",
+                  "max-width": "1200px"
+          },
+          "fontFamily": {
+                  "display-hero": ["manrope", "sans-serif"],
+                  "metric-large": ["manrope", "sans-serif"],
+                  "title-md": ["manrope", "sans-serif"],
+                  "headline-lg": ["manrope", "sans-serif"],
+                  "body-md": ["manrope", "sans-serif"],
+                  "body-lg": ["manrope", "sans-serif"],
+                  "label-caps": ["manrope", "sans-serif"],
+                  "headline-lg-mobile": ["manrope", "sans-serif"]
+          },
+          "fontSize": {
+                  "display-hero": ["48px", { "lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "800" }],
+                  "metric-large": ["32px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "300" }],
+                  "title-md": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                  "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "700" }],
+                  "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                  "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "400" }],
+                  "label-caps": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700" }],
+                  "headline-lg-mobile": ["28px", { "lineHeight": "36px", "fontWeight": "700" }]
+          }
+        },
+      },
+    }
+  </script>
+<style>
+    body {
+      background-color: #131313;
+      color: #e5e2e1;
+      overflow: hidden;
+    }
+
+    .reveal-animation {
+      animation: fadeIn 2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .bg-overlay {
+      background: linear-gradient(to bottom, rgba(19, 19, 19, 0.2) 0%, rgba(19, 19, 19, 0.6) 100%);
+    }
+
+    .text-legible {
+      text-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    }
+
+    .cta-glass {
+      background: rgba(19, 19, 19, 0.4);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(217, 119, 87, 0.3);
+      transition: all 0.3s ease;
+    }
+
+    .cta-glass:hover {
+      background: rgba(217, 119, 87, 0.1);
+      border-color: rgba(217, 119, 87, 0.6);
+      transform: scale(1.02);
+    }
+    
+    .cta-glass:active {
+      transform: scale(0.98);
+    }
+  </style>
+</head>
+<body class="h-screen w-full relative">
+<!-- Immersive Background Layer -->
+<div class="fixed inset-0 z-0">
+<img alt="A high-end, cinematic, wide-angle photograph of a singular, intentional trail cutting through a vast, sun-drenched alpine meadow at dawn." class="w-full h-full object-cover transition-transform duration-700 ease-out" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD0beeCjPSy-jLbghABcxIQwYRwwR9pcfk1akpa7jRJtr8XI4EeDPmaIoy97htbpf4Dez9NKzub7qe9D17HIdh5SRw54dii2ObIXfAFiV4rermuIA1hvt2fZcl5eToB5RVbonh7Nvv2fKwwnFhA-ARCtw2BU9sIUVa3WjjP-PyM2AB56gKSvC-Y2OU4sIQV88IWyISxqnHcVt6O80pyNhiob6YTGafz5E5aEGwGgouxk-xDG09Vv1TcL0vdIxU6ngNB1Kxv2mEJ8g1o"/>
+<div class="absolute inset-0 bg-overlay"></div>
+</div>
+<!-- Content Canvas -->
+<main class="relative z-10 h-full flex flex-col items-center justify-between py-12 px-container-padding">
+<!-- Top Bar Navigation -->
+<header class="flex justify-center items-center w-full">
+<div class="text-title-md font-title-md font-bold tracking-[0.2em] text-white text-legible">
+        RIVAL
+      </div>
+</header>
+<!-- Center Piece: Quote -->
+<div class="flex flex-col items-center text-center max-w-2xl reveal-animation" style="animation-delay: 0.5s;">
+<h1 class="font-display-hero text-display-hero text-white mb-8 md:text-5xl text-3xl leading-tight text-legible">
+        The summit is just a point. The path is where the wisdom lies.
+      </h1>
+<!-- Subtle Decorative Element -->
+<div class="w-12 h-[1px] bg-rank-pro shadow-[0_0_8px_rgba(217,119,87,0.8)]"></div>
+</div>
+<!-- Bottom Action -->
+<div class="reveal-animation" style="animation-delay: 1.2s;">
+<button class="cta-glass px-10 py-4 rounded-lg flex items-center gap-3 group">
+<span class="font-label-caps text-label-caps text-white tracking-widest uppercase">
+          Enter the Collective
+        </span>
+<span class="material-symbols-outlined text-rank-pro group-hover:translate-x-1 transition-transform" style="font-size: 18px;">
+          arrow_forward
+        </span>
+</button>
+</div>
+</main>
+<!-- Lightweight Interaction Script -->
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // Perspective tilt effect for background image
+      document.addEventListener('mousemove', (e) => {
+        const moveX = (e.clientX - window.innerWidth / 2) * 0.005;
+        const moveY = (e.clientY - window.innerHeight / 2) * 0.005;
+        const bg = document.querySelector('img');
+        if(bg) {
+          bg.style.transform = `scale(1.05) translate(${moveX}px, ${moveY}px)`;
+        }
+      });
+    });
+  </script>
+</body></html>

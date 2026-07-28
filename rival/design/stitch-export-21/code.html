@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en" style=""><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>RIVAL | Human-Centric Performance - Add Event</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        body {
+            font-family: 'Manrope', sans-serif;
+            background-color: #131313;
+            color: #e5e2e1;
+            -webkit-font-smoothing: antialiased;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-card {
+            background: rgba(20, 20, 20, 0.45);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .ember-glow {
+            box-shadow: 0 0 20px rgba(217, 119, 87, 0.15);
+        }
+        .unrivaled-glow {
+            box-shadow: inset 0 0 12px rgba(255, 215, 0, 0.05), 0 0 30px rgba(217, 119, 87, 0.1);
+        }
+        .hero-metric-glow {
+            text-shadow: 0 0 25px rgba(255, 181, 158, 0.4);
+        }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
+
+        /* Modal Specific Styles */
+        .tactical-border {
+            border: 1px solid rgba(217, 119, 87, 0.3);
+        }
+        .tactical-input {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 4px; /* Sharp corners - ROUND_FOUR equivalent */
+            transition: all 0.2s ease;
+        }
+        .tactical-input:focus {
+            outline: none;
+            border-color: #d97757;
+            background: rgba(217, 119, 87, 0.05);
+        }
+        .rounded-tactical {
+            border-radius: 4px;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                "error-container": "#93000a",
+                "surface-mid": "#1C1C1C",
+                "on-primary-fixed": "#390b00",
+                "on-surface-variant": "#dbc1b9",
+                "surface-low": "#131313",
+                "rank-elite": "#9F57D9",
+                "rank-pro": "#D97757",
+                "on-secondary-fixed-variant": "#474646",
+                "surface-variant": "#353535",
+                "on-secondary": "#313030",
+                "secondary": "#c8c6c5",
+                "on-tertiary-container": "#00312b",
+                "on-tertiary": "#003731",
+                "on-secondary-container": "#bab8b7",
+                "surface-container-highest": "#353535",
+                "tertiary-container": "#09a493",
+                "tertiary-fixed-dim": "#5edac7",
+                "tertiary": "#5edac7",
+                "surface-dim": "#131313",
+                "rank-rookie": "#B0B0B0",
+                "inverse-on-surface": "#313030",
+                "surface-bright": "#323232",
+                "surface-container-high": "#2a2a2a",
+                "status-inspired": "#FFFFFF",
+                "surface": "#131313",
+                "inverse-primary": "#99462a",
+                "on-secondary-fixed": "#1c1b1b",
+                "on-tertiary-fixed-variant": "#005047",
+                "surface-tint": "#ffb59e",
+                "secondary-fixed": "#e5e2e1",
+                "rank-unrivaled": "#FFD700",
+                "primary-fixed": "#ffdbd0",
+                "text-secondary": "#A0A0A0",
+                "tertiary-fixed": "#7df7e3",
+                "outline-variant": "#55433d",
+                "on-primary-fixed-variant": "#7a2f15",
+                "surface-high": "#282828",
+                "surface-container-lowest": "#0e0e0e",
+                "secondary-fixed-dim": "#c8c6c5",
+                "on-surface": "#e5e2e1",
+                "surface-container-low": "#1b1b1b",
+                "surface-container": "#20201f",
+                "on-error": "#690005",
+                "outline": "#a38c85",
+                "on-error-container": "#ffdad6",
+                "background": "#131313",
+                "on-tertiary-fixed": "#00201c",
+                "primary-fixed-dim": "#ffb59e",
+                "secondary-container": "#4a4949",
+                "text-primary": "#FFFFFF",
+                "on-primary-container": "#541400",
+                "on-primary": "#5c1902",
+                "on-background": "#e5e2e1",
+                "error": "#ffb4ab",
+                "primary-container": "#d97757",
+                "primary": "#ffb59e",
+                "inverse-surface": "#e5e2e1"
+              },
+              "borderRadius": {
+                "DEFAULT": "0.25rem",
+                "lg": "0.8rem",
+                "xl": "1rem",
+                "full": "9999px"
+              },
+              "spacing": {
+                "max-width": "1440px",
+                "section-margin": "2.5rem",
+                "container-padding": "2rem",
+                "gutter": "1.5rem",
+                "stack-gap": "1.25rem"
+              },
+              "fontFamily": {
+                "display-hero": ["Manrope"],
+                "headline-lg": ["Manrope"],
+                "label-caps": ["Manrope"],
+                "title-md": ["Manrope"],
+                "body-md": ["Manrope"],
+                "body-lg": ["Manrope"],
+                "metric-large": ["Manrope"]
+              }
+            }
+          }
+        }
+    </script>
+</head>
+<body class="bg-surface text-on-surface overflow-hidden">
+<!-- Modal Overlay -->
+<div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+<!-- Tactical Workstation Modal -->
+<div class="w-full max-w-2xl bg-[#1a1a1a] border tactical-border rounded-tactical shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+<!-- Header -->
+<div class="px-6 py-4 border-b border-white/10 flex items-center justify-between bg-surface-container">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary">add_box</span>
+<div>
+<h2 class="font-bold text-sm tracking-[0.15em] uppercase text-on-surface">Mission Parameters</h2>
+<p class="text-[10px] text-primary font-bold uppercase tracking-widest">New Event Entry</p>
+</div>
+</div>
+<button class="material-symbols-outlined text-on-surface-variant hover:text-on-surface transition-colors">close</button>
+</div>
+<!-- Bento Grid Form Content -->
+<div class="p-6 overflow-y-auto">
+<div class="grid grid-cols-1 md:grid-cols-6 gap-4">
+<!-- Event Name (Wide) -->
+<div class="md:col-span-4 bg-white/5 p-4 rounded-tactical border border-white/5 space-y-2">
+<label class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Event Designation</label>
+<input class="w-full tactical-input px-3 py-2 text-sm text-on-surface placeholder:text-on-surface-variant/30" placeholder="e.g. London Summit Sprint" type="text"/>
+</div>
+<!-- Status Panel (Small) -->
+<div class="md:col-span-2 bg-white/5 p-4 rounded-tactical border border-white/5 flex flex-col justify-between">
+<label class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">System Status</label>
+<div class="flex items-center gap-2 mt-1">
+<span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+<span class="text-[10px] font-bold text-primary uppercase">Ready to Commit</span>
+</div>
+<div class="mt-2 text-[9px] text-on-surface-variant/60 font-medium">Auto-sync active</div>
+</div>
+<!-- Location -->
+<div class="md:col-span-6 bg-white/5 p-4 rounded-tactical border border-white/5 space-y-2">
+<div class="flex items-center justify-between">
+<label class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Deployment Location</label>
+<span class="material-symbols-outlined text-on-surface-variant text-xs">location_on</span>
+</div>
+<input class="w-full tactical-input px-3 py-2 text-sm text-on-surface placeholder:text-on-surface-variant/30" placeholder="Enter coordinates or address" type="text"/>
+</div>
+<!-- Date Selection -->
+<div class="md:col-span-3 bg-white/5 p-4 rounded-tactical border border-white/5 space-y-4">
+<label class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Calendar Marker</label>
+<div class="flex flex-col gap-2">
+<div class="flex items-center justify-between p-2 tactical-input cursor-pointer hover:bg-white/10">
+<span class="text-sm font-bold">Oct 24, 2023</span>
+<span class="material-symbols-outlined text-sm text-primary">calendar_month</span>
+</div>
+<div class="grid grid-cols-7 gap-1 text-center">
+<div class="text-[8px] font-bold text-on-surface-variant py-1">M</div>
+<div class="text-[8px] font-bold text-on-surface-variant py-1">T</div>
+<div class="text-[8px] font-bold text-on-surface-variant py-1">W</div>
+<div class="text-[8px] font-bold text-on-surface-variant py-1">T</div>
+<div class="text-[8px] font-bold text-on-surface-variant py-1">F</div>
+<div class="text-[8px] font-bold text-on-surface-variant py-1">S</div>
+<div class="text-[8px] font-bold text-on-surface-variant py-1">S</div>
+<!-- Small tactical date indicators -->
+<div class="h-6 w-full flex items-center justify-center text-[10px] text-on-surface-variant/40">21</div>
+<div class="h-6 w-full flex items-center justify-center text-[10px] text-on-surface-variant/40">22</div>
+<div class="h-6 w-full flex items-center justify-center text-[10px] text-on-surface-variant/40">23</div>
+<div class="h-6 w-full flex items-center justify-center text-[10px] bg-primary/20 text-primary border border-primary/40 rounded-tactical font-bold">24</div>
+<div class="h-6 w-full flex items-center justify-center text-[10px] text-on-surface-variant/80">25</div>
+<div class="h-6 w-full flex items-center justify-center text-[10px] text-on-surface-variant/80">26</div>
+<div class="h-6 w-full flex items-center justify-center text-[10px] text-on-surface-variant/80">27</div>
+</div>
+</div>
+</div>
+<!-- Time Controls -->
+<div class="md:col-span-3 bg-white/5 p-4 rounded-tactical border border-white/5 flex flex-col gap-4">
+<div>
+<label class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant block mb-2">Temporal Window</label>
+<div class="space-y-3">
+<!-- Start Time -->
+<div class="flex items-center justify-between gap-3">
+<span class="text-[9px] font-bold uppercase text-on-surface-variant/60 w-12">Start</span>
+<div class="flex-1 flex gap-1">
+<button class="flex-1 py-1 text-xs tactical-input hover:bg-primary/10 hover:border-primary/40 transition-colors font-bold">06</button>
+<span class="text-primary self-center font-bold">:</span>
+<button class="flex-1 py-1 text-xs tactical-input hover:bg-primary/10 hover:border-primary/40 transition-colors font-bold">30</button>
+<button class="px-2 py-1 text-[9px] tactical-input bg-primary/10 text-primary border-primary/20 font-bold">AM</button>
+</div>
+</div>
+<!-- Finish Time -->
+<div class="flex items-center justify-between gap-3">
+<span class="text-[9px] font-bold uppercase text-on-surface-variant/60 w-12">Finish</span>
+<div class="flex-1 flex gap-1">
+<button class="flex-1 py-1 text-xs tactical-input hover:bg-primary/10 hover:border-primary/40 transition-colors font-bold">08</button>
+<span class="text-primary self-center font-bold">:</span>
+<button class="flex-1 py-1 text-xs tactical-input hover:bg-primary/10 hover:border-primary/40 transition-colors font-bold">00</button>
+<button class="px-2 py-1 text-[9px] tactical-input hover:bg-white/10 transition-colors font-bold">AM</button>
+</div>
+</div>
+</div>
+</div>
+<div class="mt-auto pt-4 border-t border-white/5">
+<div class="flex items-center justify-between text-[10px]">
+<span class="text-on-surface-variant font-bold uppercase tracking-widest">Duration</span>
+<span class="text-primary font-bold">01h 30m</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Action Footer -->
+<div class="px-6 py-4 bg-surface-container border-t border-white/10 flex items-center justify-between gap-4">
+<button class="px-4 py-2 text-xs font-bold text-on-surface-variant hover:text-on-surface uppercase tracking-widest transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">search</span>
+Search Event
+</button>
+<div class="flex items-center gap-4">
+<button class="px-6 py-2 text-xs font-bold text-on-surface-variant hover:text-on-surface uppercase tracking-widest transition-colors">Discard</button>
+<button class="px-8 py-3 bg-primary text-on-primary rounded-tactical font-bold text-xs uppercase tracking-[0.15em] ember-glow hover:scale-[1.02] transition-transform flex items-center gap-2">
+                Commit Event
+                <span class="material-symbols-outlined text-sm">rocket_launch</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Full Page Background (Visible through Blur) -->
+<div class="fixed inset-0 z-[-1] overflow-hidden opacity-50">
+<img alt="Epic Mountain Run" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida/AP1WRLsgVc4_iJE7RaygoNGaj2LEYzpfZ9aAeT9QU90QPdnP2md2z4aSX0fUdO55IEvLCt5ma4cUrZ3PqY6m_KncbriKdh-VxWz6R3O-F5FLv6D2LzqjnX_EUxD5GICcyxH0ifSVlGxYOPr0wMxM7k8fWhkKY46fB2p3pYupwymMFhOZwy5tQ6ZCAI-X-2YBlUDfsnUqV0pdPmizw280EzO88brJmm9mN3wwUbsAGXjKfC16pK_f2DzSsftlEx0"/>
+<div class="absolute inset-0 bg-black/40"></div>
+<div class="absolute inset-0 bg-gradient-to-t from-surface via-transparent to-surface/20"></div>
+</div>
+<!-- Background Content Header -->
+<header class="fixed top-0 left-0 right-0 z-50 bg-surface/40 backdrop-blur-md border-b border-white/10 opacity-30 pointer-events-none">
+<div class="max-w-max-width mx-auto flex items-center justify-between px-gutter h-16">
+<div class="flex-1 flex items-center">
+<span class="font-display-hero text-headline-lg-mobile font-extrabold tracking-tighter text-primary">RIVAL</span>
+</div>
+</div>
+</header>
+<main class="pt-24 min-h-screen blur-md grayscale opacity-30 pointer-events-none">
+<!-- Welcome Section -->
+<section class="max-w-max-width mx-auto px-gutter mb-12">
+<div class="max-w-3xl mx-auto text-center">
+<h1 class="font-display-hero text-headline-lg md:text-5xl text-on-surface mb-2">Hey, Julian</h1>
+<p class="font-body-lg text-on-surface-variant max-w-md mx-auto">Quiet consistency builds the loudest results. Ready to begin?</p>
+</div>
+</section>
+<!-- Hero Metric Centerpiece -->
+<div class="max-w-max-width mx-auto px-gutter mb-16">
+<div class="max-w-2xl mx-auto">
+<div class="glass-card p-12 rounded-xl border-primary/20">
+<div class="flex flex-col items-center text-center gap-8">
+<div class="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center">
+<span class="material-symbols-outlined text-primary text-4xl">timer</span>
+</div>
+<div>
+<p class="text-xs uppercase tracking-[0.2em] text-on-surface-variant font-bold mb-4">Total Time Earned</p>
+<p class="font-metric-large text-6xl md:text-8xl text-primary hero-metric-glow tracking-tighter">124h 32m</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // Simple UI interaction logic could go here
+    });
+</script>
+</body></html>

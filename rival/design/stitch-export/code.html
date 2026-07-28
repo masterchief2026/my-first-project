@@ -1,0 +1,432 @@
+<!DOCTYPE html><html class="dark" lang="en" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>RIVAL | Human-Centric Performance</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;600;700;800&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<style>
+        body {
+            font-family: 'Manrope', sans-serif;
+            background-color: #131313;
+            color: #e5e2e1;
+            -webkit-font-smoothing: antialiased;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-card {
+            background: rgba(20, 20, 20, 0.45);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .ember-glow {
+            box-shadow: 0 0 20px rgba(217, 119, 87, 0.15);
+        }
+        .unrivaled-glow {
+            box-shadow: inset 0 0 12px rgba(255, 215, 0, 0.05), 0 0 30px rgba(217, 119, 87, 0.1);
+        }
+        .hero-metric-glow {
+            text-shadow: 0 0 25px rgba(255, 181, 158, 0.4);
+        }
+        .bg-fixed-full {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            object-fit: cover;
+        }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                "error-container": "#93000a",
+                "surface-mid": "#1C1C1C",
+                "on-primary-fixed": "#390b00",
+                "on-surface-variant": "#dbc1b9",
+                "surface-low": "#131313",
+                "rank-elite": "#9F57D9",
+                "rank-pro": "#D97757",
+                "on-secondary-fixed-variant": "#474646",
+                "surface-variant": "#353535",
+                "on-secondary": "#313030",
+                "secondary": "#c8c6c5",
+                "on-tertiary-container": "#00312b",
+                "on-tertiary": "#003731",
+                "on-secondary-container": "#bab8b7",
+                "surface-container-highest": "#353535",
+                "tertiary-container": "#09a493",
+                "tertiary-fixed-dim": "#5edac7",
+                "tertiary": "#5edac7",
+                "surface-dim": "#131313",
+                "rank-rookie": "#B0B0B0",
+                "inverse-on-surface": "#313030",
+                "surface-bright": "#323232",
+                "surface-container-high": "#2a2a2a",
+                "status-inspired": "#FFFFFF",
+                "surface": "#131313",
+                "inverse-primary": "#99462a",
+                "on-secondary-fixed": "#1c1b1b",
+                "on-tertiary-fixed-variant": "#005047",
+                "surface-tint": "#ffb59e",
+                "secondary-fixed": "#e5e2e1",
+                "rank-unrivaled": "#FFD700",
+                "primary-fixed": "#ffdbd0",
+                "text-secondary": "#A0A0A0",
+                "tertiary-fixed": "#7df7e3",
+                "outline-variant": "#55433d",
+                "on-primary-fixed-variant": "#7a2f15",
+                "surface-high": "#282828",
+                "surface-container-lowest": "#0e0e0e",
+                "secondary-fixed-dim": "#c8c6c5",
+                "on-surface": "#e5e2e1",
+                "surface-container-low": "#1b1b1b",
+                "surface-container": "#20201f",
+                "on-error": "#690005",
+                "outline": "#a38c85",
+                "on-error-container": "#ffdad6",
+                "background": "#131313",
+                "on-tertiary-fixed": "#00201c",
+                "primary-fixed-dim": "#ffb59e",
+                "secondary-container": "#4a4949",
+                "text-primary": "#FFFFFF",
+                "on-primary-container": "#541400",
+                "on-primary": "#5c1902",
+                "on-background": "#e5e2e1",
+                "error": "#ffb4ab",
+                "primary-container": "#d97757",
+                "primary": "#ffb59e",
+                "inverse-surface": "#e5e2e1"
+              },
+              "borderRadius": {
+                "DEFAULT": "0.25rem",
+                "lg": "0.8rem",
+                "xl": "1rem",
+                "full": "9999px"
+              },
+              "spacing": {
+                "max-width": "1440px",
+                "section-margin": "2.5rem",
+                "container-padding": "2rem",
+                "gutter": "1.5rem",
+                "stack-gap": "1.25rem"
+              },
+              "fontFamily": {
+                "display-hero": ["Manrope"],
+                "headline-lg": ["Manrope"],
+                "label-caps": ["Manrope"],
+                "title-md": ["Manrope"],
+                "body-md": ["Manrope"],
+                "body-lg": ["Manrope"],
+                "metric-large": ["Manrope"]
+              }
+            }
+          }
+        }
+    </script>
+</head>
+<body class="bg-surface text-on-surface">
+<!-- Full Page Background -->
+<div class="fixed inset-0 z-[-1] overflow-hidden">
+<img alt="Epic Mountain Run" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida/AP1WRLsgVc4_iJE7RaygoNGaj2LEYzpfZ9aAeT9QU90QPdnP2md2z4aSX0fUdO55IEvLCt5ma4cUrZ3PqY6m_KncbriKdh-VxWz6R3O-F5FLv6D2LzqjnX_EUxD5GICcyxH0ifSVlGxYOPr0wMxM7k8fWhkKY46fB2p3pYupwymMFhOZwy5tQ6ZCAI-X-2YBlUDfsnUqV0pdPmizw280EzO88brJmm9mN3wwUbsAGXjKfC16pK_f2DzSsftlEx0">
+<div class="absolute inset-0 bg-black/40"></div>
+<div class="absolute inset-0 bg-gradient-to-t from-surface via-transparent to-surface/20"></div>
+</div>
+<!-- Top Navigation Bar -->
+<header class="fixed top-0 left-0 right-0 z-50 bg-surface/40 backdrop-blur-md border-b border-white/10">
+<div class="max-w-max-width mx-auto flex items-center justify-between px-gutter h-16">
+<div class="flex-1 flex items-center">
+<span class="font-display-hero text-headline-lg-mobile font-extrabold tracking-tighter text-primary">RIVAL</span>
+</div>
+<nav class="hidden md:flex gap-8 items-center flex-none">
+<a class="font-body-md text-on-surface-variant hover:text-on-surface transition-colors" href="#">Teams</a>
+<a class="font-body-md text-on-surface-variant hover:text-on-surface transition-colors" href="#">My Training</a>
+<a class="font-body-md text-primary font-bold border-b-2 border-primary pb-1" href="#">Profile</a>
+</nav>
+<div class="flex-1 flex items-center gap-4 justify-end">
+<div class="hidden sm:flex flex-col items-end mr-2">
+<span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Rank</span>
+<span class="text-xs font-bold text-rank-unrivaled">Unrivaled</span>
+</div>
+<button class="material-symbols-outlined text-on-surface-variant hover:text-on-surface transition-colors">notifications</button>
+<div class="h-10 w-10 rounded-full border-2 border-primary overflow-hidden cursor-pointer active:scale-95 transition-transform">
+<img alt="User Profile" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAc7oihTZrqup5OlyLN4WuBKGnDN6eAqe2LAI33hifKbnU_k8g70b6VLOnmDDU935QvLYBQ-d_RYuc1-sY-T_GCIeGVhozNJa8aFtE4kesZ5HalI16CTLLEL9GQg_Fl2l8jeEXqaw6Er74svAcxBaEsIRcQzBWVsZHVGSLRA7dMncv3edRKsmPt_JHgsDkWy-pNILhJY1orvvU5Vgy7FkRq4AxGCl2i4JVr4YqW5bGL8WKC_gAEyJdmtTYjUem4X-bXnTGUEr1bHWmw">
+</div>
+</div>
+</div>
+</header>
+<main class="pt-24 min-h-screen">
+<!-- Welcome Section -->
+<section class="max-w-max-width mx-auto px-gutter mb-12">
+<div class="max-w-3xl mx-auto text-center">
+<h1 class="font-display-hero text-headline-lg md:text-5xl text-on-surface mb-2">Hey, Julian</h1>
+<p class="font-body-lg text-on-surface-variant max-w-md mx-auto">Quiet consistency builds the loudest results. Ready to begin?</p>
+</div>
+</section>
+<!-- Hero Metric Centerpiece -->
+<div class="max-w-max-width mx-auto px-gutter mb-16">
+<div class="max-w-2xl mx-auto">
+<div class="glass-card p-12 rounded-xl unrivaled-glow border-primary/20" style="transform: translateY(0px); transition: 0.3s;">
+<div class="flex flex-col items-center text-center gap-8">
+<div class="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center">
+<span class="material-symbols-outlined text-primary text-4xl">timer</span>
+</div>
+<div>
+<p class="text-xs uppercase tracking-[0.2em] text-on-surface-variant font-bold mb-4">Total Time Earned</p>
+<p class="font-metric-large text-6xl md:text-8xl text-primary hero-metric-glow tracking-tighter">124h 32m</p>
+<p class="text-sm text-on-surface-variant mt-6 font-semibold">Trained • Top 2% in London</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Dashboard Grid -->
+<div class="max-w-max-width mx-auto px-gutter mb-16">
+<div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+<!-- Goal Card -->
+<div class="lg:col-span-1">
+<div class="glass-card rounded-xl p-8 unrivaled-glow border-primary/20 flex flex-col gap-6 h-full">
+<div class="flex items-center justify-between">
+<span class="px-3 py-1 rounded-full bg-primary text-on-primary text-[10px] font-bold uppercase tracking-widest">Active Mission</span>
+<span class="material-symbols-outlined text-primary text-3xl">flag</span>
+</div>
+<div>
+<p class="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold mb-2">Distance Goal</p>
+<div class="flex items-baseline gap-2 mb-4">
+<span class="font-metric-large text-5xl text-primary">240</span>
+<span class="text-on-surface-variant text-xl">/ 1,000 km</span>
+</div>
+<div class="w-full h-3 bg-white/10 rounded-full overflow-hidden mb-2">
+<div class="w-[24%] h-full bg-primary ember-glow"></div>
+</div>
+<p class="text-xs text-on-surface-variant font-semibold">3 days remaining</p>
+</div>
+<button class="w-full bg-primary text-on-primary py-3 rounded-xl font-bold text-sm hover:scale-[1.02] transition-transform mt-auto">Resume Mission</button>
+</div>
+</div>
+<!-- Streak Card -->
+<div class="lg:col-span-1">
+<div class="glass-card rounded-xl p-8 border-primary/10 flex flex-col items-center justify-center text-center h-full">
+<div class="rounded-full bg-primary/20 flex items-center justify-center mb-6 w-24 h-24">
+<span class="material-symbols-outlined text-primary text-6xl" style="font-variation-settings: &quot;FILL&quot; 1;">local_fire_department</span>
+</div>
+<div class="flex flex-col items-center">
+<p class="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold mb-2">Current Streak</p>
+<div class="flex justify-center mb-2 items-baseline gap-2">
+<span class="font-metric-large text-7xl text-on-surface hero-metric-glow tracking-tighter">12</span>
+<span class="text-base font-label-caps text-on-surface-variant uppercase font-bold tracking-widest">Weeks</span>
+</div>
+<p class="text-xs text-on-surface-variant font-semibold mb-4">Longest streak: 19 weeks</p>
+<div class="flex justify-center gap-2">
+<div class="w-3 h-1.5 rounded-full bg-primary"></div>
+<div class="w-3 h-1.5 rounded-full bg-primary"></div>
+<div class="w-3 h-1.5 rounded-full bg-primary"></div>
+<div class="w-3 h-1.5 rounded-full bg-primary"></div>
+<div class="w-3 h-1.5 rounded-full bg-white/10"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Team Momentum Card -->
+<div class="lg:col-span-1">
+<div class="glass-card rounded-xl p-8 border-primary/20 flex flex-col h-full">
+<div class="flex items-center justify-between mb-6">
+<div class="flex items-center gap-4">
+<div class="relative">
+<div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+<span class="material-symbols-outlined text-primary text-2xl">groups</span>
+</div>
+<span class="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+<span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-primary"></span>
+</span>
+</div>
+<div>
+<h3 class="font-bold text-lg text-on-surface">Momentum</h3>
+<p class="text-[9px] text-primary font-bold uppercase tracking-widest">Active Now</p>
+</div>
+</div>
+</div>
+<div class="space-y-3 mb-6">
+<div class="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/5 hover:border-primary/30 transition-colors group cursor-pointer">
+<div class="w-8 h-8 rounded-full bg-tertiary/20 flex items-center justify-center text-tertiary font-bold text-[10px]">LA</div>
+<div class="flex-1 overflow-hidden">
+<p class="font-bold text-xs truncate">London Atelier</p>
+<div class="flex items-center gap-1.5">
+<div class="flex gap-0.5">
+<div class="w-1 h-1 rounded-full bg-primary"></div>
+<div class="w-1 h-1 rounded-full bg-primary"></div>
+<div class="w-1 h-1 rounded-full bg-primary"></div>
+</div>
+<p class="text-[9px] text-on-surface-variant font-semibold">3 active</p>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/5 hover:border-primary/30 transition-colors group cursor-pointer">
+<div class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-[10px]">PP</div>
+<div class="flex-1 overflow-hidden">
+<p class="font-bold text-xs truncate">Peak Performance</p>
+<div class="flex items-center gap-1.5">
+<div class="flex gap-0.5">
+<div class="w-1 h-1 rounded-full bg-primary"></div>
+<div class="w-1 h-1 rounded-full bg-primary"></div>
+<div class="w-1 h-1 rounded-full bg-white/10"></div>
+</div>
+<p class="text-[9px] text-on-surface-variant font-semibold">10 trained</p>
+</div>
+</div>
+</div>
+</div>
+<button class="w-full bg-gradient-to-r from-primary to-primary-container text-on-primary py-3 rounded-xl font-bold text-xs hover:scale-[1.02] transition-all flex items-center justify-center gap-2 mt-auto">
+    Join Training
+    <span class="material-symbols-outlined text-xs">arrow_forward</span>
+</button>
+</div>
+</div>
+<!-- Stats Snapshot Panel -->
+<aside class="lg:col-span-1">
+<div class="glass-card rounded-xl p-6 border-white/10 flex flex-col h-full">
+<h3 class="text-xs uppercase tracking-[0.2em] text-on-surface-variant font-bold mb-6">Stats Snapshot</h3>
+<div class="flex flex-col gap-5">
+<div class="flex items-center gap-4 group cursor-pointer">
+<div class="w-10 h-10 rounded-full bg-tertiary/10 flex items-center justify-center group-hover:bg-tertiary/20 transition-colors">
+<span class="material-symbols-outlined text-tertiary text-xl">distance</span>
+</div>
+<div>
+<p class="text-[9px] uppercase tracking-widest text-on-surface-variant font-bold">Distance (KM)</p>
+<p class="font-bold text-on-surface text-xl">1,240</p>
+</div>
+</div>
+<div class="flex items-center gap-4 group cursor-pointer">
+<div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+<span class="material-symbols-outlined text-primary text-xl">terrain</span>
+</div>
+<div>
+<p class="text-[9px] uppercase tracking-widest text-on-surface-variant font-bold">Climbed (M)</p>
+<p class="font-bold text-on-surface text-xl">8,450</p>
+</div>
+</div>
+<div class="flex items-center gap-4 group cursor-pointer">
+<div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+<span class="material-symbols-outlined text-primary text-xl">event_upcoming</span>
+</div>
+<div>
+<p class="text-[9px] uppercase tracking-widest text-on-surface-variant font-bold">Next Race</p>
+<p class="font-bold text-on-surface text-xl">8 Days</p>
+</div>
+</div>
+<div class="mt-4 pt-6 border-t border-white/10">
+<button class="w-full bg-primary/10 hover:bg-primary/20 text-primary rounded-xl p-4 flex items-center gap-4 transition-all">
+<div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+<span class="material-symbols-outlined text-primary text-xl">auto_awesome</span>
+</div>
+<div class="text-left">
+<p class="text-[9px] uppercase tracking-widest font-bold">AI Share</p>
+<p class="text-xs font-bold text-on-surface">Generate Story</p>
+</div>
+</button>
+</div>
+</div>
+</div>
+</aside>
+</div>
+</div>
+<!-- Season Wrap Summary -->
+<section class="max-w-max-width mx-auto px-gutter pb-24">
+<div class="glass-card rounded-2xl p-10 border-white/10" style="transform: translateY(0px); box-shadow: none; transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); border-color: rgba(255, 255, 255, 0.1);">
+<div class="flex items-center justify-between mb-10">
+<div>
+<h3 class="text-xs uppercase tracking-[0.3em] text-primary font-bold mb-1">Season Wrap</h3>
+<p class="text-sm text-on-surface-variant">Your momentum at a glance</p>
+</div>
+<button class="text-on-surface-variant hover:text-primary text-xs font-bold flex items-center gap-2 uppercase tracking-widest transition-colors">
+                Training History <span class="material-symbols-outlined text-sm">arrow_forward</span>
+</button>
+</div>
+<div class="grid grid-cols-2 md:grid-cols-4 gap-12 md:gap-8 px-2">
+<div class="flex flex-col">
+<p class="text-[10px] text-on-surface-variant font-label-caps mb-3 tracking-[0.15em]">EFFORT</p>
+<div class="flex items-baseline gap-3">
+<p class="font-metric-large text-on-surface text-4xl">14.2k</p>
+<span class="text-[10px] text-primary font-bold bg-primary/10 px-2 py-0.5 rounded">+8%</span>
+</div>
+</div>
+<div class="flex flex-col">
+<p class="text-[10px] text-on-surface-variant font-label-caps mb-3 tracking-[0.15em]">ACTIVITIES</p>
+<p class="font-metric-large text-on-surface text-4xl">312</p>
+</div>
+<div class="flex flex-col">
+<p class="text-[10px] text-on-surface-variant font-label-caps mb-3 tracking-[0.15em]">AVG INTENSITY</p>
+<div class="flex items-center gap-2">
+<p class="font-metric-large text-on-surface text-4xl">High</p>
+<div class="flex gap-0.5">
+<div class="w-1 h-3 bg-primary rounded-full"></div>
+<div class="w-1 h-3 bg-primary rounded-full"></div>
+<div class="w-1 h-3 bg-primary rounded-full"></div>
+<div class="w-1 h-3 bg-white/20 rounded-full"></div>
+</div>
+</div>
+</div>
+<div class="flex flex-col">
+<p class="text-[10px] text-on-surface-variant font-label-caps mb-3 tracking-[0.15em]">RIVAL RANK</p>
+<div class="flex items-center h-full"><img src="https://lh3.googleusercontent.com/aida-public/AB6AXuAoFSW_KviZtxCZmOpkw8keRnpIpRGJM4WwXceUKVjJKpoDtLkfrVfCN19rVwkwrfye4pQWsSXFyT17ksjDjN5Y8Yw2J0QNx_80Yxbz8JkY8OI0t4dIfVkhElng8-ADX99QDZVr-yg6ywWhjMqIY4YSMS7GGRzuzzVkfxSro4B2DoB6FXgKcXiRU9oVhgUpROXbCPd5UjyTO3r6GXVEwyxjwgeOnP6JG9M7F5M09gE5B7xn98JZT0aI4-YyRb1ekIzkDiCK1EKHU2GN" alt="UNRIVALED" class="h-8 md:h-10 object-contain unrivaled-glow"></div>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- Mobile Navigation Bar -->
+<footer class="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-black/60 backdrop-blur-xl border-t border-white/10">
+<div class="flex justify-around items-center h-16 px-4">
+<button class="flex flex-col items-center gap-1 text-primary">
+<span class="material-symbols-outlined" style="font-variation-settings: &quot;FILL&quot; 1;">home</span>
+<span class="text-[10px] font-bold">Mission</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-on-surface-variant">
+<span class="material-symbols-outlined">explore</span>
+<span class="text-[10px] font-bold">Explore</span>
+</button>
+<button class="bg-primary text-on-primary w-12 h-12 rounded-full -mt-8 shadow-lg flex items-center justify-center">
+<span class="material-symbols-outlined">add</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-on-surface-variant">
+<span class="material-symbols-outlined">analytics</span>
+<span class="text-[10px] font-bold">Stats</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-on-surface-variant">
+<span class="material-symbols-outlined">account_circle</span>
+<span class="text-[10px] font-bold">Profile</span>
+</button>
+</div>
+</footer>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const cards = document.querySelectorAll('.glass-card');
+        cards.forEach(card => {
+            card.addEventListener('mouseenter', () => {
+                card.style.transform = 'translateY(-4px)';
+                card.style.boxShadow = '0 20px 40px -15px rgba(0,0,0,0.6)';
+                card.style.transition = 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+                card.style.borderColor = 'rgba(217, 119, 87, 0.4)';
+            });
+            card.addEventListener('mouseleave', () => {
+                card.style.transform = 'translateY(0)';
+                card.style.boxShadow = 'none';
+                card.style.borderColor = card.classList.contains('border-primary/20') ? 'rgba(217, 119, 87, 0.2)' : 'rgba(255, 255, 255, 0.1)';
+            });
+        });
+    });
+</script>
+
+
+</body></html>

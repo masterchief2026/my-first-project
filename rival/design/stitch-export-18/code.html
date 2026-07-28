@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        :root {
+            --font-manrope: 'Manrope', sans-serif;
+        }
+        body {
+            font-family: var(--font-manrope);
+            background-color: #131313;
+            color: #e5e2e1;
+            -webkit-font-smoothing: antialiased;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-card {
+            background: rgba(40, 40, 40, 0.4);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #131313;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #353535;
+            border-radius: 10px;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "surface-mid": "#1C1C1C",
+                      "secondary": "#c8c6c5",
+                      "inverse-primary": "#99462a",
+                      "primary-container": "#d97757",
+                      "on-primary": "#5c1902",
+                      "tertiary-fixed-dim": "#5edac7",
+                      "on-tertiary-container": "#00312b",
+                      "surface-dim": "#131313",
+                      "primary-fixed": "#ffdbd0",
+                      "surface-tint": "#ffb59e",
+                      "on-surface": "#e5e2e1",
+                      "surface-variant": "#353535",
+                      "inverse-surface": "#e5e2e1",
+                      "tertiary": "#5edac7",
+                      "text-secondary": "#A0A0A0",
+                      "on-secondary-fixed": "#1c1b1b",
+                      "on-secondary-container": "#bab8b7",
+                      "on-primary-container": "#541400",
+                      "on-tertiary": "#003731",
+                      "background": "#131313",
+                      "surface-bright": "#323232",
+                      "surface-high": "#282828",
+                      "on-background": "#e5e2e1",
+                      "rank-rookie": "#B0B0B0",
+                      "surface": "#131313",
+                      "rank-pro": "#D97757",
+                      "surface-low": "#131313",
+                      "text-primary": "#FFFFFF",
+                      "on-error-container": "#ffdad6",
+                      "rank-unrivaled": "#FFD700",
+                      "on-surface-variant": "#dbc1b9",
+                      "surface-container-lowest": "#0e0e0e",
+                      "on-tertiary-fixed-variant": "#005047",
+                      "on-tertiary-fixed": "#00201c",
+                      "on-secondary-fixed-variant": "#474646",
+                      "on-primary-fixed": "#390b00",
+                      "primary": "#ffb59e",
+                      "outline": "#a38c85",
+                      "surface-container": "#20201f",
+                      "secondary-container": "#4a4949",
+                      "inverse-on-surface": "#313030",
+                      "surface-container-highest": "#353535",
+                      "on-secondary": "#313030",
+                      "secondary-fixed-dim": "#c8c6c5",
+                      "primary-fixed-dim": "#ffb59e",
+                      "tertiary-fixed": "#7df7e3",
+                      "secondary-fixed": "#e5e2e1",
+                      "error": "#ffb4ab",
+                      "surface-container-high": "#2a2a2a",
+                      "rank-elite": "#9F57D9",
+                      "on-error": "#690005",
+                      "error-container": "#93000a",
+                      "on-primary-fixed-variant": "#7a2f15",
+                      "tertiary-container": "#09a493",
+                      "status-inspired": "#FFFFFF",
+                      "outline-variant": "#55433d",
+                      "surface-container-low": "#1b1b1b"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "stack-gap": "1rem",
+                      "section-margin": "2rem",
+                      "max-width": "1200px",
+                      "gutter": "1rem",
+                      "container-padding": "1.5rem"
+              },
+              "fontFamily": {
+                      "title-md": ["Manrope"],
+                      "metric-large": ["Manrope"],
+                      "headline-lg": ["Manrope"],
+                      "body-lg": ["Manrope"],
+                      "body-md": ["Manrope"],
+                      "label-caps": ["Manrope"],
+                      "display-hero": ["Manrope"],
+                      "headline-lg-mobile": ["Manrope"]
+              },
+              "fontSize": {
+                      "title-md": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                      "metric-large": ["32px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "300"}],
+                      "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                      "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                      "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                      "label-caps": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700"}],
+                      "display-hero": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "800"}],
+                      "headline-lg-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "700"}]
+              }
+            },
+          },
+        }
+    </script>
+</head>
+<body class="bg-background text-on-background min-h-screen custom-scrollbar overflow-x-hidden">
+<!-- TopNavBar -->
+<nav class="bg-surface-container-low flex justify-between items-center w-full px-container-padding h-16 fixed top-0 z-50 transition-all duration-300 ease-in-out">
+<div class="font-display-hero text-headline-lg-mobile tracking-tighter text-primary dark:text-primary">RIVAL</div>
+<div class="hidden md:flex items-center gap-8">
+<a class="text-primary font-bold border-b-2 border-primary pb-1 font-title-md text-title-md transition-all" href="#">Teams</a>
+<a class="text-on-surface-variant font-medium pb-1 font-title-md text-title-md hover:text-primary-fixed-dim transition-colors" href="#">Training</a>
+<a class="text-on-surface-variant font-medium pb-1 font-title-md text-title-md hover:text-primary-fixed-dim transition-colors" href="#">Profile</a>
+</div>
+<div class="flex items-center gap-4">
+<button class="material-symbols-outlined text-primary text-2xl hover:text-primary-fixed-dim transition-colors">notifications</button>
+<div class="w-8 h-8 rounded-full overflow-hidden border border-outline-variant bg-surface-variant">
+<img class="w-full h-full object-cover" data-alt="A professional studio headshot of an athletic individual, looking forward with confidence. The lighting is dramatic and moody, emphasizing facial features against a dark, minimalist background. The aesthetic is clean, premium, and focused, aligning with the RIVAL fitness brand identity." src="https://lh3.googleusercontent.com/aida-public/AB6AXuB7fvoSTQt-tMDnNodijXwsEwNuXfkn991oLD9fUzdjHgJpUpbWgEpAd6hHJu7Kku-BTFbS5WmKmtg8lwsRxY5CwWpUM0mcreoWXlVgXHYx9qTpUEDDdScPNc0GAT-00jzHmPmZg87fuwkU8_EtfUrWGPpMril-UitzWtVXk_oNj3JywGcFT4uVnkgo9BUBW75WccWbwg7R7Cmv9atAE_26xzWaChXnbWshwC0NOFY6eYAmC58RGVXATS0qZteUQKHslQZAphvoBbdO"/>
+</div>
+</div>
+</nav>
+<main class="pt-24 pb-20 px-container-padding max-w-max-width mx-auto">
+<!-- Header Actions -->
+<header class="mb-section-margin flex flex-col md:flex-row md:items-end justify-between gap-stack-gap">
+<div class="space-y-2">
+<h1 class="font-headline-lg text-headline-lg md:text-headline-lg text-text-primary">My Teams</h1>
+<p class="font-body-md text-body-md text-text-secondary max-w-md">Collaborate, compete, and track collective progress with your inner circle.</p>
+</div>
+<div class="flex items-center gap-3">
+<button class="flex items-center gap-2 px-6 py-2.5 bg-surface-bright border border-outline-variant rounded-lg font-label-caps text-label-caps text-text-primary hover:bg-surface-high transition-all">
+<span class="material-symbols-outlined text-sm">key</span>
+                    INVITE CODE
+                </button>
+<button class="flex items-center gap-2 px-6 py-2.5 bg-primary-container text-on-primary-container rounded-lg font-label-caps text-label-caps hover:brightness-110 transition-all">
+<span class="material-symbols-outlined text-sm">group_add</span>
+                    CREATE TEAM
+                </button>
+</div>
+</header>
+<!-- Search & Filter Bar -->
+<div class="mb-stack-gap relative">
+<span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary">search</span>
+<input class="w-full bg-surface-container-high border-none rounded-xl py-4 pl-12 pr-4 text-on-surface placeholder:text-text-secondary focus:ring-2 focus:ring-primary-container transition-all" placeholder="Search teams or activities..." type="text"/>
+</div>
+<!-- Team Cards Grid -->
+<section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-gutter">
+<!-- Team 1: SQUAMPTON CRREEW -->
+<div class="bg-surface-container rounded-xl p-6 border border-outline-variant hover:border-primary-container transition-all group flex flex-col justify-between">
+<div>
+<div class="flex justify-between items-start mb-4">
+<div class="w-12 h-12 rounded-lg bg-surface-mid flex items-center justify-center border border-outline-variant text-primary">
+<span class="material-symbols-outlined text-3xl">bolt</span>
+</div>
+<span class="font-label-caps text-label-caps px-3 py-1 bg-surface-container-highest text-secondary rounded-full">1 ACTIVITY THIS WEEK</span>
+</div>
+<h3 class="font-title-md text-title-md text-text-primary group-hover:text-primary transition-colors">SQUAMPTON CRREEW</h3>
+<div class="grid grid-cols-2 gap-4 mt-6">
+<div class="space-y-1">
+<p class="font-label-caps text-label-caps text-text-secondary">MEMBERS</p>
+<p class="font-metric-large text-metric-large text-text-primary">1</p>
+</div>
+<div class="space-y-1">
+<p class="font-label-caps text-label-caps text-text-secondary">TRAINING</p>
+<p class="font-metric-large text-metric-large text-text-primary">2<span class="text-sm font-label-caps ml-1">WKS</span></p>
+</div>
+</div>
+</div>
+<div class="mt-8 pt-6 border-t border-outline-variant flex justify-between items-center">
+<div class="flex flex-col">
+<span class="font-label-caps text-label-caps text-text-secondary">EARNED</span>
+<span class="font-body-lg text-body-lg text-primary">9h</span>
+</div>
+<div class="flex flex-col items-end">
+<span class="font-label-caps text-label-caps text-text-secondary">ACTIVITIES</span>
+<span class="font-body-lg text-body-lg text-text-primary">9</span>
+</div>
+</div>
+</div>
+<!-- Team 2: THE HIDDEN LEAF (Active Rank Focus) -->
+<div class="bg-surface-container rounded-xl p-6 border border-primary-container/30 ring-1 ring-primary-container/20 hover:border-primary-container transition-all group flex flex-col justify-between relative overflow-hidden">
+<div class="absolute top-0 right-0 p-1">
+<div class="bg-primary-container text-on-primary-container text-[10px] font-bold px-2 py-0.5 rounded-bl-lg">TOP RANK</div>
+</div>
+<div>
+<div class="flex justify-between items-start mb-4">
+<div class="w-12 h-12 rounded-lg bg-surface-mid flex items-center justify-center border border-primary-container text-primary shadow-[0_0_15px_rgba(217,119,87,0.2)]">
+<span class="material-symbols-outlined text-3xl" style="font-variation-settings: 'FILL' 1;">military_tech</span>
+</div>
+<span class="font-label-caps text-label-caps px-3 py-1 bg-primary-container text-on-primary-container rounded-full">YOU'RE 1ST THIS WEEK</span>
+</div>
+<h3 class="font-title-md text-title-md text-text-primary group-hover:text-primary transition-colors">THE HIDDEN LEAF</h3>
+<div class="grid grid-cols-2 gap-4 mt-6">
+<div class="space-y-1">
+<p class="font-label-caps text-label-caps text-text-secondary">MEMBERS</p>
+<p class="font-metric-large text-metric-large text-text-primary">3</p>
+</div>
+<div class="space-y-1">
+<p class="font-label-caps text-label-caps text-text-secondary">TRAINING</p>
+<p class="font-metric-large text-metric-large text-text-primary">4<span class="text-sm font-label-caps ml-1">WKS</span></p>
+</div>
+</div>
+</div>
+<div class="mt-8 pt-6 border-t border-outline-variant flex justify-between items-center">
+<div class="flex flex-col">
+<span class="font-label-caps text-label-caps text-text-secondary">EARNED</span>
+<span class="font-body-lg text-body-lg text-primary">45h</span>
+</div>
+<div class="flex flex-col items-end">
+<span class="font-label-caps text-label-caps text-text-secondary">ACTIVITIES</span>
+<span class="font-body-lg text-body-lg text-text-primary">76</span>
+</div>
+</div>
+</div>
+<!-- Team 3: AKATSUKI -->
+<div class="bg-surface-container rounded-xl p-6 border border-outline-variant hover:border-primary-container transition-all group flex flex-col justify-between">
+<div>
+<div class="flex justify-between items-start mb-4">
+<div class="w-12 h-12 rounded-lg bg-surface-mid flex items-center justify-center border border-outline-variant text-primary">
+<span class="material-symbols-outlined text-3xl">local_fire_department</span>
+</div>
+<span class="font-label-caps text-label-caps px-3 py-1 bg-primary-container/20 text-primary rounded-full">YOU'RE 1ST THIS WEEK</span>
+</div>
+<h3 class="font-title-md text-title-md text-text-primary group-hover:text-primary transition-colors">AKATSUKI</h3>
+<div class="grid grid-cols-2 gap-4 mt-6">
+<div class="space-y-1">
+<p class="font-label-caps text-label-caps text-text-secondary">MEMBERS</p>
+<p class="font-metric-large text-metric-large text-text-primary">2</p>
+</div>
+<div class="space-y-1">
+<p class="font-label-caps text-label-caps text-text-secondary">TRAINING</p>
+<p class="font-metric-large text-metric-large text-text-primary">2<span class="text-sm font-label-caps ml-1">WKS</span></p>
+</div>
+</div>
+</div>
+<div class="mt-8 pt-6 border-t border-outline-variant flex justify-between items-center">
+<div class="flex flex-col">
+<span class="font-label-caps text-label-caps text-text-secondary">EARNED</span>
+<span class="font-body-lg text-body-lg text-primary">14h</span>
+</div>
+<div class="flex flex-col items-end">
+<span class="font-label-caps text-label-caps text-text-secondary">ACTIVITIES</span>
+<span class="font-body-lg text-body-lg text-text-primary">19</span>
+</div>
+</div>
+</div>
+<!-- Team 4: LEGENDARY SANIN -->
+<div class="bg-surface-container rounded-xl p-6 border border-outline-variant hover:border-primary-container transition-all group flex flex-col justify-between">
+<div>
+<div class="flex justify-between items-start mb-4">
+<div class="w-12 h-12 rounded-lg bg-surface-mid flex items-center justify-center border border-outline-variant text-primary">
+<span class="material-symbols-outlined text-3xl">star</span>
+</div>
+<span class="font-label-caps text-label-caps px-3 py-1 bg-surface-container-highest text-secondary rounded-full">1 ACTIVITY THIS WEEK</span>
+</div>
+<h3 class="font-title-md text-title-md text-text-primary group-hover:text-primary transition-colors">LEGENDARY SANIN</h3>
+<div class="grid grid-cols-2 gap-4 mt-6">
+<div class="space-y-1">
+<p class="font-label-caps text-label-caps text-text-secondary">MEMBERS</p>
+<p class="font-metric-large text-metric-large text-text-primary">1</p>
+</div>
+<div class="space-y-1">
+<p class="font-label-caps text-label-caps text-text-secondary">TRAINING</p>
+<p class="font-metric-large text-metric-large text-text-primary">2<span class="text-sm font-label-caps ml-1">WKS</span></p>
+</div>
+</div>
+</div>
+<div class="mt-8 pt-6 border-t border-outline-variant flex justify-between items-center">
+<div class="flex flex-col">
+<span class="font-label-caps text-label-caps text-text-secondary">EARNED</span>
+<span class="font-body-lg text-body-lg text-primary">11h</span>
+</div>
+<div class="flex flex-col items-end">
+<span class="font-label-caps text-label-caps text-text-secondary">ACTIVITIES</span>
+<span class="font-body-lg text-body-lg text-text-primary">14</span>
+</div>
+</div>
+</div>
+<!-- Team 5: HYRPX VANCOUVER -->
+<div class="bg-surface-container rounded-xl p-6 border border-outline-variant hover:border-primary-container transition-all group flex flex-col justify-between">
+<div>
+<div class="flex justify-between items-start mb-4">
+<div class="w-12 h-12 rounded-lg bg-surface-mid flex items-center justify-center border border-outline-variant text-primary">
+<span class="material-symbols-outlined text-3xl">location_on</span>
+</div>
+<span class="font-label-caps text-label-caps px-3 py-1 bg-surface-container-highest text-secondary rounded-full">1 ACTIVITY THIS WEEK</span>
+</div>
+<h3 class="font-title-md text-title-md text-text-primary group-hover:text-primary transition-colors">HYRPX VANCOUVER</h3>
+<div class="grid grid-cols-2 gap-4 mt-6">
+<div class="space-y-1">
+<p class="font-label-caps text-label-caps text-text-secondary">MEMBERS</p>
+<p class="font-metric-large text-metric-large text-text-primary">1</p>
+</div>
+<div class="space-y-1">
+<p class="font-label-caps text-label-caps text-text-secondary">TRAINING</p>
+<p class="font-metric-large text-metric-large text-text-primary">2<span class="text-sm font-label-caps ml-1">WKS</span></p>
+</div>
+</div>
+</div>
+<div class="mt-8 pt-6 border-t border-outline-variant flex justify-between items-center">
+<div class="flex flex-col">
+<span class="font-label-caps text-label-caps text-text-secondary">EARNED</span>
+<span class="font-body-lg text-body-lg text-primary">9h</span>
+</div>
+<div class="flex flex-col items-end">
+<span class="font-label-caps text-label-caps text-text-secondary">ACTIVITIES</span>
+<span class="font-body-lg text-body-lg text-text-primary">9</span>
+</div>
+</div>
+</div>
+<!-- Add New Team Card (Bento Style) -->
+<div class="bg-surface-container-lowest border-2 border-dashed border-outline-variant rounded-xl p-6 flex flex-col items-center justify-center group hover:border-primary-container cursor-pointer transition-all gap-4">
+<div class="w-16 h-16 rounded-full bg-surface-container-high flex items-center justify-center group-hover:bg-primary-container group-hover:text-on-primary-container transition-all">
+<span class="material-symbols-outlined text-3xl">add</span>
+</div>
+<div class="text-center">
+<p class="font-title-md text-title-md text-text-primary">Join a New Team</p>
+<p class="font-body-md text-body-md text-text-secondary">Enter a code or browse public squads</p>
+</div>
+</div>
+</section>
+<!-- Activity Feed Style Context Section (Bottom) -->
+<div class="mt-section-margin bg-surface-container-low rounded-2xl p-8 flex flex-col md:flex-row items-center gap-stack-gap border border-outline-variant">
+<div class="flex-shrink-0 relative w-full md:w-1/3 aspect-[4/3] rounded-xl overflow-hidden grayscale hover:grayscale-0 transition-all duration-700">
+<img class="w-full h-full object-cover" data-alt="A gritty, high-contrast action shot of three fitness enthusiasts performing synchronized high-intensity training in a dimly lit warehouse gym. The atmosphere is filled with sweat and focus. Warm light spills from an overhead source, creating sharp highlights on their athletic forms. The image feels raw and communal, capturing the essence of team-based training." src="https://lh3.googleusercontent.com/aida-public/AB6AXuC_Adx6wXL3xCUoEUVhgQJ_4GPdSitKZCE1dNX844krYO49zQRiTiUyCt0yGDG_SsDQImpagt3sEwGWRCNbohOmsWCLBoeeoSLibiZmbSH1SqOw3wXYfgqBbGWPgWrDSasib4y-4oM7ORD_R3cJgYxdM1V8yxrGAifK1qtxLAIW2Ji88QbWxoAfVYZfyEA-_Yy_LEWB6_Te5M2QdNiQe_YXv1Qy_Injb3Q_nbAGd6gFfV8aA02SFOJOcnbaALA19SY_p3xJTQYDZE5A"/>
+<div class="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent"></div>
+</div>
+<div class="space-y-4">
+<div class="flex items-center gap-2 text-primary">
+<span class="material-symbols-outlined">diversity_3</span>
+<span class="font-label-caps text-label-caps">COMMUNITY HIGHLIGHT</span>
+</div>
+<h2 class="font-headline-lg text-headline-lg text-text-primary">Better Together.</h2>
+<p class="font-body-lg text-body-lg text-text-secondary">Teams on RIVAL see a 40% higher consistency rate. Engage with your squad to unlock milestone rewards and exclusive community events.</p>
+<div class="flex gap-4">
+<div class="px-4 py-2 bg-surface-container-high rounded-lg">
+<span class="font-label-caps text-label-caps text-text-secondary block">GLOBAL TEAMS</span>
+<span class="font-title-md text-title-md text-text-primary">12.4K</span>
+</div>
+<div class="px-4 py-2 bg-surface-container-high rounded-lg">
+<span class="font-label-caps text-label-caps text-text-secondary block">ACTIVE MEMBERS</span>
+<span class="font-title-md text-title-md text-text-primary">89.1K</span>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Footer -->
+<footer class="bg-surface-container-lowest dark:bg-surface-container-lowest flex flex-col md:flex-row justify-between items-center px-container-padding max-w-max-width mx-auto gap-stack-gap py-section-margin">
+<div class="flex flex-col gap-2">
+<div class="font-headline-lg text-headline-lg text-primary">RIVAL</div>
+<p class="font-label-caps text-label-caps text-secondary">© 2024 RIVAL Fitness. People Before Data.</p>
+</div>
+<div class="flex gap-8">
+<a class="font-label-caps text-label-caps text-on-secondary-container hover:text-primary transition-colors opacity-80 hover:opacity-100" href="#">Support</a>
+<a class="font-label-caps text-label-caps text-on-secondary-container hover:text-primary transition-colors opacity-80 hover:opacity-100" href="#">Legal</a>
+<a class="font-label-caps text-label-caps text-on-secondary-container hover:text-primary transition-colors opacity-80 hover:opacity-100" href="#">Privacy</a>
+<a class="font-label-caps text-label-caps text-on-secondary-container hover:text-primary transition-colors opacity-80 hover:opacity-100" href="#">Terms</a>
+</div>
+</footer>
+<script>
+        // Micro-interactions for cards
+        document.querySelectorAll('.bg-surface-container').forEach(card => {
+            card.addEventListener('mouseenter', () => {
+                card.style.transform = 'translateY(-4px)';
+                card.style.boxShadow = '0 10px 30px -10px rgba(0,0,0,0.5)';
+            });
+            card.addEventListener('mouseleave', () => {
+                card.style.transform = 'translateY(0)';
+                card.style.boxShadow = 'none';
+            });
+        });
+
+        // Search bar interaction
+        const searchInput = document.querySelector('input[type="text"]');
+        searchInput.addEventListener('focus', () => {
+            searchInput.parentElement.classList.add('scale-[1.01]');
+        });
+        searchInput.addEventListener('blur', () => {
+            searchInput.parentElement.classList.remove('scale-[1.01]');
+        });
+    </script>
+</body></html>

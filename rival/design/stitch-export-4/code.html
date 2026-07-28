@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>RIVAL - Team Hub</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "tertiary-fixed-dim": "#5edac7",
+                    "on-tertiary-fixed": "#00201c",
+                    "surface-dim": "#131313",
+                    "on-primary-container": "#541400",
+                    "surface-container-lowest": "#0e0e0e",
+                    "tertiary-fixed": "#7df7e3",
+                    "rank-unrivaled": "#FFD700",
+                    "surface-container": "#20201f",
+                    "primary-fixed": "#ffdbd0",
+                    "tertiary": "#5edac7",
+                    "on-tertiary-container": "#00312b",
+                    "rank-elite": "#9F57D9",
+                    "tertiary-container": "#09a493",
+                    "on-error-container": "#ffdad6",
+                    "on-secondary-container": "#bab8b7",
+                    "primary-fixed-dim": "#ffb59e",
+                    "inverse-primary": "#99462a",
+                    "outline": "#a38c85",
+                    "on-surface": "#e5e2e1",
+                    "secondary": "#c8c6c5",
+                    "on-primary": "#5c1902",
+                    "surface-high": "#282828",
+                    "surface-container-high": "#2a2a2a",
+                    "surface-bright": "#323232",
+                    "on-tertiary": "#003731",
+                    "rank-rookie": "#B0B0B0",
+                    "rank-pro": "#D97757",
+                    "on-secondary-fixed-variant": "#474646",
+                    "background": "#131313",
+                    "surface-low": "#131313",
+                    "on-tertiary-fixed-variant": "#005047",
+                    "primary": "#ffb59e",
+                    "surface-container-low": "#1b1b1b",
+                    "surface": "#131313",
+                    "on-primary-fixed": "#390b00",
+                    "on-secondary": "#313030",
+                    "secondary-fixed-dim": "#c8c6c5",
+                    "secondary-container": "#4a4949",
+                    "surface-container-highest": "#353535",
+                    "secondary-fixed": "#e5e2e1",
+                    "status-inspired": "#FFFFFF",
+                    "on-primary-fixed-variant": "#7a2f15",
+                    "on-background": "#e5e2e1",
+                    "text-secondary": "#A0A0A0",
+                    "surface-tint": "#ffb59e",
+                    "on-surface-variant": "#dbc1b9",
+                    "primary-container": "#d97757",
+                    "error-container": "#93000a",
+                    "text-primary": "#FFFFFF",
+                    "inverse-surface": "#e5e2e1",
+                    "error": "#ffb4ab",
+                    "on-error": "#690005",
+                    "surface-variant": "#353535",
+                    "surface-mid": "#1C1C1C",
+                    "outline-variant": "#55433d",
+                    "inverse-on-surface": "#313030",
+                    "on-secondary-fixed": "#1c1b1b"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "stack-gap": "1rem",
+                    "max-width": "1200px",
+                    "section-margin": "2rem",
+                    "container-padding": "1.5rem",
+                    "gutter": "1rem"
+            },
+            "fontFamily": {
+                    "title-md": ["manrope"],
+                    "label-caps": ["manrope"],
+                    "headline-lg-mobile": ["manrope"],
+                    "headline-lg": ["manrope"],
+                    "body-md": ["manrope"],
+                    "body-lg": ["manrope"],
+                    "display-hero": ["manrope"],
+                    "metric-large": ["manrope"]
+            },
+            "fontSize": {
+                    "title-md": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                    "label-caps": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700"}],
+                    "headline-lg-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "700"}],
+                    "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                    "display-hero": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "800"}],
+                    "metric-large": ["32px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "300"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Manrope', sans-serif; }
+        .glass-panel {
+            background: rgba(32, 32, 31, 0.7);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .scroll-hide::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body class="bg-background text-on-surface min-h-screen relative overflow-hidden">
+<!-- Background Layer -->
+<div class="fixed inset-0 z-0">
+<div class="w-full h-full bg-cover bg-center" style="background-image: url('https://lh3.googleusercontent.com/aida/AP1WRLtAsBPwz2xCxu0Py2HR7lZTQRAUsu5zWlDLjJxFGx870F2ItPgzsrnq-_CdEvhsXK4OhqOUa-J4l6Eq_Bvb3KzMtfYrFvsW7_bfgyvCKcckcVPEK-qU19XZE3MpIri9tcLcPivWnO61lfVMsQ8fY9pYkobs215yzwPG5XOq8oRXxIengrHl9JCmjpPureAxhav3uAGah4f3SZ3LJ1OXZgoeDkgvxqLKzMtYSWfAdeYAglcX3z1yAYdB2ks')"></div>
+<div class="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
+</div>
+<!-- Top Navigation Bar -->
+<header class="fixed top-0 w-full z-50 flex justify-between items-center px-container-padding h-20 max-w-max-width mx-auto bg-surface/80 backdrop-blur-md">
+<div class="font-display-hero text-headline-lg tracking-tighter text-primary">RIVAL</div>
+<nav class="hidden md:flex gap-8 items-center">
+<a class="text-primary font-bold border-b-2 border-primary pb-1 font-title-md text-title-md transition-all hover:text-primary" href="#">Teams</a>
+<a class="text-on-surface-variant font-medium pb-1 font-title-md text-title-md transition-all hover:text-primary" href="#">My Training</a>
+<a class="text-on-surface-variant font-medium pb-1 font-title-md text-title-md transition-all hover:text-primary" href="#">Profile</a>
+</nav>
+<div class="flex items-center gap-4">
+<button class="material-symbols-outlined text-primary text-2xl">notifications</button>
+<div class="w-10 h-10 rounded-full overflow-hidden border-2 border-outline-variant">
+<img class="w-full h-full object-cover" data-alt="Close up portrait of a fit athlete with sharp features and determined expression, professional studio lighting with high contrast shadows against a dark background, premium editorial sports photography style." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCw_FfLBOrZeEK-mxHqzX-4AyGYcX7AxAzbv8v4lGKu41ppxymgG9dvlFDY5Nvn-Iv6FuB-f45rIFrWAiT-rcTEE38_TtWvg_fg6yrErP1Tiide65Z6V3FmaEe0pjjNWsBGODoyLGVzSRagLPPKkWeMkoz-12EBU-eJ0GbQKMf9lIS39mxK8e_QNtzlnoLmq4nLpOR-mWgd1wWV7Y2NcInBJ-zdeQXFxYrDciM2DXUz28v_afkiCka6sG-oT7jA63orRr7P1NYoxgJJ"/>
+</div>
+</div>
+</header>
+<!-- Main Content Grid -->
+<main class="relative z-10 pt-24 px-container-padding max-w-max-width mx-auto grid grid-cols-12 gap-stack-gap h-[calc(100vh-6rem)]">
+<!-- LEFT COLUMN: Sidebar -->
+<aside class="col-span-2 flex flex-col justify-between pb-8">
+<div class="space-y-8">
+<!-- Team Header -->
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 glass-panel rounded-lg flex items-center justify-center">
+<span class="material-symbols-outlined text-primary">groups</span>
+</div>
+<div>
+<h3 class="font-title-md text-body-md text-primary font-bold">London Atelier</h3>
+<p class="font-label-caps text-label-caps text-on-surface-variant">Team Hub</p>
+</div>
+</div>
+<!-- Navigation Links -->
+<nav class="flex flex-col gap-2">
+<a class="flex items-center gap-3 px-4 py-3 bg-primary-container text-on-primary-container rounded-lg font-title-md text-body-md" href="#">
+<span class="material-symbols-outlined">rss_feed</span>
+                        Team Feed
+                    </a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-primary transition-colors rounded-lg font-title-md text-body-md" href="#">
+<span class="material-symbols-outlined">fitness_center</span>
+                        My Training
+                    </a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-primary transition-colors rounded-lg font-title-md text-body-md" href="#">
+<span class="material-symbols-outlined">group</span>
+                        Club Members
+                    </a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-primary transition-colors rounded-lg font-title-md text-body-md" href="#">
+<span class="material-symbols-outlined">analytics</span>
+                        My Impact
+                    </a>
+</nav>
+</div>
+<div class="space-y-4">
+<button class="w-full py-4 bg-rank-pro text-white rounded-lg flex items-center justify-center gap-2 font-title-md text-body-md hover:opacity-90 active:scale-95 transition-all">
+<span class="material-symbols-outlined">add</span>
+                    Add Workout
+                </button>
+<div class="flex flex-col gap-2 px-4">
+<a class="flex items-center gap-3 text-on-surface-variant hover:text-primary font-label-caps text-label-caps" href="#">
+<span class="material-symbols-outlined text-[18px]">settings</span>
+                        Settings
+                    </a>
+<a class="flex items-center gap-3 text-on-surface-variant hover:text-primary font-label-caps text-label-caps" href="#">
+<span class="material-symbols-outlined text-[18px]">help</span>
+                        Support
+                    </a>
+</div>
+</div>
+</aside>
+<!-- CENTER COLUMN: Team Feed -->
+<section class="col-span-7 overflow-y-auto scroll-hide pb-8 space-y-stack-gap">
+<header class="flex justify-between items-end mb-4">
+<div>
+<h1 class="font-headline-lg text-headline-lg text-white">Team Feed</h1>
+<p class="font-body-md text-body-md text-on-surface-variant">London Atelier • 14 Active Members</p>
+</div>
+<div class="flex -space-x-2">
+<div class="w-8 h-8 rounded-full border-2 border-surface bg-surface overflow-hidden"><img class="w-full h-full object-cover" data-alt="Portrait of an athlete" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDBNoNt5VhbhqKejs8ENh19pmbxas0sLB7NTNjyq7pOQSwClCrm1dFeaVD2BuEVWikbn-kL8SJhcEL4X0hNOtqdbEPrxWwdpvfjcctpEufaPUYgYOO6knJfXXSyvXpLBj93APJKA_2Xc8A9nxiZbnPPEPR04sUjlU_UJA_ieII4eCdBWfjTkl4ijfF3os7SHqfWLgVE3uI4CkcTCDIkfZ3dm5mMHa8OI9YbRBlXqOVSuBqBjNVDkcVUlOobi7RDNvYas-_ml13Mx_aO"/></div>
+<div class="w-8 h-8 rounded-full border-2 border-surface bg-surface overflow-hidden"><img class="w-full h-full object-cover" data-alt="Portrait of an athlete" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCwrj-UagmAAJg10q6lYKkQ5K8WfAvTJTTC-SJIUmzDxBGFWNK9WV3p23-mr2Xa8LtYibWyRC3kr0ZzvfheXkIAf2NMhxnaGW_4bWb4h57nXjucMHYrch0qmAOak-2bKWNx4Ksy-JV9PjZPgIgpNvH8nc16VJMOT_y1HiYYuLDPXn3-HjBPRGV6MGs4salpStkK3KLoZmzxa_mHzR1j5evl2PxaXOVzqoHbkELJ4Mgy8pnxw2PTHjWMZWfLgHe5ws3Hn8JfwnuwwBW5"/></div>
+<div class="w-8 h-8 rounded-full border-2 border-surface bg-surface overflow-hidden"><img class="w-full h-full object-cover" data-alt="Portrait of an athlete" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDc0OAmzQmQp6jOO_MzfzrbWtnS0kZeqoyfkZOdCdaSjzgm_1cCJSfhv8es5zEF1eKC0ccCbQnOvrISbUq6wu-UWOPm-Myldc_p_Pe0lgdKcjdeGcV0ECp23pjGrmpzjMBT5FFM0yXhqdLo7k8xpYAvh1xca0qjtKUUqD8V1eDGQXpf71dXlSp2zHQ7He7vD4IeACS4Et7SnBsTH6aAKU-5472Yu8DQLoXFjgojjuxdEOj4GMxCXD-KjIm-GUzlRyShBhD1ZMq_-sDs"/></div>
+<div class="w-8 h-8 rounded-full border-2 border-surface bg-surface-container-highest flex items-center justify-center font-label-caps text-[10px]">+11</div>
+</div>
+</header>
+<!-- Activity Card 1 -->
+<article class="glass-panel rounded-xl overflow-hidden">
+<div class="p-4 flex justify-between items-center">
+<div class="flex items-center gap-3">
+<div class="relative">
+<div class="w-12 h-12 rounded-full border-2 border-rank-unrivaled overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="Close up of a runner's face with dramatic lighting, sweat glistening on skin, vibrant high-energy mood, cinematic lighting style, high resolution detail." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBtXURnm0hy49WrxKoyAcj_Mzwkky30SAHSOauOHQc9sYdxvJ4VnoIj4yU5LoTfipZl-5XhKzFhpz5APBaSozVd0m9NYnolplwdw__rFDDuqbIrhRK0SOG4b1H2SbMzZ39d_wE2ZL9eVA7VDwAE531TCs_xJqhWmpxMybS4sV_vPnKWSviq7eQF6-ywjp8ib46TYiykilqHK0GO19NcHbtUR5rkFbRCdarIUmSi8unb12WY00DRYpk0nWjRMjdJvx4Hb3E_pn0qENyl"/>
+</div>
+<div class="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-surface-high"></div>
+</div>
+<div>
+<h4 class="font-title-md text-body-md text-white">Julian M.</h4>
+<p class="font-body-md text-[14px] text-on-surface-variant">Morning Tempo Run • 12.4km</p>
+</div>
+</div>
+<div class="text-right">
+<div class="font-metric-large text-metric-large text-rank-pro">842</div>
+<div class="font-label-caps text-label-caps text-on-surface-variant uppercase">Effort</div>
+</div>
+</div>
+<div class="relative h-[340px]">
+<img class="w-full h-full object-cover" data-alt="A lone runner navigating the rainy streets of London at dawn, Big Ben visible in the hazy distance, atmospheric cinematic lighting, wet asphalt reflections, moody urban fitness photography style." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAbE07kIfSLIP92CAqJuubVWuEP9T05TB0GNq59ODRslBWwygWX4a8NOsg-VjQmrfsK75biKUBLzthX3F5Dwmz-XK_uZsLx1Z8sPDB4ET9aUpOjjhoGLBBwuGRLKiiINRmr96geBrh3lN4HbqFJSFudwk7Cr26d4JTKDCZvng_VGWDjJb8vhiUGd7vDNHy65q6qzCGViCdFHOTEQwKbYtjLIP184cW4_kOdctrBvVr9EbM4mvvZdOukg5fCYs4cjSnIbSWnysaK1QAN"/>
+<div class="absolute bottom-4 left-4 flex gap-2">
+<div class="glass-panel px-3 py-1 rounded-full flex items-center gap-2 font-label-caps text-label-caps text-white">
+<span class="material-symbols-outlined text-[16px]">speed</span> 4:12 /km
+                        </div>
+<div class="glass-panel px-3 py-1 rounded-full flex items-center gap-2 font-label-caps text-label-caps text-white">
+<span class="material-symbols-outlined text-[16px]">timer</span> 52:04
+                        </div>
+</div>
+</div>
+<div class="p-4 flex justify-between items-center">
+<div class="flex gap-2">
+<button class="px-6 py-2 bg-rank-pro text-white rounded-lg flex items-center gap-2 font-label-caps text-label-caps hover:scale-105 transition-transform">
+<span class="material-symbols-outlined text-[18px]">favorite</span>
+                            Respect
+                        </button>
+<button class="px-6 py-2 bg-white text-on-surface rounded-lg flex items-center gap-2 font-label-caps text-label-caps hover:scale-105 transition-transform">
+<span class="material-symbols-outlined text-[18px]">bolt</span>
+                            Inspired
+                        </button>
+</div>
+<div class="flex items-center gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined">chat_bubble</span>
+<span class="font-label-caps text-label-caps">12</span>
+</div>
+</div>
+</article>
+<!-- Activity Card 2 -->
+<article class="glass-panel rounded-xl overflow-hidden opacity-80">
+<div class="p-4 flex justify-between items-center">
+<div class="flex items-center gap-3">
+<div class="w-12 h-12 rounded-full border-2 border-rank-elite overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="Profile of a female athlete focused on her workout, glowing skin under soft morning light, professional athletic portrait, premium aesthetic, shallow depth of field." src="https://lh3.googleusercontent.com/aida-public/AB6AXuC24bNOP0pdbLbi8LShOIuF_QGAit5V-Z0tAKJmloe1Ygufm15jytXqOKt3-cw5l00gOrghiS7ndjuCuxzVAfBDhpEQHRwy0u5bkvPFogK3utsm-ZyvXJYr7xkgH1Te1RUzAMoEMIx9YaW_q7zOrjNe2p5ofPfPsc7ncIYaLcKGb31-YJhMgH1zATi1Dv5JJuwWG3UgBHbShWs69C5HqhQLZ_c6FZEel7YchQK9FeTH1Qtw0djdSTMWIOCW0dCvOxWFCAnOGLIVmctN"/>
+</div>
+<div>
+<h4 class="font-title-md text-body-md text-white">Elena R.</h4>
+<p class="font-body-md text-[14px] text-on-surface-variant">Interval Training • Thames Path</p>
+</div>
+</div>
+<div class="text-right">
+<div class="font-metric-large text-metric-large text-on-surface">710</div>
+<div class="font-label-caps text-label-caps text-on-surface-variant uppercase">Effort</div>
+</div>
+</div>
+<div class="h-32 bg-surface-container-high relative overflow-hidden">
+<div class="absolute inset-0 grayscale opacity-40 mix-blend-overlay">
+<img class="w-full h-full object-cover" data-location="London" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBa9PMxHE_PtUfj8xu7EBg1tSXC_KAxYcqVb3rhx-g-RUmN8mWx_KlrLLI2zpOiXvzxAcQTiLhVKwlz5ReDdwA6-benyyk_uNfsUjWDfdlUrObEASswGTXa-yZ2Uyj809yL9oTZArmPAjIVLZL41xXVf5P14vc_XutWrDyaVdH93kqeyONNPJ5TT29WUU-SkXWaoJNuhnMJNqOoRe3JKnMvSculVllvOYrJMyZlardxMywvPdw-cS9Ika_6fHGnwGpjB0BwDOhcc75V"/>
+</div>
+<div class="absolute inset-0 flex items-center justify-center">
+<span class="text-on-surface-variant font-label-caps text-label-caps">MAP DATA HIDDEN</span>
+</div>
+</div>
+</article>
+</section>
+<!-- RIGHT COLUMN: Metrics -->
+<aside class="col-span-3 space-y-stack-gap">
+<!-- Distance Goal Card -->
+<section class="glass-panel rounded-xl p-6">
+<div class="flex justify-between items-center mb-6">
+<h5 class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-widest">Team Distance Goal</h5>
+<span class="material-symbols-outlined text-on-surface-variant text-[18px]">flag</span>
+</div>
+<div class="flex justify-between items-baseline mb-2">
+<span class="font-metric-large text-metric-large text-white">320 <span class="text-body-md">km</span></span>
+<span class="font-label-caps text-label-caps text-on-surface-variant">Target: 500km</span>
+</div>
+<div class="h-2 bg-surface-container-highest rounded-full overflow-hidden mb-2">
+<div class="h-full bg-rank-pro rounded-full shadow-[0_0_8px_rgba(217,119,87,0.5)]" style="width: 64%"></div>
+</div>
+<p class="font-label-caps text-[10px] text-on-surface-variant text-right">64% OF MONTHLY GOAL REACHED</p>
+</section>
+<!-- Standings Card -->
+<section class="glass-panel rounded-xl p-6">
+<div class="flex justify-between items-center mb-6">
+<h5 class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-widest">Team Standings</h5>
+<span class="material-symbols-outlined text-on-surface-variant text-[18px]">leaderboard</span>
+</div>
+<ul class="space-y-4">
+<li class="flex items-center gap-4 p-2 rounded-lg bg-white/5 border border-white/10">
+<span class="font-metric-large text-metric-large text-rank-unrivaled w-6">1</span>
+<div class="w-10 h-10 rounded-full border-2 border-rank-unrivaled overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="Portrait of Julian M, an athlete." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCmh23djCRcEJ9qhlDn2G_ZY1rwwxJwubZb_GIK0VhRT58RLjqM2e8VjdvK_6bpy_6ErD2t73OsEi6SyKHsFuAzPoTQiofQUHCUCDKpJmdnZpYcfPvMM9u0V8KUU4SsR2ZscY4zz5JJFSgXTQDAogEnQX13R8G9_Hc1U2ZnBUxpEQlzL34EsDcwH9c5fLtfpg9Z98NTmEX8W73qDmeSlCH1ga_goUyS0yAThychUlb22gCPPf91N3p_LQIkrj6bSMhW1QeVmGxEnqXJ"/>
+</div>
+<div class="flex-1">
+<p class="font-title-md text-body-md text-white leading-tight">Julian M.</p>
+<p class="font-label-caps text-label-caps text-on-surface-variant">842 Effort</p>
+</div>
+<span class="material-symbols-outlined text-green-400">trending_up</span>
+</li>
+<li class="flex items-center gap-4 p-2">
+<span class="font-metric-large text-metric-large text-secondary-fixed w-6">2</span>
+<div class="w-10 h-10 rounded-full border-2 border-rank-elite overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="Portrait of Elena R, an athlete." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBHNo97pi6VcuxqferNeIoxYZjCmQ8Uux3GwbgUzd3seQ9d6OUaRLDFTcsx84OuTkpPZZRbXmsU0F1L3E4KGUPe_DoIGyrRyJBbUZvtAOt0o9wgGYtI1Q7cVIAYqn92I1lZB4Btz66Szq2Z0RIBrCvv0JTXrCtEdTLgoXYqM-ieROYv2XzVavJyk0YBoKDiiA7MARjUCc5uJRU1IowgpzhquUmsic_NboPtkI9dcWNxrRSeMv8jPYs5wWtu9QBzEZ8KwXyE7kuF3eFa"/>
+</div>
+<div class="flex-1">
+<p class="font-title-md text-body-md text-white leading-tight">Elena R.</p>
+<p class="font-label-caps text-label-caps text-on-surface-variant">710 Effort</p>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant">remove</span>
+</li>
+<li class="flex items-center gap-4 p-2">
+<span class="font-metric-large text-metric-large text-outline w-6">3</span>
+<div class="w-10 h-10 rounded-full border-2 border-rank-rookie overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="Portrait of Marcus K, an athlete, intense focused look, athletic style." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBN4zRDaLGyM8358A_u-aMYNfEKVl_rcF_AvPN5kAueIGuUS0GG11gPBDlehXZ19Z-YvfytX6h3DfyDm2ZStL0ZjE-Vecq4DsuPgszoIAGtAKH6MtXWWGhuEhxJJCbqSjkmwyZBUwMEd64rMm2HfbdkgLf4PGSAyDpA9cwTButgLwhfmmfAYt3F1EzR3gKUbBylzCosUFYIt_MsYIFxTfpXBatuuqpJbhW2A1w4VBSAUz65NuJUpDt4TnHr9Cr7a_ZE7pKKDdOXhNJi"/>
+</div>
+<div class="flex-1">
+<p class="font-title-md text-body-md text-white leading-tight">Marcus K.</p>
+<p class="font-label-caps text-label-caps text-on-surface-variant">685 Effort</p>
+</div>
+<span class="material-symbols-outlined text-error">trending_down</span>
+</li>
+</ul>
+</section>
+</aside>
+</main>
+<!-- Floating Chat Button -->
+<button class="fixed bottom-8 right-8 z-50 glass-panel px-6 py-4 rounded-2xl flex items-center gap-4 shadow-2xl hover:scale-105 active:scale-95 transition-all">
+<div class="relative">
+<span class="material-symbols-outlined text-white text-3xl">forum</span>
+<div class="absolute -top-2 -right-2 w-5 h-5 bg-rank-pro rounded-full flex items-center justify-center font-label-caps text-[10px] text-white">2</div>
+</div>
+<span class="font-title-md text-body-md text-white">Team Chat</span>
+</button>
+<!-- Footer -->
+<footer class="fixed bottom-0 w-full py-4 px-container-padding flex justify-between items-center z-50 bg-surface-container-lowest/20 backdrop-blur-sm border-t border-white/5">
+<p class="font-label-caps text-label-caps text-on-surface-variant">© 2024 RIVAL. People Before Data.</p>
+<div class="flex gap-6">
+<a class="font-label-caps text-label-caps text-on-surface-variant hover:text-primary" href="#">Privacy</a>
+<a class="font-label-caps text-label-caps text-on-surface-variant hover:text-primary" href="#">Terms</a>
+<a class="font-label-caps text-label-caps text-on-surface-variant hover:text-primary" href="#">Community Guidelines</a>
+</div>
+</footer>
+<script>
+        // Micro-interactions for glass panels
+        document.querySelectorAll('.glass-panel').forEach(panel => {
+            panel.addEventListener('mousemove', (e) => {
+                const rect = panel.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                panel.style.setProperty('--mouse-x', `${x}px`);
+                panel.style.setProperty('--mouse-y', `${y}px`);
+            });
+        });
+    </script>
+</body></html>

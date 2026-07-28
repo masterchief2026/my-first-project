@@ -1,0 +1,46 @@
+# RIVAL — agent guide
+
+RIVAL is a social fitness app: friends form **Teams**, log workouts (manual entry, photo scan via AI, or Strava sync), earn **Effort** points, and compete on weekly leaderboards. React Native + **Expo (SDK 56)** running primarily on WEB via react-native-web, deployed on Vercel. Backend is Supabase (Postgres + Auth + Storage + Deno edge functions), project ref `dgauxvrvqnkbfvarexok`.
+
+**Expo HAS CHANGED** — read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before writing Expo-API code.
+
+## Layout
+
+- `src/app/*.tsx` — one file per screen, Expo Router file-based routes. `league.tsx` is the Team hub (feed/chat/sessions/challenges/standings).
+- `src/lib/` — shared logic: `xp.ts` (level math), `streak.ts`, `season.ts`, `identity.ts` (display-name styles), `dateFormat.ts` (DD/MM/YYYY ↔ ISO), `achievements.ts`, `supabase.ts` (client).
+- `supabase/functions/` — Deno edge functions. `_shared/` holds cross-function modules (`activityDedup.ts`, `formatName.ts`).
+- `supabase/*.sql` — schema/RLS migrations as standalone files. **Ricky runs these manually in the Supabase dashboard** — never apply schema changes yourself; write the .sql file, ask him to run it, then verify it applied (see below).
+
+## Commands
+
+- Dev server: use the preview tools / `.claude/launch.json` (`rival-web`, port 8081). Start it proactively at session start.
+- Type check: `npx tsc --noEmit` from `rival/`.
+- Tests: `npm test` from `rival/` (vitest, forced to `TZ=Pacific/Auckland` — the streak suite contains NZ DST regression tests that only bite in that zone). Pure-logic libs (`streak`, `dateFormat`, `effort`, `xp`, `season`) are covered in `src/lib/__tests__/` — run this after touching any of them. The effort tests mirror the server formula in `supabase/functions/_shared/effortScore.ts`; if the formula changes, change BOTH and the test.
+- **Live DB introspection (read-only use)**: `supabase db query "<SQL>" --linked` from `rival/`. Use this to check schema, `pg_policies`, `pg_proc` etc. yourself instead of asking Ricky to paste query output. Do NOT use it for writes — mutations go through human-reviewed `.sql` files.
+- Deploy an edge function: `supabase functions deploy <name> --project-ref dgauxvrvqnkbfvarexok`. The deploy bundler is the real Deno type-check (local `tsc` can't resolve Deno URL imports). Code changes in `supabase/functions/` do nothing until deployed.
+
+## Database rules (hard-won — do not relearn these in production)
+
+- **RLS is permissive (policies OR together).** One overly-broad policy silently undermines every scoped one. After any policy change, re-verify with `select * from pg_policies where tablename='...'` via `supabase db query --linked`.
+- SECURITY DEFINER helpers: `is_league_member(lid)` (checks `status='active'`), `is_league_admin(lid)`, `lookup_league_by_invite_code(code)` (invite lookup without exposing the leagues table — the client must use this RPC, not select on `leagues`).
+- `league_members.status` is `'pending' | 'active'` (public-team join requests). **Every** membership-scoped query — client AND edge functions — must filter `.eq('status', 'active')` unless it is explicitly about pending requests.
+- External-activity uniqueness is **per-user**: `unique (user_id, provider, provider_activity_id)` on both `activities` and `activity_sources`. Never add a global unique constraint on an external-ID column (one Strava account can legitimately touch two RIVAL profiles over time).
+- **Activity importer rule**: any importer (Strava today; Garmin/HealthKit later) must call `resolveCanonicalActivityId()` before insert and `linkNewActivitySource()` after, from `_shared/activityDedup.ts` — never a bespoke upsert keyed on provider ID. Pass the provenance payload (`external_id`, `upload_id`) so cross-source matching can be deterministic later.
+
+## Client-code footguns
+
+- **Always check `.error` (and `count` on deletes) from every Supabase write** before treating it as done or navigating away. RLS failures are silent no-ops (0 rows, no error thrown) — this has caused real shipped bugs (leave-team, kick-member).
+- **`Alert.alert` with buttons does not work on web.** Use `window.confirm` for confirmations and inline error text (state + styled Text) for errors.
+- **PostgREST embedded-resource filters** (`.select('x, parent!inner(y)').eq('parent.y', …)`) can silently fail to filter. Use two plain sequential queries instead.
+- Dates display as **DD/MM/YYYY** everywhere; convert with `src/lib/dateFormat.ts` helpers at input boundaries, store ISO `YYYY-MM-DD`. Ricky is in NZ (UTC+12/13) — be careful parsing date-only strings with `new Date()`.
+- Week boundaries are **Monday-start** (`streak.ts` has the canonical helper).
+
+## Product vocabulary (copy-only renames — internals unchanged)
+
+User-facing copy says **Team, Effort, Respect, Inspired, Impact, Unrivaled**. The code/DB deliberately still says `leagues`, `league_members`, `xp`, `effort_score`, route paths `/league`, `/create-league`, etc. **Never rename DB columns, internal identifiers, or route paths to match display copy** — display strings only. Reactions are stored as the strings `'respect'` and `'inspired'` (old emoji rows were migrated to `'respect'`); only `'inspired'` feeds the Impact stat.
+
+Voice: always encourage, never pressure or shame. Streaks are pure consistency info — no bonus/penalty language. Gate new copy against the brand-voice bible (in Claude's memory: "RIVAL Brand Voice" / "Daily Perspectives").
+
+## Verification limits
+
+Authenticated flows (RLS behavior under a real session, OAuth callbacks) cannot be fully verified without Ricky's credentials — verify what you can (DB introspection, type checks, preview logs/screenshots, deploy success) and say plainly what still needs a human check.

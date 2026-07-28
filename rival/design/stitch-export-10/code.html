@@ -1,0 +1,297 @@
+<!DOCTYPE html><html class="dark" lang="en" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Log Session | RIVAL</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "rank-unrivaled": "#FFD700",
+                    "on-primary": "#5c1902",
+                    "surface-bright": "#323232",
+                    "text-primary": "#FFFFFF",
+                    "outline-variant": "#55433d",
+                    "on-secondary-fixed": "#1c1b1b",
+                    "error-container": "#93000a",
+                    "rank-elite": "#9F57D9",
+                    "inverse-primary": "#99462a",
+                    "tertiary": "#5edac7",
+                    "on-surface-variant": "#dbc1b9",
+                    "outline": "#a38c85",
+                    "surface-container-lowest": "#0e0e0e",
+                    "secondary-fixed": "#e5e2e1",
+                    "status-inspired": "#FFFFFF",
+                    "on-error-container": "#ffdad6",
+                    "on-secondary": "#313030",
+                    "primary-fixed-dim": "#ffb59e",
+                    "error": "#ffb4ab",
+                    "surface-dim": "#131313",
+                    "surface-high": "#282828",
+                    "inverse-on-surface": "#313030",
+                    "surface-container-low": "#1b1b1b",
+                    "inverse-surface": "#e5e2e1",
+                    "secondary": "#c8c6c5",
+                    "primary-fixed": "#ffdbd0",
+                    "on-error": "#690005",
+                    "tertiary-fixed-dim": "#5edac7",
+                    "surface-mid": "#1C1C1C",
+                    "background": "#131313",
+                    "primary-container": "#d97757",
+                    "rank-pro": "#D97757",
+                    "tertiary-container": "#09a493",
+                    "on-secondary-container": "#bab8b7",
+                    "text-secondary": "#A0A0A0",
+                    "surface-variant": "#353535",
+                    "surface-container-high": "#2a2a2a",
+                    "surface-tint": "#ffb59e",
+                    "secondary-container": "#4a4949",
+                    "surface-container": "#20201f",
+                    "surface": "#131313",
+                    "rank-rookie": "#B0B0B0",
+                    "on-tertiary-fixed": "#00201c",
+                    "on-primary-container": "#541400",
+                    "secondary-fixed-dim": "#c8c6c5",
+                    "surface-container-highest": "#353535",
+                    "on-tertiary-container": "#00312b",
+                    "primary": "#ffb59e",
+                    "on-tertiary": "#003731",
+                    "on-primary-fixed": "#390b00",
+                    "on-tertiary-fixed-variant": "#005047",
+                    "tertiary-fixed": "#7df7e3",
+                    "on-background": "#e5e2e1",
+                    "on-primary-fixed-variant": "#7a2f15",
+                    "on-secondary-fixed-variant": "#474646",
+                    "surface-low": "#131313",
+                    "on-surface": "#e5e2e1"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "gutter": "1rem",
+                    "stack-gap": "1rem",
+                    "section-margin": "2rem",
+                    "container-padding": "1.5rem",
+                    "max-width": "1200px"
+            },
+            "fontFamily": {
+                    "headline-lg": ["Manrope"],
+                    "title-md": ["Manrope"],
+                    "label-caps": ["Manrope"],
+                    "body-lg": ["Manrope"],
+                    "body-md": ["Manrope"],
+                    "metric-large": ["Manrope"],
+                    "headline-lg-mobile": ["Manrope"],
+                    "display-hero": ["Manrope"]
+            },
+            "fontSize": {
+                    "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                    "title-md": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                    "label-caps": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700"}],
+                    "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "metric-large": ["32px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "300"}],
+                    "headline-lg-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "700"}],
+                    "display-hero": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "800"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body {
+            font-family: 'Manrope', sans-serif;
+            background-color: #131313;
+        }
+        .custom-slider::-webkit-slider-runnable-track {
+            background: #2a2a2a;
+            height: 4px;
+            border-radius: 2px;
+        }
+        .custom-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 20px;
+            width: 20px;
+            border-radius: 50%;
+            background: #d97757;
+            margin-top: -8px;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(217, 119, 87, 0.4);
+        }
+        .glass-card {
+            background: rgba(40, 40, 40, 0.4);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface min-h-screen flex flex-col selection:bg-primary-container selection:text-on-primary-container">
+<!-- TopNavBar -->
+<header class="fixed top-0 left-0 right-0 z-50 bg-surface shadow-sm border-none h-20">
+<nav class="flex justify-between items-center px-gutter w-full max-w-max-width mx-auto h-full relative md:grid md:grid-cols-3"><div class="flex items-center">
+<a class="text-headline-lg font-headline-lg font-black tracking-tighter text-primary" href="#">RIVAL</a>
+</div>
+<div class="hidden md:flex items-center gap-8 justify-center">
+<a class="text-on-surface-variant font-medium hover:text-primary transition-colors duration-200" href="#">Teams</a>
+<a class="text-primary font-bold border-b-2 border-primary pb-1" href="#">My Training</a>
+<a class="text-on-surface-variant font-medium hover:text-primary transition-colors duration-200" href="#">Profile</a>
+</div>
+<div class="flex items-center gap-6 justify-end">
+<button class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors">notifications</button>
+<button class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors">settings</button>
+<button class="bg-primary-container text-on-primary-container px-6 py-2.5 rounded-lg font-bold text-body-md active:scale-95 transition-transform">
+                    Start Session
+                </button>
+<div class="w-10 h-10 rounded-full bg-surface-container overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="A professional athlete headshot with dramatic side-lighting on a dark charcoal background, reflecting a premium and intense fitness club aesthetic. The subject has a determined expression, and the image quality is high-contrast and sharp." src="https://lh3.googleusercontent.com/aida-public/AB6AXuC7RBYekgICs9qwmYQ0HbFUrbV3PpOm9Dm3-S3JE2Wxl8_BXE9hKYCNT0fErqVpMTf-Rf0IzrnQ0w6J956uN9lkFEVCN94_hsz1xVPXF2Hz5QcZiW5debpxQj4InVY5H3ZWNw5j71kkNCzLEpwTTtsQqrRRK9HFpC24vTYoYI4YQH44jo1jkOz_JRfXFaP1p-z9I6ChxRMDJoMRpzvFpul29Us32QmqlhL-SQg76OABXFsPGV6vgnY9DM6beCSvks5uWca1Wi6X-k6T">
+</div>
+</div></nav>
+</header>
+<!-- Main Content: Log Workout Focus Layout -->
+<main class="flex-grow pt-32 pb-section-margin px-gutter flex items-center justify-center relative overflow-hidden">
+<!-- Ambient Shader Background (Subtle) -->
+<div class="absolute inset-0 z-0 opacity-20 pointer-events-none">
+
+</div>
+<div class="w-full max-w-2xl z-10">
+<div class="glass-card rounded-2xl p-8 md:p-12 shadow-2xl animate-in fade-in slide-in-from-bottom-8 duration-700">
+<!-- Header -->
+<div class="mb-10 text-center">
+<h1 class="font-headline-lg text-headline-lg mb-2">Log Your Session</h1>
+<p class="text-on-surface-variant text-body-md">Honor the commitment. Document the grit.</p>
+</div>
+<form class="space-y-10" onsubmit="event.preventDefault();">
+<!-- Activity Type: Custom Pill Grid -->
+<section>
+<label class="block text-label-caps font-label-caps text-on-surface-variant uppercase mb-4">Activity Type</label>
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+<button class="flex flex-col items-center justify-center p-4 rounded-xl border border-outline-variant bg-surface-container hover:border-primary-container hover:bg-surface-high transition-all group active:scale-95" type="button">
+<span class="material-symbols-outlined text-3xl mb-2 group-hover:text-primary">directions_run</span>
+<span class="text-label-caps">Run</span>
+</button>
+<button class="flex flex-col items-center justify-center p-4 rounded-xl border-2 border-primary-container bg-surface-high transition-all group active:scale-95" type="button">
+<span class="material-symbols-outlined text-3xl mb-2 text-primary" style="font-variation-settings: 'FILL' 1;">fitness_center</span>
+<span class="text-label-caps text-primary">Strength</span>
+</button>
+<button class="flex flex-col items-center justify-center p-4 rounded-xl border border-outline-variant bg-surface-container hover:border-primary-container hover:bg-surface-high transition-all group active:scale-95" type="button">
+<span class="material-symbols-outlined text-3xl mb-2 group-hover:text-primary">pedal_bike</span>
+<span class="text-label-caps">Cycling</span>
+</button>
+<button class="flex flex-col items-center justify-center p-4 rounded-xl border border-outline-variant bg-surface-container hover:border-primary-container hover:bg-surface-high transition-all group active:scale-95" type="button">
+<span class="material-symbols-outlined text-3xl mb-2 group-hover:text-primary">pool</span>
+<span class="text-label-caps">Swim</span>
+</button>
+</div>
+</section>
+<!-- Duration & Effort -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-10">
+<!-- Duration -->
+<section>
+<label class="block text-label-caps font-label-caps text-on-surface-variant uppercase mb-4">Duration</label>
+<div class="flex items-center gap-3">
+<div class="flex-1 relative">
+<input class="w-full bg-surface-bright border border-outline-variant rounded-lg px-4 py-3 text-headline-lg font-metric-large text-center focus:ring-2 focus:ring-primary focus:border-transparent transition-all outline-none" placeholder="00:00" type="text">
+<div class="absolute inset-y-0 right-4 flex items-center pointer-events-none text-on-surface-variant">
+<span class="material-symbols-outlined">schedule</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Effort Level (Premium Slider) -->
+<section>
+<div class="flex justify-between items-end mb-4">
+<label class="block text-label-caps font-label-caps text-on-surface-variant uppercase">Effort Level</label>
+<span class="text-primary font-bold text-title-md" id="effort-val">7</span>
+</div>
+<div class="pt-4 pb-2">
+<input class="custom-slider w-full h-1 bg-surface-bright rounded-lg appearance-none cursor-pointer" id="effort-slider" max="10" min="1" step="1" type="range" value="7">
+<div class="flex justify-between mt-4 px-1 text-[10px] text-on-surface-variant font-medium">
+<span class="">RESTORE</span>
+<span class="">THRESHOLD</span>
+<span class="">MAXIMAL</span>
+</div>
+</div>
+</section>
+</div>
+<!-- Training Notes -->
+<section>
+<label class="block text-label-caps font-label-caps text-on-surface-variant uppercase mb-4">Training Notes</label>
+<textarea class="w-full min-h-[120px] bg-surface-bright border border-outline-variant rounded-xl px-4 py-4 text-body-md focus:ring-2 focus:ring-primary focus:border-transparent transition-all outline-none resize-none" placeholder="Describe the physical sensation, the mental state, or the small wins..."></textarea>
+</section>
+<!-- Community Toggle & CTA -->
+<div class="flex flex-col md:flex-row items-center justify-between gap-6 pt-4">
+<div class="flex items-center gap-3 order-2 md:order-1">
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox">
+<div class="w-11 h-6 bg-surface-container peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-on-surface after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-container"></div>
+</label>
+<span class="text-body-md font-medium text-on-surface">Share with Team</span>
+</div>
+<button class="w-full md:w-auto px-10 py-4 bg-primary-container text-on-primary-container rounded-lg font-bold text-body-lg shadow-lg shadow-primary-container/20 hover:brightness-110 active:scale-95 transition-all order-1 md:order-2" type="submit">
+                            Complete Session
+                        </button>
+</div>
+</form>
+</div>
+<!-- Footer Quote (Human Utility) -->
+<p class="mt-8 text-center text-on-surface-variant font-light italic text-body-md opacity-60">"It's not just data, it's proof of work."</p>
+</div>
+</main>
+<!-- Footer -->
+
+<script>
+        // Micro-interactions for Effort Slider
+        const slider = document.getElementById('effort-slider');
+        const effortVal = document.getElementById('effort-val');
+        
+        slider.addEventListener('input', (e) => {
+            effortVal.innerText = e.target.value;
+            // Visual feedback on the slider value
+            const val = e.target.value;
+            if (val > 8) {
+                effortVal.className = "text-error font-bold text-title-md scale-110 transition-all duration-300";
+            } else if (val < 4) {
+                effortVal.className = "text-tertiary font-bold text-title-md transition-all";
+            } else {
+                effortVal.className = "text-primary font-bold text-title-md transition-all";
+            }
+        });
+
+        // Simple button active state toggle for Activity Type
+        const activityButtons = document.querySelectorAll('section .grid button');
+        activityButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                activityButtons.forEach(b => {
+                    b.classList.remove('border-2', 'border-primary-container', 'bg-surface-high');
+                    b.classList.add('border', 'border-outline-variant', 'bg-surface-container');
+                    const icon = b.querySelector('.material-symbols-outlined');
+                    const text = b.querySelector('.text-label-caps');
+                    icon.style.fontVariationSettings = "'FILL' 0";
+                    icon.classList.remove('text-primary');
+                    text.classList.remove('text-primary');
+                });
+                btn.classList.remove('border', 'border-outline-variant', 'bg-surface-container');
+                btn.classList.add('border-2', 'border-primary-container', 'bg-surface-high');
+                const activeIcon = btn.querySelector('.material-symbols-outlined');
+                const activeText = btn.querySelector('.text-label-caps');
+                activeIcon.style.fontVariationSettings = "'FILL' 1";
+                activeIcon.classList.add('text-primary');
+                activeText.classList.add('text-primary');
+            });
+        });
+    </script>
+
+
+</body></html>

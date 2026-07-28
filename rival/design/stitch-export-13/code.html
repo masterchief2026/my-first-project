@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>RIVAL - Tactical Command</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+    body {
+      font-family: 'Manrope', sans-serif;
+      background-color: #131313;
+      color: #e5e2e1;
+      -webkit-font-smoothing: antialiased;
+    }
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    }
+    .unrivaled-glow {
+      box-shadow: 0 0 30px rgba(255, 215, 0, 0.15);
+    }
+    .glass-card {
+      background: rgba(28, 28, 28, 0.6);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(163, 140, 133, 0.1);
+    }
+    .scanline {
+      width: 100%;
+      height: 2px;
+      background: rgba(217, 119, 87, 0.1);
+      position: absolute;
+      animation: scan 4s linear infinite;
+      z-index: 20;
+    }
+    @keyframes scan {
+      0% { top: 0%; }
+      100% { top: 100%; }
+    }
+  </style>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "background": "#131313",
+            "surface-container-highest": "#353535",
+            "surface": "#131313",
+            "on-surface-variant": "#dbc1b9",
+            "tertiary-container": "#09a493",
+            "primary": "#ffb59e",
+            "error": "#ffb4ab",
+            "rank-unrivaled": "#FFD700",
+            "outline-variant": "#55433d",
+            "on-primary-container": "#541400",
+            "on-background": "#e5e2e1",
+            "status-inspired": "#FFFFFF",
+            "primary-fixed": "#ffdbd0",
+            "inverse-on-surface": "#313030",
+            "on-secondary-container": "#bab8b7",
+            "error-container": "#93000a",
+            "surface-variant": "#353535",
+            "tertiary-fixed-dim": "#5edac7",
+            "on-tertiary-fixed-variant": "#005047",
+            "surface-high": "#282828",
+            "on-error-container": "#ffdad6",
+            "surface-container": "#20201f",
+            "on-tertiary-fixed": "#00201c",
+            "inverse-surface": "#e5e2e1",
+            "rank-elite": "#9F57D9",
+            "outline": "#a38c85",
+            "tertiary-fixed": "#7df7e3",
+            "secondary": "#c8c6c5",
+            "rank-rookie": "#B0B0B0",
+            "text-primary": "#FFFFFF",
+            "surface-bright": "#393939",
+            "surface-low": "#131313",
+            "surface-container-lowest": "#0e0e0e",
+            "secondary-fixed-dim": "#c8c6c5",
+            "primary-fixed-dim": "#ffb59e",
+            "on-primary": "#5c1902",
+            "on-primary-fixed": "#390b00",
+            "on-error": "#690005",
+            "on-surface": "#e5e2e1",
+            "on-secondary-fixed-variant": "#474646",
+            "on-secondary-fixed": "#1c1b1b",
+            "tertiary": "#5edac7",
+            "secondary-fixed": "#e5e2e1",
+            "surface-tint": "#ffb59e",
+            "surface-container-high": "#2a2a2a",
+            "surface-dim": "#131313",
+            "on-primary-fixed-variant": "#7a2f15",
+            "inverse-primary": "#99462a",
+            "primary-container": "#d97757",
+            "on-tertiary-container": "#00312b",
+            "text-secondary": "#A0A0A0",
+            "surface-mid": "#1C1C1C",
+            "surface-container-low": "#1b1b1b",
+            "on-secondary": "#313030",
+            "secondary-container": "#4a4949",
+            "rank-pro": "#D97757",
+            "on-tertiary": "#003731"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.5rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          "spacing": {
+            "max-width": "1200px",
+            "section-margin": "2rem",
+            "stack-gap": "1rem",
+            "container-padding": "1.5rem",
+            "gutter": "1rem"
+          },
+          "fontFamily": {
+            "headline-lg-mobile": ["manrope"],
+            "display-hero": ["manrope"],
+            "title-md": ["manrope"],
+            "label-caps": ["manrope"],
+            "headline-lg": ["manrope"],
+            "body-lg": ["manrope"],
+            "metric-large": ["manrope"],
+            "body-md": ["manrope"]
+          },
+          "fontSize": {
+            "headline-lg-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "700"}],
+            "display-hero": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "800"}],
+            "title-md": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+            "label-caps": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700"}],
+            "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+            "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+            "metric-large": ["32px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "300"}],
+            "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}]
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-surface text-on-surface selection:bg-primary/30 min-h-screen overflow-x-hidden">
+<!-- Immersive Fixed Background: Alpine Lake Variant -->
+<div class="fixed inset-0 z-0 overflow-hidden">
+<img alt="Alpine Lake Backdrop" class="w-full h-full object-cover opacity-60 scale-105" src="https://lh3.googleusercontent.com/aida/AP1WRLvB5WIqS0VM-gGB9GJ5Iq9ReO7MLDNp3VlYiEJrPMkMfRp2_6H0cRlGuzL7AAn2JFFGVfoI4kFDXKPwZi2fOPXXMPidpHQYnaU7wgpdRTeMyiW6QgkOX2bVntQGvAmdRu3GbZ-eJYl_wq6MDgzd4_IpgowGQUPBVqdqfIm_7lZ-Ipi_8WbJGp1csw1A85DHFZyXqns3NsC_TuNu5HVYj6L23mmKH1b157ZEkxZdiCWVi40z2xekuFKN3Pwb"/>
+<div class="absolute inset-0 bg-gradient-to-b from-surface-lowest/40 via-transparent to-surface-lowest/90"></div>
+<div class="scanline"></div>
+</div>
+<!-- Tactical Header Overlay -->
+<header class="fixed top-0 left-0 w-full h-20 z-[100] bg-surface/40 backdrop-blur-md border-b border-outline/10">
+<div class="flex justify-between items-center h-full px-container-padding max-w-[1600px] mx-auto">
+<div class="flex items-center gap-8">
+<div class="font-display-hero text-3xl tracking-tighter text-primary">RIVAL</div>
+<div class="hidden md:flex gap-6 font-label-caps text-[10px] tracking-[0.2em] uppercase opacity-50">
+<span>System Status: Optimal</span>
+<span>Comm: Active</span>
+</div>
+</div>
+<nav class="hidden md:flex items-center gap-12">
+<a class="text-on-surface-variant font-bold border-b border-primary/50 pb-1" href="#">Tactical Grid</a>
+<a class="text-on-surface-variant/40 font-medium hover:text-primary transition-colors" href="#">Squads</a>
+<a class="text-on-surface-variant/40 font-medium hover:text-primary transition-colors" href="#">Intel</a>
+</nav>
+<div class="flex items-center gap-6">
+<div class="text-right hidden sm:block">
+<div class="font-label-caps text-[10px] text-primary">AUTHORIZED PERSONNEL</div>
+<div class="font-bold text-sm uppercase">Athlete 09-Beta</div>
+</div>
+<div class="w-10 h-10 rounded-sm border border-primary/50 p-0.5">
+<img alt="Athlete" class="w-full h-full object-cover grayscale contrast-125" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDBgS3FKSBuQzdkDUGUbnPW5n9R1h8gO2eC6iixPxIN9QcPodnyR-BgfwkBezIMaX043kxtS7ETzYu93DIoG6fo353mhDG2JIlgxiG5cePwWZsSnqtdCIQA-G3U32SY_ahF3cyr_SNw4KImZcrLiHB0FhQ3PrLJ1RB2IEY_Fwm2vKVKnc7W9MmDpBBZhi_fHKpomTxizgl-GYLgwr7lpaFikiZ1GzuvHu3aJWbR-56FtDSTUcYh-9EIxWJkSonDPMXGsGEo2L4bBpbS"/>
+</div>
+</div>
+</div>
+</header>
+<main class="relative z-10 pt-32 pb-32">
+<div class="max-w-4xl mx-auto px-container-padding">
+<!-- Hero Stats Column -->
+<div class="glass-card p-12 mb-8 border-l-4 border-l-primary-container">
+<div class="flex flex-col md:flex-row items-end justify-between gap-12">
+<div class="flex flex-col gap-2">
+<!-- Refined: Primary Focal Point Effort Score -->
+<h1 class="font-display-hero text-[128px] leading-[0.9] text-white tracking-tighter font-extrabold">64.5</h1>
+<div class="flex items-center gap-4">
+<span class="h-0.5 w-12 bg-primary-container"></span>
+<span class="font-label-caps text-primary-container tracking-[0.5em] uppercase">Effort Score // This Week</span>
+</div>
+</div>
+<div class="flex gap-8">
+<div class="border-l border-white/20 pl-4">
+<div class="text-[10px] font-label-caps text-white/40 uppercase">Status</div>
+<div class="text-lg font-bold text-primary">PUSHING TARGETS</div>
+</div>
+<div class="border-l border-white/20 pl-4">
+<div class="text-[10px] font-label-caps text-white/40 uppercase">Weekly Rank</div>
+<div class="text-lg font-bold text-rank-unrivaled">ELITE</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Section Header -->
+<div class="glass-card mb-8 p-6 flex flex-col md:flex-row justify-between items-center gap-6">
+<div class="flex items-center gap-6">
+<button class="flex items-center gap-2 text-primary group">
+<span class="material-symbols-outlined text-lg group-hover:-translate-x-1 transition-transform">arrow_back</span>
+<span class="font-label-caps uppercase text-xs">Return</span>
+</button>
+<h2 class="font-display-hero text-2xl uppercase tracking-widest">Your Activities</h2>
+</div>
+<!-- Refined Premium Button: Secondary with Glass Effect -->
+<button class="flex items-center gap-3 px-5 py-2.5 bg-secondary-container/20 hover:bg-secondary-container/40 border border-secondary/20 rounded-lg transition-all group backdrop-blur-sm">
+<span class="text-xl grayscale group-hover:grayscale-0 transition-all">🏆</span>
+<span class="font-title-md text-sm text-secondary group-hover:text-white transition-colors">Your Lifts — PBs &amp; goals</span>
+<span class="material-symbols-outlined text-primary-container text-sm group-hover:translate-x-1 transition-transform">arrow_forward</span>
+</button>
+</div>
+<!-- Scrollable Activities Column -->
+<div class="flex flex-col gap-6">
+<!-- Activity Card: Morning Swim -->
+<div class="glass-card group p-10 hover:bg-surface-bright/50 transition-all cursor-crosshair relative overflow-hidden">
+<div class="absolute top-0 right-0 p-6 flex flex-col items-end gap-2">
+<div class="font-label-caps text-primary-container text-[10px] mb-1">DATA MULTIPLIER</div>
+<div class="bg-primary-container text-on-primary-container px-3 py-1 font-bold text-[10px] uppercase tracking-tighter">x1.5 ACTIVE</div>
+</div>
+<div class="flex justify-between items-start mb-12">
+<div class="p-5 bg-primary-container/10 border border-primary-container/20 text-primary-container group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-5xl">pool</span>
+</div>
+</div>
+<div>
+<h5 class="font-display-hero text-4xl mb-2">Morning Swim</h5>
+<p class="font-body-md text-on-surface-variant">Swim · Mon, Jul 13 · 43 min · 1.3 km</p>
+</div>
+<div class="mt-12 flex justify-between items-end">
+<div class="font-display-hero text-5xl text-primary-container">64.5 <span class="text-xl">Effort</span></div>
+<div class="flex gap-4 opacity-20 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined hover:text-primary">edit</span>
+<span class="material-symbols-outlined hover:text-primary">photo_camera</span>
+<span class="material-symbols-outlined hover:text-primary">auto_awesome</span>
+</div>
+</div>
+</div>
+<!-- Activity Card: Morning Ride (PB) -->
+<div class="glass-card unrivaled-glow border-2 border-rank-unrivaled/40 p-10 group hover:bg-surface-bright/50 transition-all cursor-crosshair relative overflow-hidden">
+<div class="absolute top-0 right-0 p-6">
+<div class="bg-rank-unrivaled text-black px-4 py-1 font-label-caps text-[10px] tracking-widest uppercase flex items-center gap-2">
+<span class="material-symbols-outlined text-[14px]" style="font-variation-settings: 'FILL' 1;">local_fire_department</span>
+              PB FURTHEST RIDE
+            </div>
+</div>
+<div class="flex items-start mb-12">
+<div class="p-5 bg-rank-unrivaled/10 border border-rank-unrivaled/30 text-rank-unrivaled">
+<span class="material-symbols-outlined text-5xl">directions_bike</span>
+</div>
+</div>
+<div>
+<h5 class="font-display-hero text-4xl mb-2 text-rank-unrivaled">Morning Ride</h5>
+<p class="font-body-md text-on-surface-variant">Ride · Tue, Jul 7 · 2h 3m · 42.1 km</p>
+</div>
+<div class="mt-12 flex justify-between items-end">
+<div class="font-display-hero text-5xl text-rank-unrivaled">141.9 <span class="text-xl">Effort</span></div>
+<div class="flex gap-4 opacity-20 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined hover:text-rank-unrivaled">edit</span>
+<span class="material-symbols-outlined hover:text-rank-unrivaled">auto_awesome</span>
+</div>
+</div>
+</div>
+<!-- Secondary Activities Row -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<!-- Activity Card: Afternoon Hike -->
+<div class="glass-card p-8 group hover:bg-surface-bright/50 transition-all">
+<div class="flex justify-between items-center mb-8">
+<div class="w-12 h-12 bg-primary-container/10 border border-primary-container/20 flex items-center justify-center text-primary-container">
+<span class="material-symbols-outlined text-3xl">hiking</span>
+</div>
+<span class="text-[10px] font-bold text-on-surface-variant/40">x0.7 MULTIPLIER</span>
+</div>
+<h5 class="font-title-md text-xl mb-1">Afternoon Hike</h5>
+<p class="text-sm text-on-surface-variant mb-8">Wed, Jul 8 · 1h 43m</p>
+<div class="flex justify-between items-end">
+<div class="font-bold text-2xl text-on-surface">72.1 <span class="text-xs opacity-50 uppercase">Effort</span></div>
+<div class="flex gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-lg cursor-pointer">edit</span>
+<span class="material-symbols-outlined text-lg cursor-pointer">photo_camera</span>
+</div>
+</div>
+</div>
+<!-- Activity Card: Morning Swim (Repeated) -->
+<div class="glass-card p-8 group hover:bg-surface-bright/50 transition-all">
+<div class="flex justify-between items-center mb-8">
+<div class="w-12 h-12 bg-primary-container/10 border border-primary-container/20 flex items-center justify-center text-primary-container">
+<span class="material-symbols-outlined text-3xl">pool</span>
+</div>
+<span class="text-[10px] font-bold text-on-surface-variant/40">x1.5 MULTIPLIER</span>
+</div>
+<h5 class="font-title-md text-xl mb-1">Morning Swim</h5>
+<p class="text-sm text-on-surface-variant mb-8">Fri, Jul 10 · 38 min</p>
+<div class="flex justify-between items-end">
+<div class="font-bold text-2xl text-on-surface">56.9 <span class="text-xs opacity-50 uppercase">Effort</span></div>
+<div class="flex gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-lg cursor-pointer">edit</span>
+<span class="material-symbols-outlined text-lg cursor-pointer">auto_awesome</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Load More Trigger -->
+<div class="glass-card p-8 flex items-center justify-center group cursor-pointer hover:bg-primary transition-colors mt-4">
+<button class="font-label-caps tracking-[0.4em] uppercase text-xs group-hover:text-on-primary flex items-center gap-4">
+            LOAD PREVIOUS ACTIVITIES
+            <span class="material-symbols-outlined group-hover:translate-y-1 transition-transform">expand_more</span>
+</button>
+</div>
+</div>
+</div>
+</main>
+<!-- Tactical Footer -->
+<footer class="relative z-10 bg-surface/80 backdrop-blur-md border-t border-outline/10 py-16">
+<div class="max-w-[1600px] mx-auto px-container-padding flex flex-col md:flex-row justify-between items-center gap-12">
+<div class="flex flex-col gap-2">
+<div class="font-label-caps text-xs tracking-[0.5em] text-on-surface-variant">RIVAL. PEOPLE BEFORE DATA.</div>
+<div class="text-[10px] font-bold text-on-surface-variant/20 tracking-tighter uppercase">GRID_SYSTEM_STABLE_REV_04</div>
+</div>
+<div class="flex gap-16">
+<div class="flex flex-col gap-3">
+<div class="text-[10px] font-label-caps text-primary uppercase">Protocol</div>
+<a class="text-sm font-medium hover:text-primary transition-colors" href="#">Philosophy</a>
+<a class="text-sm font-medium hover:text-primary transition-colors" href="#">Terms</a>
+<a class="text-sm font-medium hover:text-primary transition-colors" href="#">Privacy</a>
+</div>
+<div class="flex flex-col gap-3">
+<div class="text-[10px] font-label-caps text-primary uppercase">Metadata</div>
+<div class="text-sm font-medium opacity-50">© 2024 RIVAL.</div>
+<div class="text-sm font-medium opacity-50">EST. 20XX</div>
+</div>
+</div>
+</div>
+</footer>
+<!-- Floating Command Trigger -->
+<div class="fixed bottom-12 right-12 flex flex-col gap-4 z-[110]">
+<button class="w-16 h-16 bg-surface-bright/80 backdrop-blur border border-outline/20 text-white flex items-center justify-center hover:bg-primary hover:text-on-primary transition-all rounded-lg">
+<span class="material-symbols-outlined">filter_list</span>
+</button>
+<button class="w-20 h-20 bg-primary-container text-white rounded-lg shadow-2xl flex items-center justify-center hover:bg-white hover:text-primary-container transition-all group relative overflow-hidden">
+<div class="absolute inset-0 border border-white/20 group-hover:scale-125 transition-transform"></div>
+<span class="material-symbols-outlined text-4xl">add</span>
+</button>
+</div>
+<script>
+    // Subtle parallax effect on background
+    window.addEventListener('scroll', () => {
+      const scrolled = window.pageYOffset;
+      const bg = document.querySelector('.fixed.inset-0 img');
+      if(bg) bg.style.transform = `scale(1.05) translateY(${scrolled * 0.12}px)`;
+    });
+  </script>
+</body></html>

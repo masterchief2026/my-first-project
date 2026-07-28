@@ -1,0 +1,328 @@
+<!DOCTYPE html><html class="dark" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>RIVAL // AI Share Preview</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;600;700;800&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .premium-glow {
+            box-shadow: inset 0 0 20px rgba(217, 119, 87, 0.1), 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+        .route-path {
+            stroke-dasharray: 1000;
+            stroke-dashoffset: 1000;
+            animation: dash 3s ease-in-out forwards;
+        }
+        @keyframes dash {
+            to { stroke-dashoffset: 0; }
+        }
+        .shimmer {
+            background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.05) 50%, rgba(255,255,255,0) 100%);
+            background-size: 200% 100%;
+            animation: shimmer 2s infinite;
+        }
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-error-container": "#ffdad6",
+                        "outline-variant": "#55433d",
+                        "on-primary": "#5c1902",
+                        "surface-tint": "#ffb59e",
+                        "secondary": "#c8c6c5",
+                        "on-tertiary-fixed-variant": "#005047",
+                        "surface-container-high": "#2a2a2a",
+                        "tertiary-fixed-dim": "#5edac7",
+                        "secondary-container": "#4a4949",
+                        "on-secondary-container": "#bab8b7",
+                        "surface-low": "#131313",
+                        "text-primary": "#FFFFFF",
+                        "surface-variant": "#353535",
+                        "inverse-primary": "#99462a",
+                        "primary-fixed": "#ffdbd0",
+                        "surface": "#131313",
+                        "on-tertiary": "#003731",
+                        "rank-pro": "#D97757",
+                        "on-primary-fixed-variant": "#7a2f15",
+                        "error": "#ffb4ab",
+                        "tertiary": "#5edac7",
+                        "surface-bright": "#323232",
+                        "surface-container-low": "#1b1b1b",
+                        "secondary-fixed": "#e5e2e1",
+                        "on-secondary-fixed": "#1c1b1b",
+                        "primary": "#ffb59e",
+                        "tertiary-container": "#09a493",
+                        "primary-fixed-dim": "#ffb59e",
+                        "on-tertiary-fixed": "#00201c",
+                        "secondary-fixed-dim": "#c8c6c5",
+                        "on-surface-variant": "#dbc1b9",
+                        "surface-mid": "#1C1C1C",
+                        "surface-container": "#20201f",
+                        "text-secondary": "#A0A0A0",
+                        "on-primary-container": "#541400",
+                        "on-surface": "#e5e2e1",
+                        "on-error": "#690005",
+                        "surface-dim": "#131313",
+                        "on-background": "#e5e2e1",
+                        "surface-container-lowest": "#0e0e0e",
+                        "error-container": "#93000a",
+                        "rank-elite": "#9F57D9",
+                        "rank-rookie": "#B0B0B0",
+                        "background": "#131313",
+                        "on-primary-fixed": "#390b00",
+                        "primary-container": "#d97757",
+                        "on-tertiary-container": "#00312b",
+                        "on-secondary": "#313030",
+                        "status-inspired": "#FFFFFF",
+                        "outline": "#a38c85",
+                        "surface-high": "#282828",
+                        "on-secondary-fixed-variant": "#474646",
+                        "surface-container-highest": "#353535",
+                        "rank-unrivaled": "#FFD700",
+                        "inverse-surface": "#e5e2e1",
+                        "inverse-on-surface": "#313030",
+                        "tertiary-fixed": "#7df7e3"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "section-margin": "2rem",
+                        "max-width": "1200px",
+                        "gutter": "1rem",
+                        "container-padding": "1.5rem",
+                        "stack-gap": "1rem"
+                    },
+                    "fontFamily": {
+                        "metric-large": ["manrope"],
+                        "label-caps": ["manrope"],
+                        "title-md": ["manrope"],
+                        "headline-lg-mobile": ["manrope"],
+                        "body-lg": ["manrope"],
+                        "display-hero": ["manrope"],
+                        "headline-lg": ["manrope"],
+                        "body-md": ["manrope"]
+                    },
+                    "fontSize": {
+                        "metric-large": ["32px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "300"}],
+                        "label-caps": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700"}],
+                        "title-md": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                        "headline-lg-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "700"}],
+                        "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                        "display-hero": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "800"}],
+                        "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                        "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}]
+                    }
+                },
+            },
+        }
+    </script>
+</head>
+<body class="bg-background text-on-surface font-body-md overflow-x-hidden">
+<!-- TopNavBar -->
+<header class="fixed top-0 w-full z-50 bg-surface-low/80 backdrop-blur-md shadow-sm">
+<nav class="flex justify-between items-center h-20 px-container-padding max-w-max-width mx-auto">
+<div class="font-headline-lg text-headline-lg font-extrabold tracking-tight text-primary">RIVAL</div>
+<div class="hidden md:flex items-center gap-8">
+<a class="text-on-surface-variant font-medium hover:text-primary transition-colors duration-200" href="#">Community</a>
+<a class="text-on-surface-variant font-medium hover:text-primary transition-colors duration-200" href="#">Training</a>
+<a class="text-on-surface-variant font-medium hover:text-primary transition-colors duration-200" href="#">Teams</a>
+<a class="text-primary font-bold border-b-2 border-primary pb-1" href="#">Profile</a>
+</div>
+<div class="flex items-center gap-4">
+<button class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors">search</button>
+<button class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors">notifications</button>
+<button class="bg-primary-container text-on-primary-container px-6 py-2 rounded-lg font-title-md active:scale-95 transition-transform">
+                    Start Session
+                </button>
+</div>
+</nav>
+</header>
+<main class="pt-32 pb-20 px-container-padding max-w-max-width mx-auto min-h-screen">
+<!-- Header Section -->
+<div class="mb-12">
+<h1 class="font-headline-lg text-headline-lg mb-2">Share Your Progress</h1>
+<p class="text-on-surface-variant font-body-lg">AI is generating your premium story card. People before data.</p>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+<!-- Left Panel: Workout Stats -->
+<div class="lg:col-span-3 space-y-6">
+<div class="bg-surface-container-low p-6 rounded-xl border border-outline-variant/30">
+<h3 class="font-label-caps text-label-caps text-primary uppercase mb-4 tracking-widest">Session Summary</h3>
+<div class="space-y-8">
+<div>
+<span class="block text-on-surface-variant text-sm font-medium mb-1">Distance</span>
+<div class="flex items-baseline gap-2">
+<span class="font-metric-large text-metric-large text-on-surface">12.4</span>
+<span class="text-on-surface-variant font-title-md">km</span>
+</div>
+</div>
+<div>
+<span class="block text-on-surface-variant text-sm font-medium mb-1">Effort Score</span>
+<div class="flex items-baseline gap-2">
+<span class="font-metric-large text-metric-large text-rank-pro">842</span>
+<span class="material-symbols-outlined text-rank-pro" style="font-variation-settings: 'FILL' 1;">bolt</span>
+</div>
+<div class="mt-2 h-1.5 w-full bg-surface-container rounded-full overflow-hidden">
+<div class="h-full bg-rank-pro w-[84%] rounded-full"></div>
+</div>
+<p class="mt-2 text-xs text-on-surface-variant italic">Top 5% of your community today.</p>
+</div>
+<div>
+<span class="block text-on-surface-variant text-sm font-medium mb-1">Duration</span>
+<span class="font-title-md text-title-md text-on-surface">58:12</span>
+</div>
+</div>
+</div>
+<div class="bg-surface-container-low p-6 rounded-xl border border-outline-variant/30">
+<h3 class="font-label-caps text-label-caps text-on-surface-variant uppercase mb-4 tracking-widest">Atmosphere</h3>
+<div class="flex items-center gap-3 text-on-surface">
+<span class="material-symbols-outlined">wb_twilight</span>
+<span class="font-body-md">Sunset Run in Barcelona</span>
+</div>
+</div>
+</div>
+<!-- Center Panel: Social Card Preview -->
+<div class="lg:col-span-6 flex flex-col items-center">
+<div class="relative w-full aspect-[4/5] max-w-[450px] rounded-[32px] overflow-hidden premium-glow bg-surface-container-highest group">
+<!-- High Fidelity Background Image -->
+<div class="absolute inset-0 z-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-110" data-alt="A breathtaking cinematic photograph of a runner silhouette against a vibrant Mediterranean sunset in Barcelona. The sky is a gradient of deep terracotta, soft orange, and hazy violet. Warm, golden hour light spills across the coastal path, highlighting the texture of the stone and the sea spray. The style is premium and evocative, capturing the emotional essence of a high-performance workout." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAXbSLYqdescxYaQJ4gxmJZagTwg16nsZn9eDPfA8jUxRqTXJXXWbukwgEOeebt45YYL3DstPV7IbSAW77EHtPoVTSCOxWOuSA1U_fIVyFseZFNqcNVQIt2NdsFfOmZ1O1mbPn3PsOESDebvnVpMVQIkHhclV8wPnUWgmFvr9D-kTrz6WeaH2aO7a2CrimgRO7XEFDhsw65UWxFoihEn2Mi8RUJdOcF9aQk3OHdbZIcCPd2hppcaB7kkz0AXCVSfJs_arp6FsZx4ND0')">
+</div>
+<!-- Visual Overlay Layers -->
+<div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/30 z-10"></div>
+<!-- Top Content: Brand & Context -->
+<div class="absolute top-8 left-8 right-8 z-20 flex justify-between items-start">
+<div class="text-white font-headline-lg font-extrabold tracking-tighter opacity-90">RIVAL</div>
+<div class="bg-white/10 backdrop-blur-md px-3 py-1 rounded-full border border-white/20 flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-rank-pro animate-pulse"></span>
+<span class="text-[10px] font-bold tracking-widest text-white uppercase">Live Route</span>
+</div>
+</div>
+<!-- Map Overlay (Conceptual) -->
+<div class="absolute inset-x-8 top-24 bottom-32 z-15 pointer-events-none opacity-60">
+<svg class="w-full h-full" preserveAspectRatio="none" viewBox="0 0 100 100">
+<path class="route-path" d="M10,80 C30,70 40,90 60,75 S80,40 90,20" fill="none" stroke="white" stroke-linecap="round" stroke-width="2"></path>
+<circle cx="10" cy="80" fill="#D97757" r="2"></circle>
+<circle cx="90" cy="20" fill="white" r="2"></circle>
+</svg>
+</div>
+<!-- Bottom Content: Main Stats -->
+<div class="absolute bottom-8 left-8 right-8 z-20 space-y-4">
+<div class="flex items-end justify-between">
+<div>
+<h2 class="text-white font-display-hero text-[42px] leading-none mb-1">12.4</h2>
+<p class="text-white/60 font-label-caps uppercase tracking-widest text-[10px]">Kilometers // Coastal Loop</p>
+</div>
+<div class="text-right">
+<p class="text-rank-pro font-metric-large text-[28px] leading-none">842</p>
+<p class="text-white/60 font-label-caps uppercase tracking-widest text-[10px]">Effort Score</p>
+</div>
+</div>
+<div class="pt-4 border-t border-white/10 flex justify-between items-center">
+<div class="flex -space-x-2">
+<div class="w-8 h-8 rounded-full border-2 border-surface bg-surface-variant flex items-center justify-center overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="Close up portrait of a smiling female athlete with athletic headband." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBkUOWmqp1alkSIU8RKqWTXTPH9EaUGL56nO6Gfl6UbZi3e_Dxs8eCWxJor9zaU1F6aWonlrpYPzM2xkzKKag5gXfI7xvUploOKBm94tR_yluctKtgnXpQlb5oPal6OK7_KAZKpK8r5mlkHa-Mf2keBnuqXW_Zs1LOu9o1HUJTvewupFSKH0jWhrvV266kVgPqimcMdXodRQqZN5bUoSkzmxk5zRYtzGTUY2Xa5ve80sobCbSzYKoJrL4KOwqTG4EkXl6sIE3MBkPIT">
+</div>
+<div class="w-8 h-8 rounded-full border-2 border-surface bg-surface-variant flex items-center justify-center overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="Close up portrait of a focused male runner with sweat on his brow." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCbQc8gp5rpOHjjlS7XR41t2JdsXWz_ld3CjBMog-wm_ZKHT7e1QkpAMSYCNpDQgRIBTaUUJExDEAr2CS_-Dg111L9Q7dYlBAkuuXJ2LTMsMAoWPQJRdbTJaKb3aymFnMG5IP7Hw-h1Lj0vptpgA7sgNFYWfXoodM5Cj_MClExAx5kZQYe1r6JQcmknq-y4dxsqWr-ywunKatc5Y5l94YZg8kg_-54aIXnvtumQvmFDZ_pUeb_uR09-mQ59okNTKfh1reb68uJ8he84">
+</div>
+<div class="w-8 h-8 rounded-full border-2 border-surface bg-surface-variant flex items-center justify-center text-[10px] font-bold text-white">
+                                    +12
+                                </div>
+</div>
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-white text-sm" style="font-variation-settings: 'FILL' 1;">favorite</span>
+<span class="text-white font-bold text-sm">48 Respects</span>
+</div>
+</div>
+</div>
+<!-- Shimmer effect overlay for "Generating" state -->
+<div class="absolute inset-0 shimmer pointer-events-none z-30 opacity-30"></div>
+</div>
+<p class="mt-6 text-on-surface-variant font-body-md italic flex items-center gap-2">
+<span class="material-symbols-outlined text-sm animate-spin">sync</span>
+                    Optimizing visual fidelity...
+                </p>
+</div>
+<!-- Right Panel: Export Options -->
+<div class="lg:col-span-3 space-y-4">
+<button class="w-full bg-primary text-on-primary-fixed py-4 rounded-xl font-title-md flex items-center justify-center gap-3 hover:bg-surface-tint transition-colors active:scale-95 duration-200">
+<span class="material-symbols-outlined">share</span>
+                    Share to Team
+                </button>
+<button class="w-full bg-surface-high border border-outline-variant text-on-surface py-4 rounded-xl font-title-md flex items-center justify-center gap-3 hover:bg-surface-bright transition-colors active:scale-95 duration-200">
+<span class="material-symbols-outlined">download</span>
+                    Download HQ
+                </button>
+<div class="h-px bg-outline-variant/30 my-6"></div>
+<h4 class="font-label-caps text-label-caps text-on-surface-variant uppercase mb-4 tracking-widest text-center">Social Ready</h4>
+<button class="w-full bg-[#E1306C] text-white py-4 rounded-xl font-title-md flex items-center justify-center gap-3 hover:opacity-90 transition-opacity active:scale-95 duration-200">
+<i class="material-symbols-outlined">photo_camera</i>
+                    Instagram Stories
+                </button>
+<button class="w-full bg-[#1DA1F2] text-white py-4 rounded-xl font-title-md flex items-center justify-center gap-3 hover:opacity-90 transition-opacity active:scale-95 duration-200">
+<i class="material-symbols-outlined">chat</i>
+                    Post to X
+                </button>
+<div class="mt-12 p-4 bg-surface-container rounded-xl border border-primary/20">
+<p class="text-xs text-on-surface-variant leading-relaxed">
+<span class="text-primary font-bold">Pro Tip:</span> RIVAL cards are designed for 4:5 aspect ratio. Best for high-engagement story placement.
+                    </p>
+</div>
+</div>
+</div>
+</main>
+<!-- Footer -->
+<footer class="w-full py-12 bg-surface-container-lowest border-t border-outline-variant/10">
+<div class="max-w-max-width mx-auto px-container-padding flex flex-col md:flex-row justify-between items-center gap-stack-gap">
+<div class="flex flex-col items-center md:items-start gap-2">
+<div class="font-title-md text-title-md font-bold text-on-surface">RIVAL</div>
+<p class="font-body-md text-body-md text-on-surface-variant text-center md:text-left opacity-60">© 2024 RIVAL. People Before Data.</p>
+</div>
+<div class="flex flex-wrap justify-center gap-8">
+<a class="text-on-surface-variant font-body-md hover:text-primary transition-colors" href="#">Privacy Policy</a>
+<a class="text-on-surface-variant font-body-md hover:text-primary transition-colors" href="#">Terms of Service</a>
+<a class="text-on-surface-variant font-body-md hover:text-primary transition-colors" href="#">Help Center</a>
+<a class="text-on-surface-variant font-body-md hover:text-primary transition-colors" href="#">Community Guidelines</a>
+</div>
+</div>
+</footer>
+<!-- Micro-interaction Script -->
+<script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const card = document.querySelector('.group');
+            card.addEventListener('mousemove', (e) => {
+                const rect = card.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                const centerX = rect.width / 2;
+                const centerY = rect.height / 2;
+                
+                const rotateX = (y - centerY) / 20;
+                const rotateY = (centerX - x) / 20;
+                
+                card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+            });
+            
+            card.addEventListener('mouseleave', () => {
+                card.style.transform = 'perspective(1000px) rotateX(0) rotateY(0)';
+            });
+        });
+    </script>
+</body></html>

@@ -1,0 +1,220 @@
+<!DOCTYPE html><html class="dark" lang="en" style="width: 1458px; height: 989px; overflow: hidden; position: relative;"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>RIVAL | Connect Data</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<style>
+        body {
+            font-family: 'Manrope', sans-serif;
+            background-color: #131313;
+            color: #e5e2e1;
+            margin: 0;
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-card {
+            background: rgba(20, 20, 20, 0.7);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(85, 67, 61, 0.4);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .glass-card:hover {
+            border-color: #d97757;
+            transform: translateY(-4px);
+            background: rgba(30, 30, 30, 0.85);
+        }
+        .glow-accent {
+            box-shadow: 0 0 25px rgba(217, 119, 87, 0.3);
+        }
+        .bg-hero {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBUEtjDXTOWzrmIK_E-cP-8bgsUMYC025zPoMoz94aqmxFpv9bnsjfX46hx0-ExjIfzD7GhgIkNUbGlTXJ607sKmNhZVrohNurPYZR_Utg1hL7LBrm18XREZ9a_KwKbIFhkKbcNdgtHIPGk27vuppY3KgdThZRAVVDTrQafC70hQWUbzLUr-zp-HHAEM4cm_KhsTbzcLBR-pVDf4Fmrq-yVMh0ynrOIeBtcowsgebuLfYvX4Ry1NSQRzsKk9JJrDetWjlQKaewsZLBo');
+            background-size: cover;
+            background-position: center;
+            z-index: -2;
+        }
+        .bg-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(rgba(19, 19, 19, 0.4), rgba(19, 19, 19, 0.85));
+            backdrop-filter: blur(2px);
+            z-index: -1;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-tertiary-container": "#00312b",
+                      "tertiary-container": "#09a493",
+                      "surface-container-high": "#2a2a2a",
+                      "inverse-primary": "#99462a",
+                      "surface-bright": "#393939",
+                      "surface-dim": "#131313",
+                      "on-primary": "#5c1902",
+                      "rank-unrivaled": "#FFD700",
+                      "surface-low": "#131313",
+                      "on-tertiary": "#003731",
+                      "text-secondary": "#A0A0A0",
+                      "secondary": "#c8c6c5",
+                      "on-secondary-fixed-variant": "#474646",
+                      "on-background": "#e5e2e1",
+                      "primary-fixed": "#ffdbd0",
+                      "on-secondary-fixed": "#1c1b1b",
+                      "on-primary-container": "#541400",
+                      "surface-container-low": "#1b1b1b",
+                      "on-error": "#690005",
+                      "error": "#ffb4ab",
+                      "surface-mid": "#1C1C1C",
+                      "primary-container": "#d97757",
+                      "primary": "#ffb59e",
+                      "on-secondary": "#313030",
+                      "secondary-fixed-dim": "#c8c6c5",
+                      "rank-elite": "#9F57D9",
+                      "status-inspired": "#FFFFFF",
+                      "inverse-surface": "#e5e2e1",
+                      "surface": "#131313",
+                      "background": "#131313",
+                      "on-surface-variant": "#dbc1b9",
+                      "tertiary-fixed-dim": "#5edac7",
+                      "text-primary": "#FFFFFF",
+                      "surface-tint": "#ffb59e",
+                      "outline-variant": "#55433d",
+                      "surface-variant": "#353535",
+                      "primary-fixed-dim": "#ffb59e",
+                      "error-container": "#93000a",
+                      "surface-container-highest": "#353535",
+                      "surface-container": "#20201f",
+                      "on-surface": "#e5e2e1",
+                      "on-primary-fixed": "#390b00",
+                      "tertiary": "#5edac7",
+                      "surface-container-lowest": "#0e0e0e",
+                      "outline": "#a38c85",
+                      "on-secondary-container": "#bab8b7",
+                      "on-error-container": "#ffdad6",
+                      "inverse-on-surface": "#313030",
+                      "surface-high": "#282828",
+                      "rank-pro": "#D97757",
+                      "rank-rookie": "#B0B0B0",
+                      "secondary-fixed": "#e5e2e1",
+                      "on-tertiary-fixed-variant": "#005047",
+                      "secondary-container": "#4a4949",
+                      "tertiary-fixed": "#7df7e3",
+                      "on-tertiary-fixed": "#00201c",
+                      "on-primary-fixed-variant": "#7a2f15"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.8px",
+                      "xl": "16px",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "gutter": "1.5rem",
+                      "container-padding": "2rem",
+                      "max-width": "1200px",
+                      "section-margin": "3rem",
+                      "stack-gap": "1.5rem"
+              },
+              "fontFamily": {
+                      "title-md": ["Manrope"],
+                      "display-hero": ["Manrope"],
+                      "label-caps": ["Manrope"],
+                      "headline-lg-mobile": ["Manrope"],
+                      "body-lg": ["Manrope"],
+                      "metric-large": ["Manrope"],
+                      "headline-lg": ["Manrope"],
+                      "body-md": ["Manrope"]
+              },
+              "fontSize": {
+                      "title-md": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                      "display-hero": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "800"}],
+                      "label-caps": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700"}],
+                      "headline-lg-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "700"}],
+                      "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                      "metric-large": ["32px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "300"}],
+                      "headline-lg": ["40px", {"lineHeight": "48px", "letterSpacing": "-0.01em", "fontWeight": "800"}],
+                      "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}]
+              }
+            },
+          },
+        }
+      </script>
+</head>
+<body class="bg-background text-on-background min-h-screen flex flex-col items-center">
+<div class="bg-hero" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDgZMe-lXIwIwD6HIFppfhuwRFkREwhRP_RFDMIvK4ut8ONt6yl3d-uTtFB9NLD7R93gWJu4Ph_jFREnG0FhOgQ1XIMLFh-0a1K7fe2Ay3HGydQ72SHMxDs3yF_gY165TDEd39q7Z4wEQ-PWvwnHTmtuy2Lny0E0yCiVCriJgmjZ_-grRwV-PGsbXcS6nNQ6Ssw4-EbHHQn4yAKMHhZixSkzN69MFlUBkXuiOCzg0VAOQLyLslwSj-duyUs5wfn9gv3zQx3bAPm62im');"></div>
+<div class="bg-overlay" style="background: linear-gradient(rgba(19, 19, 19, 0.5), rgba(19, 19, 19, 0.9)); backdrop-filter: blur(4px);"></div>
+<main class="w-full max-w-max-width px-gutter py-section-margin flex flex-col items-center animate-fade-in relative z-10">
+<!-- Header Section -->
+<header class="text-center mb-stack-gap max-w-2xl">
+<h1 class="font-display-hero text-headline-lg-mobile md:text-headline-lg text-white drop-shadow-xl tracking-tight mb-4">Bring your training with you.</h1>
+<p class="font-body-lg text-secondary-fixed-dim drop-shadow-md">
+            Connect your devices to automatically sync your workouts. Your history becomes your foundation here.
+        </p>
+</header>
+<!-- Bento Grid of Services -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-stack-gap w-full mt-section-margin max-w-2xl mx-auto">
+<!-- Strava Card -->
+<button class="glass-card rounded-xl p-6 flex flex-col items-center justify-center group h-48 overflow-hidden relative border-2 border-outline-variant/50 bg-surface-container-highest/40 text-center w-full" style="transform: translateY(20px); transition: 0.6s cubic-bezier(0.22, 1, 0.36, 1); opacity: 0;" data-stitch-orig-opacity="1"><div class="absolute -right-12 -top-12 w-48 h-48 bg-primary-container/20 rounded-full blur-3xl group-hover:bg-primary-container/30 transition-all"></div><div class="relative z-10 flex flex-col items-center justify-center gap-2"><span class="material-symbols-outlined text-primary" style="color: rgb(217, 119, 87); font-size: 48px;">sprint</span><h2 class="text-text-primary tracking-tight text-white text-headline-lg-mobile">Strava</h2><span class="text-label-caps font-label-caps uppercase tracking-widest text-primary opacity-0 group-hover:opacity-100 transition-opacity absolute -bottom-6">Connect</span></div></button>
+<!-- Apple Health Card -->
+<button class="glass-card rounded-xl p-6 flex flex-col items-center justify-center group h-48 overflow-hidden relative border-2 border-outline-variant/50 bg-surface-container-highest/40 text-center w-full" style="transform: translateY(20px); transition: 0.6s cubic-bezier(0.22, 1, 0.36, 1); opacity: 0;" data-stitch-orig-opacity="1"><div class="absolute -right-12 -top-12 w-48 h-48 bg-status-inspired/10 rounded-full blur-3xl group-hover:bg-status-inspired/20 transition-all"></div><div class="relative z-10 flex flex-col items-center justify-center gap-2"><span class="material-symbols-outlined text-status-inspired" style="color: rgb(217, 119, 87); font-variation-settings: 'FILL' 1; font-size: 48px;">favorite</span><h2 class="text-text-primary tracking-tight text-white text-headline-lg-mobile">Apple Health</h2><span class="text-label-caps font-label-caps uppercase tracking-widest text-status-inspired opacity-0 group-hover:opacity-100 transition-opacity absolute -bottom-6">Connect</span></div></button>
+<!-- Garmin Card -->
+<button class="glass-card rounded-xl p-6 flex flex-col items-center justify-center group h-48 overflow-hidden relative border-2 border-outline-variant/50 bg-surface-container-highest/40 text-center w-full" style="transform: translateY(20px); transition: 0.6s cubic-bezier(0.22, 1, 0.36, 1); opacity: 0;" data-stitch-orig-opacity="1"><div class="absolute -right-12 -top-12 w-48 h-48 bg-primary/20 rounded-full blur-3xl group-hover:bg-primary/30 transition-all"></div><div class="relative z-10 flex flex-col items-center justify-center gap-2"><span class="material-symbols-outlined text-primary" style="color: rgb(217, 119, 87); font-size: 48px;">watch</span><h2 class="text-text-primary tracking-tight text-white text-headline-lg-mobile">Garmin</h2><span class="text-label-caps font-label-caps uppercase tracking-widest text-primary opacity-0 group-hover:opacity-100 transition-opacity absolute -bottom-6">Connect</span></div></button>
+<!-- COROS Card -->
+<button class="glass-card rounded-xl p-6 flex flex-col items-center justify-center group h-48 overflow-hidden relative border-2 border-outline-variant/50 bg-surface-container-highest/40 text-center w-full" style="transform: translateY(20px); transition: 0.6s cubic-bezier(0.22, 1, 0.36, 1); opacity: 0;" data-stitch-orig-opacity="1"><div class="absolute -right-12 -top-12 w-48 h-48 bg-secondary/20 rounded-full blur-3xl group-hover:bg-secondary/30 transition-all"></div><div class="relative z-10 flex flex-col items-center justify-center gap-2"><span class="material-symbols-outlined text-secondary" style="color: rgb(217, 119, 87); font-size: 48px;">altitude</span><h2 class="text-text-primary tracking-tight text-white text-headline-lg-mobile">COROS</h2><span class="text-label-caps font-label-caps uppercase tracking-widest text-secondary opacity-0 group-hover:opacity-100 transition-opacity absolute -bottom-6">Connect</span></div></button>
+</div>
+<!-- Primary Action -->
+<div class="w-full max-w-sm mt-section-margin mb-8 text-center">
+<button class="w-full py-5 bg-primary-container text-on-primary-container font-label-caps text-title-md rounded-xl glow-accent hover:scale-[1.02] active:scale-95 transition-all shadow-2xl relative overflow-hidden group">
+<span class="relative z-10">Sync Services</span>
+<div class="absolute inset-0 bg-white/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
+</button>
+<button class="mt-4 w-full py-2 text-secondary-fixed-dim font-label-caps text-label-caps uppercase tracking-widest hover:text-primary transition-colors drop-shadow-md">
+            Skip for now
+        </button>
+<p class="mt-6 font-body-md text-secondary-fixed-dim flex items-center justify-center gap-2 drop-shadow-md">
+<span class="material-symbols-outlined text-sm" data-icon="lock" style="font-variation-settings: 'FILL' 1;"></span>
+            Your data is encrypted. People before data.
+        </p>
+</div>
+</main>
+<footer class="w-full py-gutter px-gutter flex flex-col md:flex-row justify-center items-center gap-8 border-t border-outline-variant/30 mt-auto bg-black/40 backdrop-blur-sm z-10">
+</footer>
+<script>
+    // Micro-interaction for smooth card reveals
+    document.addEventListener('DOMContentLoaded', () => {
+        const cards = document.querySelectorAll('.glass-card');
+        cards.forEach((card, index) => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(20px)';
+            setTimeout(() => {
+                card.style.transition = 'all 0.6s cubic-bezier(0.22, 1, 0.36, 1)';
+                card.style.opacity = '1';
+                card.style.transform = 'translateY(0)';
+            }, 100 * index);
+        });
+    });
+</script>
+
+
+
+
+
+
+
+
+<div id="snapdom-sandbox" data-snapdom-sandbox="true" aria-hidden="true" style="position: absolute; left: -9999px; top: -9999px; width: 0px; height: 0px; overflow: hidden;"></div></body></html>
