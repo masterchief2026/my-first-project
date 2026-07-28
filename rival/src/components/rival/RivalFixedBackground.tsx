@@ -43,5 +43,10 @@ export function RivalFixedBackground({
 }
 
 const styles = StyleSheet.create({
-  bgFixed: { position: 'fixed' as any, top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%' },
+  // top/right/bottom/left: 0 alone is sufficient (and correct) to pin this to the
+  // true viewport edges, including the safe-area strips in standalone/PWA mode. Do
+  // NOT also set width/height: '100%' — on iOS Safari that resolves against the
+  // shorter "layout viewport" rather than the real screen, which used to leave a
+  // gap at the bottom edge that the inset-only edges don't have.
+  bgFixed: { position: 'fixed' as any, top: 0, left: 0, right: 0, bottom: 0 },
 });
