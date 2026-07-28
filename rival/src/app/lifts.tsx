@@ -401,7 +401,7 @@ const styles = StyleSheet.create({
   // Bias the crop toward the lifter (right of frame) so she stays centred at
   // any width — objectPosition is resolution-independent, so this holds on a
   // half-width window too.
-  scrim: { position: 'fixed' as any, top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(14,14,14,0.5)' },
+  scrim: { position: 'fixed' as any, top: 0, left: 0, right: 0, height: '100vh' as any, backgroundColor: 'rgba(14,14,14,0.5)' },
   content: { flexGrow: 1, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 32, maxWidth: 1100, width: '100%', alignSelf: 'center' },
   heroWrap: { flex: 1, justifyContent: 'center', width: '100%' },
 

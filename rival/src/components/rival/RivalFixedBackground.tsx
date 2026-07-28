@@ -39,14 +39,20 @@ export function RivalFixedBackground({
       </View>
     );
   }
-  return <ImageBackground source={source} style={styles.bgFixed} resizeMode="cover" />;
+  return <ImageBackground source={source} style={styles.bgNative} resizeMode="cover" />;
 }
 
 const styles = StyleSheet.create({
-  // top/right/bottom/left: 0 alone is sufficient (and correct) to pin this to the
-  // true viewport edges, including the safe-area strips in standalone/PWA mode. Do
-  // NOT also set width/height: '100%' — on iOS Safari that resolves against the
-  // shorter "layout viewport" rather than the real screen, which used to leave a
-  // gap at the bottom edge that the inset-only edges don't have.
-  bgFixed: { position: 'fixed' as any, top: 0, left: 0, right: 0, bottom: 0 },
+  // iOS Safari has TWO viewport heights: the "small" one (the strip between the
+  // status bar and the bottom toolbar) and the "large" one (the whole screen, as if
+  // the toolbars weren't there). Expo's own reset sets `html,body,#root{height:100%}`,
+  // and a percentage/inset-based height resolves against the SMALL viewport — so a
+  // full-bleed photo stops dead at the toolbars and reads as a hard grey box top and
+  // bottom. `100vh` is the LARGE viewport: the usual "100vh is too tall on iOS"
+  // complaint is exactly the behaviour wanted here, letting the photo run edge to
+  // edge *behind* Safari's translucent chrome the way other sites do.
+  // `bottom` is deliberately omitted — height governs instead.
+  bgFixed: { position: 'fixed' as any, top: 0, left: 0, right: 0, width: '100%', height: '100vh' as any },
+  // Native has no browser chrome and no vh units — plain full-bleed insets.
+  bgNative: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
 });

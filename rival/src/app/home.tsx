@@ -1094,7 +1094,7 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   bg: { flex: 1 },
   bgFixed: { position: 'fixed' as any, top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%' },
-  scrim: { position: 'fixed' as any, top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(14,14,14,0.55)' },
+  scrim: { position: 'fixed' as any, top: 0, left: 0, right: 0, height: '100vh' as any, backgroundColor: 'rgba(14,14,14,0.55)' },
   container: { flex: 1 },
   // Max-width + auto margins keep desktop content centered with the photo
   // breathing on both sides, like the mockup (Yoga supports 'auto' margins).

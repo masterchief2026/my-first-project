@@ -15,44 +15,6 @@ export default function WelcomeScreen() {
     });
   }, []);
 
-  // react-native-web locks the real <body> to overflow:hidden (it manages scrolling
-  // itself, per-screen, via internal ScrollViews) — but that also stops iOS Safari
-  // from ever seeing this outermost document as scrollable, so it keeps its fully
-  // opaque toolbar permanently instead of the translucent/collapsed chrome it uses
-  // on genuinely scrollable pages. This is the very first screen anyone sees, so:
-  // temporarily let the real document scroll a hair and nudge it, then restore
-  // react-native-web's normal behavior on the way out so every other screen's own
-  // ScrollView-based scrolling is unaffected.
-  useEffect(() => {
-    if (Platform.OS !== 'web') return;
-    const html = document.documentElement;
-    const { body } = document;
-    const prev = {
-      htmlOverflow: html.style.overflow,
-      bodyOverflow: body.style.overflow,
-      bodyMinHeight: body.style.minHeight,
-      htmlOverscroll: (html.style as any).overscrollBehaviorY,
-      bodyOverscroll: (body.style as any).overscrollBehaviorY,
-    };
-    html.style.overflow = 'auto';
-    body.style.overflow = 'auto';
-    body.style.minHeight = 'calc(100% + 1px)';
-    // Without this, pulling down triggers the native rubber-band bounce, which
-    // yanks the whole (fixed-position) page down and exposes empty space above the
-    // background photo — worse than the bar we're trying to fix. We only need the
-    // page to register as "scrollable" for Safari's chrome-collapse heuristic, not
-    // to actually let anyone scroll or bounce it.
-    (html.style as any).overscrollBehaviorY = 'none';
-    (body.style as any).overscrollBehaviorY = 'none';
-    window.scrollTo(0, 1);
-    return () => {
-      html.style.overflow = prev.htmlOverflow;
-      body.style.overflow = prev.bodyOverflow;
-      body.style.minHeight = prev.bodyMinHeight;
-      (html.style as any).overscrollBehaviorY = prev.htmlOverscroll;
-      (body.style as any).overscrollBehaviorY = prev.bodyOverscroll;
-    };
-  }, []);
 
   return (
     <View style={styles.root}>
@@ -89,7 +51,8 @@ const styles = StyleSheet.create({
   },
   scrim: {
     position: 'fixed' as any,
-    top: 0, left: 0, right: 0, bottom: 0,
+    // 100vh (large viewport) to match RivalFixedBackground — see the note there.
+    top: 0, left: 0, right: 0, height: '100vh' as any,
     backgroundColor: 'rgba(14,14,14,0.4)',
   },
   container: {

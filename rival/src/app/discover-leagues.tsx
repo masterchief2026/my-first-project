@@ -556,7 +556,7 @@ function TeamGridCard({
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: RivalColors.surfaceLow },
-  scrim: { position: 'fixed' as any, top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(14,14,14,0.55)' },
+  scrim: { position: 'fixed' as any, top: 0, left: 0, right: 0, height: '100vh' as any, backgroundColor: 'rgba(14,14,14,0.55)' },
   container: { flex: 1, backgroundColor: 'transparent' },
   content: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 60, maxWidth: 1200, width: '100%', alignSelf: 'center' },
 
