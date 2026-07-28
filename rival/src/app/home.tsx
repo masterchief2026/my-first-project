@@ -6,9 +6,9 @@ import { supabase } from '../lib/supabase';
 import { fetchAllActivities } from '../lib/fetchAllActivities';
 import { notify } from '../lib/notify';
 import { getDailyQuote, QuoteTone } from '../lib/quotes';
-import { getMondayOfWeek } from '../lib/streak';
+import { getMondayOfWeek, calculateStreak } from '../lib/streak';
+import { getCurrentSeasonYear, daysUntilSeasonEnd, getSeasonStartISO } from '../lib/season';
 import { getLevel } from '../lib/xp';
-import { getSeasonStartISO, getCurrentSeasonYear, daysUntilSeasonEnd } from '../lib/season';
 import { computeGoalProgress, goalUnit, GoalRow } from '../lib/goalProgress';
 import { RivalButton, RivalCard, RivalProgressBar, RivalIcon, RivalTopNav } from '../components/rival';
 import { RivalColors, RivalRadius, RivalType } from '../constants/rivalTheme';
@@ -182,13 +182,9 @@ function greetingLetterSpacing(name: string): number {
 export default function HomeScreen() {
   const [displayName, setDisplayName] = useState('');
   const [stravaConnected, setStravaConnected] = useState(false);
-  const [stravaAthleteName, setStravaAthleteName] = useState<string | null>(null);
-  const [syncing, setSyncing] = useState(false);
   const [leagues, setLeagues] = useState<League[]>([]);
   const [weeklyLeader, setWeeklyLeader] = useState<WeeklyLeader | null>(null);
   const [momentumTrainers, setMomentumTrainers] = useState<MomentumTrainers | null>(null);
-  const [totalXp, setTotalXp] = useState(0);
-  const [seasonActivityCount, setSeasonActivityCount] = useState(0);
   const [nextRace, setNextRace] = useState<NextRace>(null);
   const [totalDistanceKm, setTotalDistanceKm] = useState(0);
   const [totalElevationM, setTotalElevationM] = useState(0);
@@ -198,16 +194,16 @@ export default function HomeScreen() {
   // same timeframe without changing what powers the user's rank.
   const [lifetimeXp, setLifetimeXp] = useState(0);
   const [lifetimeActivityCount, setLifetimeActivityCount] = useState(0);
+  const [weeklyStreak, setWeeklyStreak] = useState(0);
+  const [rankName, setRankName] = useState<string | null>(null);
   const [featuredGoal, setFeaturedGoal] = useState<FeaturedGoal | null>(null);
   const [goalsCardHovered, setGoalsCardHovered] = useState(false);
   const [leaderCardHovered, setLeaderCardHovered] = useState(false);
   const [momentumCardHovered, setMomentumCardHovered] = useState(false);
   const [statsCardHovered, setStatsCardHovered] = useState(false);
   const [addActivityHovered, setAddActivityHovered] = useState(false);
-  const [inspiredTimes, setInspiredTimes] = useState(0);
   const [quote, setQuote] = useState(() => getDailyQuote());
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [lastActivity, setLastActivity] = useState<{ id: string; activity_type: string } | null>(null);
 
   useFocusEffect(useCallback(() => {
     loadAll();
@@ -224,20 +220,16 @@ export default function HomeScreen() {
     const today = todayLocalStr();
 
     // Phase 1: own data + strava status
-    const [stravaRes, activitiesRes, leaguesRes, raceRes, userProfileRes, goalsRes, raceIdsRes] = await Promise.all([
-      supabase.from('fitness_connections').select('athlete_firstname, athlete_lastname').eq('user_id', uId).eq('provider', 'strava').maybeSingle(),
+    const [stravaRes, activitiesRes, leaguesRes, raceRes, userProfileRes, goalsRes] = await Promise.all([
+      supabase.from('fitness_connections').select('user_id').eq('user_id', uId).eq('provider', 'strava').maybeSingle(),
       fetchAllActivities(uId, 'id, started_at, effort_score, distance_meters, elevation_meters, activity_type, duration_seconds'),
       supabase.from('league_members').select('league_id, leagues(id, name, invite_code, logo_url)').eq('user_id', uId).eq('status', 'active'),
       supabase.from('races').select('name, race_date').eq('user_id', uId).gte('race_date', today).order('race_date', { ascending: true }).limit(1).maybeSingle(),
       supabase.from('users').select('avatar_url, quote_tone').eq('id', uId).single(),
       supabase.from('goals').select('*').eq('user_id', uId),
-      supabase.from('races').select('id').eq('user_id', uId),
     ]);
 
     setStravaConnected(!!stravaRes.data);
-    setStravaAthleteName(
-      stravaRes.data ? [stravaRes.data.athlete_firstname, stravaRes.data.athlete_lastname].filter(Boolean).join(' ') || null : null
-    );
     setNextRace(raceRes.data ?? null);
     const myAvatarUrl: string | null = userProfileRes.data?.avatar_url || null;
     setAvatarUrl(myAvatarUrl);
@@ -249,18 +241,17 @@ export default function HomeScreen() {
     const leagueIds = leaguesRes.data?.map((m: any) => m.league_id) ?? [];
 
     const activities = activitiesRes;
-    const mostRecent = [...activities].sort((a, b) => (b.started_at || '').localeCompare(a.started_at || ''))[0];
-    setLastActivity(mostRecent ? { id: (mostRecent as any).id, activity_type: mostRecent.activity_type } : null);
     setTotalDistanceKm(Math.round(activities.reduce((s, a) => s + (a.distance_meters || 0), 0) / 1000));
     setTotalElevationM(Math.round(activities.reduce((s, a) => s + (a.elevation_meters || 0), 0)));
     setTotalTimeMinutes(Math.round(activities.reduce((s, a) => s + (a.duration_seconds || 0), 0) / 60));
     setLifetimeXp(activities.reduce((s, a) => s + (a.effort_score || 0), 0));
     setLifetimeActivityCount(activities.length);
+    setWeeklyStreak(calculateStreak(activities).current);
 
+    // Rank = level from this season's Effort — same definition the nav bar uses.
     const seasonStart = new Date(getSeasonStartISO());
-    const seasonActivities = activities.filter(a => new Date(a.started_at) >= seasonStart);
-    setTotalXp(seasonActivities.reduce((s, a) => s + (a.effort_score || 0), 0));
-    setSeasonActivityCount(seasonActivities.length);
+    const seasonEffort = activities.filter(a => new Date(a.started_at) >= seasonStart).reduce((s, a) => s + (a.effort_score || 0), 0);
+    setRankName(getLevel(seasonEffort).name);
 
     // Featured goal: the ACTIVE goal nearest its deadline (tie-break: most
     // complete). One goal on the dashboard, deliberately — Ricky's call:
@@ -300,23 +291,6 @@ export default function HomeScreen() {
       // endedMessage), not here. Today's card just invites setting a new
       // one either way.
       setFeaturedGoal(null);
-    }
-
-    // Impact (times people showed up for your effort) — same definition as the
-    // Profile Impact card: 'inspired' reactions on your activities and races,
-    // excluding your own.
-    const myActivityIds = activities.map((a: any) => a.id);
-    const myRaceIds = (raceIdsRes.data ?? []).map((r: any) => r.id);
-    const reactionQueries: PromiseLike<{ data: { user_id: string }[] | null }>[] = [];
-    if (myActivityIds.length > 0) reactionQueries.push(supabase.from('feed_reactions').select('user_id').eq('target_type', 'activity').eq('emoji', 'inspired').in('target_id', myActivityIds));
-    if (myRaceIds.length > 0) reactionQueries.push(supabase.from('feed_reactions').select('user_id').eq('target_type', 'race').eq('emoji', 'inspired').in('target_id', myRaceIds));
-    if (reactionQueries.length > 0) {
-      const reactionResults = await Promise.all(reactionQueries);
-      let times = 0;
-      reactionResults.forEach(r => (r.data || []).forEach(row => { if (row.user_id !== uId) times += 1; }));
-      setInspiredTimes(times);
-    } else {
-      setInspiredTimes(0);
     }
 
     // Per-league "new activity" teaser count — powers the Team Pulse card.
@@ -449,41 +423,6 @@ export default function HomeScreen() {
     }
   }
 
-  async function runBackfill() {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
-    setSyncing(true);
-    try {
-      const response = await fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/strava-backfill`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-          'apikey': process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!,
-        },
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        notify('Sync failed', data.error || 'Could not sync with Strava. Try reconnecting Strava.');
-      } else if (data.saved === 0) {
-        notify('Nothing new', 'No new Strava activities found.');
-      }
-    } catch {
-      notify('Sync failed', 'Could not reach the server. Check your connection and try again.');
-    } finally {
-      setSyncing(false);
-      loadAll();
-      // Fire-and-forget milestone check after every sync
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        if (!session) return;
-        fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/check-milestones`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}`, 'apikey': process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY! },
-        }).catch(() => {});
-      });
-    }
-  }
-
   async function connectStrava() {
     const clientId = process.env.EXPO_PUBLIC_STRAVA_CLIENT_ID;
     const redirectUri = typeof window !== 'undefined'
@@ -501,7 +440,6 @@ export default function HomeScreen() {
     }
   }
 
-  const level = getLevel(totalXp);
   // The mockup's 4-card row must stay 4-across on desktop — explicit quarter
   // widths above the breakpoint, natural wrapping (2-up/stacked) below it.
   const { width: windowWidth } = useWindowDimensions();
@@ -964,12 +902,12 @@ export default function HomeScreen() {
                   </View>
                   <View style={{ flex: 1 }} />
                   <View style={styles.goalsEmptyCentered}>
-                    <Text style={styles.goalsEmptyTitle}>You're not in any teams yet.</Text>
+                    <Text style={styles.goalsEmptyTitle}>Training is better together.</Text>
                   </View>
                   <View style={{ flex: 1 }} />
                   <View style={[styles.focusEmptyLinkRow, styles.focusEmptyLinkBottom]}>
                     <TouchableOpacity onPress={() => router.push('/create-league')}>
-                      <Text style={styles.focusEmptyLink}>Create a Team</Text>
+                      <Text style={styles.focusEmptyLink}>Create Your Team</Text>
                     </TouchableOpacity>
                     <Text style={styles.focusEmptyLink}> →</Text>
                   </View>
@@ -1054,7 +992,7 @@ export default function HomeScreen() {
                     <Text style={[styles.focusLabel, { textAlign: 'center' }]}>LEGACY</Text>
                     <Text style={[styles.focusGoalTitle, styles.focusActiveTitleGap, { textAlign: 'center' }]}>Everything you've Earned</Text>
                   </TouchableOpacity>
-                  <View style={{ flex: 1, justifyContent: 'center', gap: 10, marginTop: 8 }}>
+                  <View style={{ flex: 1, justifyContent: 'center', gap: 10, marginTop: 11 }}>
                     <TouchableOpacity style={styles.snapshotRow} onPress={() => router.push('/stats')}>
                       <View style={{ alignItems: 'center' }}>
                         <Text style={[styles.snapshotHeroValue, styles.snapshotHeroValueLead]}>{Math.round(lifetimeXp).toLocaleString()}</Text>
@@ -1094,61 +1032,50 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          {/* Season Wrap strip */}
+          {/* Momentum strip */}
           <RivalCard glass style={styles.seasonWrap}>
-            <View style={styles.seasonWrapHeader}>
-              <View>
-                <Text style={styles.seasonWrapTitle}>SEASON WRAP</Text>
-                <Text style={styles.seasonWrapSub}>Your momentum at a glance</Text>
-              </View>
-              <TouchableOpacity onPress={() => router.push('/my-activities')}>
-                <Text style={styles.seasonWrapLink}>TRAINING HISTORY →</Text>
-              </TouchableOpacity>
-            </View>
             <View style={styles.seasonWrapRow}>
-              <View>
+              <View style={{ alignItems: 'center' }}>
                 <Text style={styles.gridCardLabel}>NEXT RACE</Text>
-                <Text style={styles.seasonWrapValue}>{days !== null ? `${days} Days` : '—'}</Text>
+                {days !== null ? (
+                  <TouchableOpacity onPress={() => router.push('/races')}>
+                    <Text style={styles.seasonWrapValue}>{days} Days</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity style={styles.addRaceBtn} onPress={() => router.push('/races?add=true')}>
+                    <RivalIcon name="add" size={13} color={RivalColors.accentText} />
+                    <Text style={styles.addRaceBtnText}>Add Race</Text>
+                  </TouchableOpacity>
+                )}
               </View>
-              <View><Text style={styles.gridCardLabel}>ACTIVITIES</Text><Text style={styles.seasonWrapValue}>{seasonActivityCount}</Text></View>
-              <View>
-                <Text style={styles.gridCardLabel}>IMPACT</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <RivalIcon name="ai" size={16} color={RivalColors.textPrimary} />
-                  <Text style={styles.seasonWrapValue}>{inspiredTimes.toLocaleString()}</Text>
-                </View>
-              </View>
-              <View>
-                <Text style={styles.gridCardLabel}>RIVAL RANK</Text>
-                <Text
-                  style={[
-                    styles.seasonWrapRank,
-                    { color: '#D8A81D', textShadowColor: 'rgba(216,168,29,0.53)' },
-                    // Same gradient recipe as the hero number / nav rank —
-                    // web-only, flat gold above is the native fallback.
-                    ...(Platform.OS === 'web' ? [{
-                      backgroundImage: 'linear-gradient(180deg, #FFE48A, #D8A81D)',
-                      backgroundClip: 'text',
-                      WebkitBackgroundClip: 'text',
-                      color: 'transparent',
-                    } as any] : []),
-                  ]}
-                >
-                  {level.name.toUpperCase()}
-                </Text>
-              </View>
+              {rankName && (
+                <TouchableOpacity onPress={() => router.push('/ranks')} style={{ alignItems: 'center' }}>
+                  <Text style={styles.gridCardLabel}>RIVAL RANK</Text>
+                  <Text
+                    style={[
+                      styles.seasonWrapValue,
+                      { color: '#D8A81D', fontStyle: 'italic', letterSpacing: 1.5, fontSize: 26, lineHeight: 24 },
+                      ...(Platform.OS === 'web' ? [{
+                        backgroundImage: 'linear-gradient(180deg, #FFE48A, #D8A81D)',
+                        backgroundClip: 'text',
+                        WebkitBackgroundClip: 'text',
+                        color: 'transparent',
+                      } as any] : []),
+                    ]}
+                  >
+                    {rankName.toUpperCase()}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              <View style={{ alignItems: 'center' }}><Text style={styles.gridCardLabel}>WEEKLY STREAK</Text><Text style={styles.seasonWrapValue}>{weeklyStreak}</Text></View>
             </View>
-            <TouchableOpacity
-              style={styles.aiShareBox}
-              onPress={() => lastActivity ? router.push(`/ai-share?activityId=${lastActivity.id}`) : router.push('/my-activities')}
-            >
-              <View style={styles.snapshotDiscSm}><RivalIcon name="ai" size={12} color={RivalColors.textPrimary} /></View>
-              <View><Text style={styles.gridCardLabel}>AI SHARE</Text><Text style={styles.snapshotValue}>Generate Story</Text></View>
-            </TouchableOpacity>
           </RivalCard>
 
-          {/* Strava connection — not in the Stitch mockup but a real, needed feature */}
-          {!stravaConnected ? (
+          {/* Strava connection prompt — only shown pre-connection. Once
+              connected, status/sync/disconnect live on the profile page
+              (Connected Apps panel) instead of taking up home real estate
+              on every visit. */}
+          {!stravaConnected && (
             <TouchableOpacity style={styles.stravaCard} onPress={connectStrava}>
               <View>
                 <Text style={styles.stravaCardTitle}>Connect Strava</Text>
@@ -1156,35 +1083,7 @@ export default function HomeScreen() {
               </View>
               <Text style={styles.stravaCardArrow}>→</Text>
             </TouchableOpacity>
-          ) : (
-            <TouchableOpacity style={styles.stravaConnectedRow} onPress={runBackfill} disabled={syncing}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                <RivalIcon name="check" size={13} color={RivalColors.tertiary} />
-                <Text style={styles.syncConnected}>
-                  {stravaAthleteName ? `Connected to ${stravaAthleteName}'s Strava` : 'Strava connected'}
-                </Text>
-              </View>
-              <Text style={[styles.syncBtn, syncing && { opacity: 0.4 }]}>
-                {syncing ? 'Syncing…' : 'Sync'}
-              </Text>
-            </TouchableOpacity>
           )}
-
-          {/* Secondary quick links — features the mockup nav doesn't cover */}
-          <View style={styles.quickLinks}>
-            <TouchableOpacity style={styles.quickLink} onPress={() => router.push('/plan')}>
-              <Text style={styles.quickLinkText}>Plan</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.quickLink} onPress={() => router.push('/races')}>
-              <Text style={styles.quickLinkText}>Races</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.quickLink} onPress={() => router.push('/friends')}>
-              <Text style={styles.quickLinkText}>Friends</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.quickLink} onPress={() => router.push('/achievements')}>
-              <Text style={styles.quickLinkText}>Badges</Text>
-            </TouchableOpacity>
-          </View>
 
         </ScrollView>
       </SafeAreaView>
@@ -1261,7 +1160,7 @@ const styles = StyleSheet.create({
   // lighter weight, muted color — so "186h 10m" reads as two number+unit
   // pairs instead of the "h"/"m" fusing into the digits around them.
   heroValueUnit: { fontWeight: '600', color: RivalColors.textPrimary },
-  heroSub: { ...RivalType.bodyMd, fontSize: 18, letterSpacing: 3.42, textTransform: 'uppercase', color: RivalColors.textPrimary, textAlign: 'center' },
+  heroSub: { ...RivalType.bodyMd, fontSize: 18, letterSpacing: 3, textTransform: 'uppercase', color: RivalColors.textPrimary, textAlign: 'center' },
 
   seasonBanner: { backgroundColor: 'rgba(20,20,20,0.55)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', borderRadius: RivalRadius.DEFAULT, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12 },
   bannerIcon: { fontSize: 22 },
@@ -1346,33 +1245,20 @@ const styles = StyleSheet.create({
   momentumAvatarText: { fontSize: 14, color: RivalColors.textPrimary, fontWeight: '700' },
 
   snapshotRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
-  snapshotDiscSm: { width: 26, height: 26, borderRadius: 13, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center' },
   snapshotHeroValue: { fontSize: 17, fontWeight: '700', color: RivalColors.textPrimary },
   snapshotDivider: { height: 1, width: '70%', alignSelf: 'center', backgroundColor: 'rgba(255,255,255,0.1)', marginVertical: -3 },
   snapshotHoverOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
   snapshotHeroValueLead: { fontSize: 25, color: RivalColors.accentText },
-  snapshotIcon: { fontSize: 15 },
-  snapshotValue: { fontSize: 16, fontWeight: '700', color: RivalColors.textPrimary },
-  aiShareBox: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 10, padding: 10, marginTop: 'auto' },
 
-  seasonWrap: { gap: 14 },
-  seasonWrapHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  seasonWrapTitle: { ...RivalType.labelCaps, color: RivalColors.accentText },
-  seasonWrapSub: { fontSize: 13, color: RivalColors.textSecondary, marginTop: 2 },
-  seasonWrapLink: { ...RivalType.labelCaps, fontSize: 11, color: RivalColors.textSecondary },
+  seasonWrap: { gap: 14, width: '50%', alignSelf: 'center' },
   seasonWrapRow: { flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 },
   seasonWrapValue: { fontSize: 20, fontWeight: '600', color: RivalColors.textPrimary, marginTop: 4 },
-  seasonWrapRank: { fontSize: 20, fontWeight: '800', fontStyle: 'italic', marginTop: 4, textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 12 },
+  addRaceBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4, paddingVertical: 4, paddingHorizontal: 10, borderRadius: RivalRadius.full, backgroundColor: 'rgba(255,181,158,0.12)', borderWidth: 1, borderColor: 'rgba(255,181,158,0.3)' },
+  addRaceBtnText: { fontSize: 13, fontWeight: '700', color: RivalColors.accentText },
 
   stravaCard: { backgroundColor: 'rgba(20,20,20,0.55)', borderRadius: RivalRadius.DEFAULT, padding: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderColor: RivalColors.outlineVariant },
   stravaCardTitle: { fontSize: 15, fontWeight: '700', color: RivalColors.textPrimary },
   stravaCardSub: { fontSize: 12, color: RivalColors.textSecondary, marginTop: 2 },
   stravaCardArrow: { fontSize: 20, color: RivalColors.accentText },
-  stravaConnectedRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'rgba(20,20,20,0.55)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', borderRadius: RivalRadius.DEFAULT, paddingHorizontal: 14, paddingVertical: 12 },
-  syncConnected: { color: RivalColors.tertiary, fontSize: 13, fontWeight: '600' },
-  syncBtn: { color: RivalColors.tertiary, fontSize: 13, fontWeight: '700' },
 
-  quickLinks: { flexDirection: 'row', gap: 10 },
-  quickLink: { flex: 1, backgroundColor: 'rgba(20,20,20,0.55)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', borderRadius: RivalRadius.DEFAULT, paddingVertical: 12, alignItems: 'center' },
-  quickLinkText: { color: RivalColors.textSecondary, fontSize: 13, fontWeight: '600' },
 });

@@ -1260,7 +1260,7 @@ const styles = StyleSheet.create({
   searchBarInput: { flex: 1 },
   // Icon + label, not icon-only — an icon-only square next to the input was
   // too easy to miss and skip straight to typing the website in by hand.
-  searchBarBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 40, paddingHorizontal: 14, backgroundColor: RivalColors.accentFill, borderRadius: RivalRadius.DEFAULT, ...(Platform.OS === 'web' ? { boxShadow: '0 4px 14px rgba(217,119,87,0.35)' } as any : {}) },
+  searchBarBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 40, paddingHorizontal: 14, backgroundColor: RivalColors.accentFill, borderRadius: RivalRadius.DEFAULT },
   searchBarBtnText: { fontSize: 13, fontWeight: '700', color: RivalColors.onAccentFill },
   openLinkBtn: { height: 40, width: 40, alignItems: 'center', justifyContent: 'center', borderRadius: RivalRadius.DEFAULT, borderWidth: 1, borderColor: 'rgba(217,119,87,0.4)' },
   panelLabel: { ...RivalType.labelCaps, fontSize: 11, color: RivalColors.onSurfaceVariant, opacity: 0.8 },
@@ -1331,12 +1331,8 @@ const styles = StyleSheet.create({
     ...(Platform.OS === 'web' ? { backdropFilter: 'blur(16px)' } as any : {}),
   },
   previewCountdownGlassBelowName: { marginTop: 14 },
-  // Glow via textShadow (same recipe as home.tsx's rank number) rather than
-  // a boxShadow, since it needs to hug the glyphs themselves, not a
-  // rectangular box.
   previewCountdownNum: {
     ...RivalType.metricLarge, fontSize: 72, lineHeight: 74, fontWeight: '800', color: RivalColors.accentText,
-    textShadowColor: 'rgba(217,119,87,0.85)', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 20,
   },
   previewCountdownLabel: { ...RivalType.labelCaps, fontSize: 12, color: RivalColors.textSecondary, lineHeight: 15 },
   // Dropped the progress-bar treatment stitch-export-22/23 used here — with

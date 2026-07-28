@@ -339,7 +339,7 @@ export default function ManualEntryScreen() {
   );
 
   // ---- Right column: metrics + comments + media ---------------------------
-  const metric = (label: string, unit: string, value: string, onChange: (v: string) => void, placeholder: string) => (
+  const metric = (label: string, unit: string, value: string, onChange: (v: string) => void, placeholder: string, keyboardType: 'numeric' | 'decimal-pad' = 'numeric') => (
     <View style={styles.metricBox}>
       <Text style={styles.metricLabel}>{label}</Text>
       <View style={styles.metricInputRow}>
@@ -349,7 +349,7 @@ export default function ManualEntryScreen() {
           onChangeText={onChange}
           placeholder={placeholder}
           placeholderTextColor={RivalColors.textSecondary}
-          keyboardType="numeric"
+          keyboardType={keyboardType}
         />
         <Text style={styles.metricUnit}>{unit}</Text>
       </View>
@@ -361,7 +361,7 @@ export default function ManualEntryScreen() {
       <Text style={styles.panelLabel}>CORE PERFORMANCE METRICS</Text>
       <View style={styles.metricsRow}>
         {metric('DURATION', 'MIN', durationMin, setDurationMin, '0')}
-        {metric('DISTANCE', 'KM', distanceKm, setDistanceKm, '0.00')}
+        {metric('DISTANCE', 'KM', distanceKm, setDistanceKm, '0.00', 'decimal-pad')}
         {metric('ELEVATION', 'M', elevationM, setElevationM, '0')}
       </View>
       {durationSeconds > 0 && (

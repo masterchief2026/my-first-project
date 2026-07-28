@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { StyleSheet, TouchableOpacity, View, Text, ScrollView, TextInput, Modal, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { supabase } from '../lib/supabase';
 import { formatDisplayName } from '../lib/identity';
 import { isoToDisplayDate, displayToIsoDate } from '../lib/dateFormat';
@@ -159,12 +159,13 @@ function TrainingBar({ avgWeeklyKm, distanceKm }: { avgWeeklyKm: number; distanc
 }
 
 export default function RacesScreen() {
+  const { add } = useLocalSearchParams<{ add?: string }>();
   const [races, setRaces] = useState<Race[]>([]);
   const [completedRaces, setCompletedRaces] = useState<Race[]>([]);
   const [leagueMateIds, setLeagueMateIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState('');
-  const [showAdd, setShowAdd] = useState(false);
+  const [showAdd, setShowAdd] = useState(add === 'true');
   const [showFind, setShowFind] = useState(false);
   const [findFilter, setFindFilter] = useState<string | null>(null);
   const [editingRace, setEditingRace] = useState<Race | null>(null);

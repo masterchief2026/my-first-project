@@ -1,4 +1,4 @@
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { StyleProp, TextStyle } from 'react-native';
 import { RivalColors } from '../../constants/rivalTheme';
 
@@ -6,6 +6,10 @@ import { RivalColors } from '../../constants/rivalTheme';
 // Symbols is what the Stitch mockups use, so MaterialIcons is a near-exact
 // match, monochrome, and takes the accent color. Add new icons HERE, once,
 // rather than reaching for an emoji in a screen (see feedback: real icons > emoji).
+// Most entries are a plain MaterialIcons glyph name; a `['mci', name]` tuple
+// pulls from MaterialCommunityIcons instead, for the rare case where that
+// set has a better-proportioned glyph (e.g. notificationsActive, where
+// MaterialIcons' bell has its ring-lines crowded right against the bell body).
 const ICONS = {
   // Navigation / interface
   back: 'arrow-back',
@@ -27,6 +31,7 @@ const ICONS = {
   camera: 'photo-camera',
   upload: 'file-upload',
   notifications: 'notifications',
+  notificationsActive: ['mci', 'bell-ring-outline'] as const,
   settings: 'settings',
   logout: 'logout',
   delete: 'delete-outline',
@@ -99,7 +104,11 @@ export function RivalIcon({
   color?: string;
   style?: StyleProp<TextStyle>;
 }) {
-  return <MaterialIcons name={ICONS[name]} size={size} color={color} style={style} />;
+  const glyph: string | readonly [string, string] = ICONS[name];
+  if (Array.isArray(glyph)) {
+    return <MaterialCommunityIcons name={glyph[1] as any} size={size} color={color} style={style} />;
+  }
+  return <MaterialIcons name={glyph as any} size={size} color={color} style={style} />;
 }
 
 // activity_type (DB value) → RivalIcon name. Mirrors ACTIVITY_ICONS keys.

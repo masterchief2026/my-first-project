@@ -100,6 +100,18 @@ export async function resolveCanonicalActivityId(
   if (match) {
     // Link this source to the existing activity so future syncs from it take the fast path.
     await linkNewActivitySource(supabase, candidate.userId, match.id, candidate.provider, candidate.providerActivityId, candidate.rawPayload)
+
+    // The canonical row is whichever source arrived first, which isn't necessarily the
+    // more complete one (e.g. a Garmin-derived Strava activity with no distance beats a
+    // manually-entered Strava activity that has it, purely by sync timing). Backfill any
+    // field the canonical row is missing rather than silently losing data a later source did have.
+    const backfill: Record<string, unknown> = {}
+    if (!match.distance_meters && candidate.distanceMeters) backfill.distance_meters = candidate.distanceMeters
+    if (!match.duration_seconds && candidate.durationSeconds) backfill.duration_seconds = candidate.durationSeconds
+    if (Object.keys(backfill).length > 0) {
+      await supabase.from('activities').update(backfill).eq('id', match.id)
+    }
+
     return match.id
   }
 

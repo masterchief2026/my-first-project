@@ -152,6 +152,14 @@ function dateToLocalStr(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
+// Matches races.tsx's finish-time parser — typed directly as "1:31:25" (h:mm:ss) or "31:25" (mm:ss).
+function parseTimeToSeconds(t: string): number {
+  const parts = t.trim().split(':').map(Number);
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  return 0;
+}
+
 function todayLocalStr(): string {
   return dateToLocalStr(new Date());
 }
@@ -171,6 +179,31 @@ export default function ScanWorkoutScreen() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [mediaErrorMsg, setMediaErrorMsg] = useState<string | null>(null);
+  // Decoupled from extractedWorkout.distance (a number) so typing "42." doesn't
+  // immediately snap back to "42" — Number("42.") === 42, and a controlled input
+  // whose value is re-derived from the parsed number on every keystroke can never
+  // hold a trailing "." or trailing zeros while the user is still typing.
+  const [distanceText, setDistanceText] = useState('');
+  // Same decoupling for duration, typed directly as "1:31:25" (h:mm:ss) rather than
+  // a separate minutes field + read-only preview — matches the finish-time input on races.tsx.
+  const [durationText, setDurationText] = useState('');
+
+  useEffect(() => {
+    const current = distanceText.trim() === '' ? null : Number(distanceText);
+    if (extractedWorkout?.distance !== current) {
+      setDistanceText(extractedWorkout?.distance != null ? String(extractedWorkout.distance) : '');
+    }
+    // Only re-sync from extractedWorkout — distanceText itself is the typing source of truth.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [extractedWorkout?.distance]);
+
+  useEffect(() => {
+    const current = parseTimeToSeconds(durationText);
+    if (extractedWorkout?.duration !== current) {
+      setDurationText(extractedWorkout?.duration ? formatDurationHMS(extractedWorkout.duration) : '');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [extractedWorkout?.duration]);
 
   useEffect(() => {
     if (!errorMsg) return;
@@ -900,22 +933,19 @@ export default function ScanWorkoutScreen() {
                 </View>
 
                 <View style={styles.fieldRow}>
-                  <Text style={styles.fieldLabel}>Duration (minutes):</Text>
+                  <Text style={styles.fieldLabel}>Duration:</Text>
                   <TextInput
                     style={styles.fieldValueInput}
-                    value={extractedWorkout.duration ? String(Math.round(extractedWorkout.duration / 60)) : ''}
+                    value={durationText}
                     onChangeText={(v) => {
-                      const mins = v.trim() === '' ? 0 : Number(v);
-                      setExtractedWorkout({ ...extractedWorkout, duration: mins * 60 });
+                      setDurationText(v);
+                      setExtractedWorkout({ ...extractedWorkout, duration: parseTimeToSeconds(v) });
                     }}
-                    placeholder="0"
+                    placeholder="e.g. 1:31:25"
                     placeholderTextColor={RivalColors.textSecondary}
-                    keyboardType="numeric"
+                    autoCapitalize="none"
                   />
                 </View>
-                {extractedWorkout.duration > 0 && (
-                  <Text style={styles.durationPreview}>{formatDurationHMS(extractedWorkout.duration)}</Text>
-                )}
                 {CLASS_BASED_TYPES.has(extractedWorkout.workoutType) && (
                   <Text style={styles.classDurationHint}>
                     CrossFit/Hyrox/HIIT classes usually run 45-60 min total — make sure this includes warm-up & skill work, not just the timed WOD.
@@ -926,14 +956,15 @@ export default function ScanWorkoutScreen() {
                   <Text style={styles.fieldLabel}>Distance (km):</Text>
                   <TextInput
                     style={styles.fieldValueInput}
-                    value={extractedWorkout.distance != null ? String(extractedWorkout.distance) : ''}
+                    value={distanceText}
                     onChangeText={(v) => {
+                      setDistanceText(v);
                       const km = v.trim() === '' ? null : Number(v);
-                      setExtractedWorkout({ ...extractedWorkout, distance: km });
+                      if (!Number.isNaN(km)) setExtractedWorkout({ ...extractedWorkout, distance: km });
                     }}
                     placeholder="0"
                     placeholderTextColor={RivalColors.textSecondary}
-                    keyboardType="numeric"
+                    keyboardType="decimal-pad"
                   />
                 </View>
 
@@ -1299,7 +1330,6 @@ const styles = StyleSheet.create({
   fieldLabel: { fontSize: 13, color: RivalColors.textSecondary, fontWeight: '600' },
   fieldValue: { fontSize: 15, fontWeight: '700', color: RivalColors.textPrimary },
   fieldValueInput: { fontSize: 15, fontWeight: '700', color: RivalColors.textPrimary, backgroundColor: RivalColors.surfaceContainer, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: RivalColors.surfaceContainerHigh, minWidth: 80, textAlign: 'right' },
-  durationPreview: { fontSize: 12, color: RivalColors.textSecondary, textAlign: 'right', marginTop: -4, marginBottom: 4 },
   classDurationHint: { fontSize: 12, color: RivalColors.success, backgroundColor: RivalColors.surfaceContainer, borderRadius: 8, padding: 10, marginTop: 6, marginBottom: 8, lineHeight: 17 },
 
   typeFieldBox: { paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: RivalColors.surfaceContainerHigh, gap: 8 },

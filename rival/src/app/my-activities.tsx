@@ -1030,7 +1030,7 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 100, maxWidth: 900, width: '100%', alignSelf: 'center' },
 
   // Hero
-  hero: { backgroundColor: 'rgba(24,24,24,0.72)', borderWidth: 1, borderColor: 'rgba(163,140,133,0.15)', borderLeftWidth: 4, borderLeftColor: RivalColors.accentFill, borderRadius: RivalRadius.xl, padding: 28, marginBottom: 20 },
+  hero: { backgroundColor: 'rgba(24,24,24,0.6)', borderWidth: 1, borderColor: 'rgba(163,140,133,0.15)', borderLeftWidth: 4, borderLeftColor: RivalColors.accentFill, borderRadius: RivalRadius.xl, padding: 28, marginBottom: 20 },
   heroBody: { flexDirection: 'column', gap: 20 },
   heroBodyWide: { flexDirection: 'row', alignItems: 'stretch' },
   heroMain: { flex: 1, justifyContent: 'space-between' },
@@ -1053,11 +1053,11 @@ const styles = StyleSheet.create({
   contextLineHighlight: { fontWeight: '800', color: RivalColors.accentText },
   sectionHeader: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 14, marginBottom: 12 },
   title: { ...RivalType.headlineLg, fontSize: 22, color: RivalColors.textPrimary, textTransform: 'uppercase', letterSpacing: 1 },
-  liftsLink: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(74,73,73,0.2)', borderWidth: 1, borderColor: 'rgba(200,198,197,0.2)', borderRadius: RivalRadius.DEFAULT, paddingVertical: 10, paddingHorizontal: 16 },
-  liftsLinkText: { color: RivalColors.textSecondary, fontSize: 13, fontWeight: '600' },
+  liftsLink: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: `${RivalColors.rankAnchors.unrivaled}14`, borderWidth: 1, borderColor: `${RivalColors.rankAnchors.unrivaled}55`, borderRadius: RivalRadius.DEFAULT, paddingVertical: 10, paddingHorizontal: 16 },
+  liftsLinkText: { color: RivalColors.rankAnchors.unrivaled, fontSize: 13, fontWeight: '600' },
 
   // Monthly PB snapshot — fills what used to be empty space beside the hero stats.
-  monthlyPbCard: { backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', borderRadius: RivalRadius.DEFAULT, padding: 14, gap: 10 },
+  monthlyPbCard: { backgroundColor: `${RivalColors.rankAnchors.unrivaled}0D`, borderWidth: 1, borderColor: `${RivalColors.rankAnchors.unrivaled}40`, borderRadius: RivalRadius.DEFAULT, padding: 14, gap: 10 },
   monthlyPbHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   monthlyPbTitle: { ...RivalType.labelCaps, fontSize: 14, letterSpacing: 1, color: RivalColors.textPrimary, textAlign: 'center' },
   monthlyPbCount: { backgroundColor: `${RivalColors.rankAnchors.unrivaled}22`, borderRadius: RivalRadius.full, minWidth: 24, height: 24, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 },
@@ -1065,13 +1065,13 @@ const styles = StyleSheet.create({
   monthlyPbEmpty: { fontSize: 12, color: RivalColors.textSecondary, lineHeight: 17 },
   monthlyPbScroll: { maxHeight: 168 },
   monthlyPbList: { gap: 12 },
-  monthlyPbEntry: { borderLeftWidth: 2, borderLeftColor: 'rgba(255,255,255,0.14)', paddingLeft: 10, gap: 1 },
+  monthlyPbEntry: { borderLeftWidth: 2, borderLeftColor: `${RivalColors.rankAnchors.unrivaled}55`, paddingLeft: 10, gap: 1 },
   monthlyPbName: { fontSize: 11, fontWeight: '600', letterSpacing: 0.8, color: RivalColors.textSecondary, textTransform: 'uppercase' },
   monthlyPbValueRow: { flexDirection: 'row', alignItems: 'baseline', gap: 5 },
   monthlyPbValue: { fontSize: 28, fontWeight: '800', color: RivalColors.textPrimary, lineHeight: 32 },
   monthlyPbUnit: { fontSize: 12, fontWeight: '700', fontStyle: 'italic', color: RivalColors.textSecondary },
   monthlyPbProgressRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
-  monthlyPbProgress: { fontSize: 13, fontWeight: '700', letterSpacing: 0.4, color: RivalColors.accentText },
+  monthlyPbProgress: { fontSize: 13, fontWeight: '700', letterSpacing: 0.4, color: RivalColors.rankAnchors.unrivaled },
   // Compact icon toolbar — replaces the old row of 5 full-size buttons so the
   // cards start right after the hero instead of behind a wall of controls.
   toolbarRow: { flexDirection: 'row', gap: 6 },

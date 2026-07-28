@@ -33,7 +33,7 @@ const TABS: Array<{ id: TabId; label: string; icon: RivalIconName }> = [
 ];
 
 export default function ProfileScreen() {
-  const { userId: viewedUserId } = useLocalSearchParams<{ userId?: string }>();
+  const { userId: viewedUserId, tab: tabParam } = useLocalSearchParams<{ userId?: string; tab?: TabId }>();
   const { width: windowWidth } = useWindowDimensions();
   const wide = windowWidth >= 840;
 
@@ -46,7 +46,9 @@ export default function ProfileScreen() {
     if (viewedUserId) router.replace({ pathname: '/stats', params: { userId: viewedUserId } });
   }, [viewedUserId]);
 
-  const [activeTab, setActiveTab] = useState<TabId>('personal');
+  const [activeTab, setActiveTab] = useState<TabId>(
+    tabParam && TABS.some(t => t.id === tabParam) ? tabParam : 'personal'
+  );
 
   const [displayName, setDisplayName] = useState('');
   const [editingName, setEditingName] = useState(false);
@@ -72,6 +74,7 @@ export default function ProfileScreen() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [importingHistory, setImportingHistory] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
@@ -260,6 +263,42 @@ export default function ProfileScreen() {
     setConfirmingDisconnect(false);
     setDisconnecting(false);
     loadProfile();
+  }
+
+  async function syncNow() {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+    setSyncing(true);
+    try {
+      const res = await fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/strava-backfill`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+          'apikey': process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!,
+        },
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        notify('Sync failed', data.error || 'Could not sync with Strava. Try reconnecting Strava.');
+      } else if (data.saved === 0) {
+        notify('Nothing new', 'No new Strava activities found.');
+      } else {
+        notify('Synced', `Pulled in ${data.saved} new activities.`);
+      }
+    } catch {
+      notify('Sync failed', 'Could not reach the server. Check your connection and try again.');
+    } finally {
+      setSyncing(false);
+      // Fire-and-forget milestone check after every sync
+      supabase.auth.getSession().then(({ data: { session: s } }) => {
+        if (!s) return;
+        fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/check-milestones`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${s.access_token}`, 'apikey': process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY! },
+        }).catch(() => {});
+      });
+    }
   }
 
   async function importFullHistory() {
@@ -523,9 +562,11 @@ export default function ProfileScreen() {
           <View>
             <Text style={styles.appName}>Strava</Text>
             <Text style={styles.appStatus}>
-              {stravaConnected
-                ? (stravaAthleteName ? `Connected · ${stravaAthleteName}` : 'Connected')
-                : 'Not connected'}
+              {syncing
+                ? 'Syncing…'
+                : stravaConnected
+                  ? (stravaAthleteName ? `Connected · ${stravaAthleteName}` : 'Connected')
+                  : 'Not connected'}
             </Text>
           </View>
         </View>
@@ -536,6 +577,13 @@ export default function ProfileScreen() {
 
       {stravaConnected && (
         <>
+          <RivalButton
+            label={syncing ? 'Syncing…' : 'Sync now'}
+            onPress={syncNow}
+            disabled={syncing}
+            variant="secondary"
+            style={styles.actionBtn}
+          />
           <RivalButton
             label={importingHistory ? 'Importing…' : 'Import full Strava history'}
             onPress={importFullHistory}
