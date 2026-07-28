@@ -1,10 +1,17 @@
 import { useEffect } from 'react';
-import { StyleSheet, TouchableOpacity, View, Text, Platform } from 'react-native';
+import { StyleSheet, TouchableOpacity, View, Text, Image, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { Asset } from 'expo-asset';
 import { supabase } from '../lib/supabase';
-import { RivalButton, RivalFixedBackground } from '../components/rival';
+import { RivalButton } from '../components/rival';
 import { RivalColors, RivalType } from '../constants/rivalTheme';
+
+const HERO_SOURCE = require('../../assets/images/backgrounds/optimized/a-small-group-of-diverse-athletes-2.jpg');
+// RN Web's <Image> has no public resolveAssetSource (native-RN-only static) — see the
+// same note in RivalFixedBackground.tsx. expo-asset's Asset.fromModule is the
+// documented cross-platform way to turn a require()'d module id into a usable URI.
+const HERO_URI = Platform.OS === 'web' ? Asset.fromModule(HERO_SOURCE).uri : undefined;
 
 export default function WelcomeScreen() {
   useEffect(() => {
@@ -15,19 +22,31 @@ export default function WelcomeScreen() {
     });
   }, []);
 
-
   return (
-    <View style={styles.root}>
-      <RivalFixedBackground
-        source={require('../../assets/images/backgrounds/optimized/a-small-group-of-diverse-athletes-2.jpg')}
-      />
-      <View style={styles.scrim} />
-      <SafeAreaView style={styles.container}>
-        <View style={styles.content}>
+    <View style={styles.page}>
+      <View style={styles.hero}>
+        {/* Same web-only real-<img> escape hatch as RivalFixedBackground, and for the
+            same reason: react-native-web's Image/ImageBackground hardcode
+            backgroundPosition:'center' on the element that actually paints, so a
+            focal point passed via style/imageStyle is silently ignored on web. This
+            hero doesn't need one (centered is fine), but a plain <img> is also just
+            the correct primitive for a normal block-flow photo — no position:fixed,
+            no viewport math, it simply fills this relatively-positioned section. */}
+        {Platform.OS === 'web' ? (
+          // @ts-ignore — intentional escape hatch to a real DOM element.
+          <img
+            src={HERO_URI}
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+          />
+        ) : (
+          <Image source={HERO_SOURCE} style={styles.heroImageNative} resizeMode="cover" />
+        )}
+        <View style={styles.scrim} />
 
+        <SafeAreaView style={styles.content}>
           <Text style={styles.logo}>RIVAL</Text>
 
-          <View style={styles.hero}>
+          <View style={styles.taglineWrap}>
             <Text style={styles.tagline}>Fitness is better shared</Text>
           </View>
 
@@ -37,29 +56,33 @@ export default function WelcomeScreen() {
               <Text style={styles.signInLinkText}>Sign In</Text>
             </TouchableOpacity>
           </View>
-
-        </View>
-      </SafeAreaView>
+        </SafeAreaView>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
+  // Plain block container — no flex:1 (that requires a height-bounded ancestor,
+  // which this screen deliberately no longer has).
+  page: {
     backgroundColor: RivalColors.surfaceLow,
   },
+  // minHeight, not height: fills at least one screen but is free to grow, same as
+  // any ordinary hero section on a real webpage.
+  hero: {
+    position: 'relative',
+    minHeight: '100vh' as any,
+    width: '100%',
+  },
+  heroImageNative: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   scrim: {
-    position: 'fixed' as any,
-    // 100vh (large viewport) to match RivalFixedBackground — see the note there.
-    top: 0, left: 0, right: 0, height: '100vh' as any,
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
     backgroundColor: 'rgba(14,14,14,0.4)',
   },
-  container: {
-    flex: 1,
-  },
   content: {
-    flex: 1,
+    minHeight: '100vh' as any,
     paddingHorizontal: 24,
     justifyContent: 'space-between',
     paddingBottom: 40,
@@ -71,9 +94,7 @@ const styles = StyleSheet.create({
     letterSpacing: 8,
     textAlign: 'center',
   },
-  hero: {
-    flex: 1,
-    justifyContent: 'flex-end',
+  taglineWrap: {
     alignItems: 'center',
     gap: 16,
     paddingBottom: 32,

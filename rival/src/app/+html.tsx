@@ -24,27 +24,16 @@ export default function Root({ children }: { children: React.ReactNode }) {
 
         <ScrollViewStyleReset />
 
-        {/* Overrides Expo's injected reset. Must come after ScrollViewStyleReset to win.
-            Two things matter here, and they're why the app looked letterboxed on iOS
-            while ordinary sites don't:
-
-            1. height:100vh, not 100%. Expo's reset pins the document to 100%, which on
-               iOS resolves to the SMALL viewport — the strip between the status bar and
-               the toolbar. The page then physically cannot reach the screen edges. 100vh
-               is the LARGE viewport, so the document spans the full screen length.
-
-            2. Scrollable, not overflow:hidden. iOS Safari only floats its bars
-               translucently OVER page content when the document is scrollable; on a
-               locked page it reserves solid bars and insets the content instead. Expo
-               sets overflow:hidden because React Native scrolls via its own ScrollViews,
-               which is what kept Safari in the solid-bar mode.
-
-            overscroll-behavior stops the rubber-band bounce that scrollability
-            reintroduces. background-color keeps the document itself dark, so nothing
-            white shows through the home-indicator area in standalone mode. */}
+        {/* Every OTHER screen in this app is a react-native-web "app shell": locked to
+            one viewport, RN's own ScrollViews handle scrolling internally. That's
+            correct for them. An earlier attempt fixed iOS letterboxing by forcing the
+            WHOLE document scrollable here — reverted, since the actual fix only
+            applies to one screen (see index.tsx, which is a plain flowing document,
+            not part of the app shell, for exactly this reason). Keep this to things
+            safe for every route: a dark default backdrop so nothing white flashes
+            through — never a height/overflow override. */}
         <style dangerouslySetInnerHTML={{ __html: `
-          html, body, #root { height: 100vh; background-color: #0e0e0e; }
-          body { overflow-y: auto; overscroll-behavior-y: none; }
+          html, body, #root { background-color: #0e0e0e; }
         ` }} />
       </head>
       <body>{children}</body>
