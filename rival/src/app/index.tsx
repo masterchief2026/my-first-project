@@ -98,6 +98,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 16,
     paddingBottom: 32,
+    marginTop: 80,
   },
   tagline: {
     ...RivalType.headlineLg,
@@ -105,6 +106,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     textTransform: 'uppercase',
     letterSpacing: 2,
+    fontSize: 17,
+    lineHeight: 22,
   },
   buttons: {
     gap: 4,
