@@ -105,7 +105,7 @@ const styles = StyleSheet.create({
     color: RivalColors.textPrimary,
     textAlign: 'center',
     textTransform: 'uppercase',
-    letterSpacing: 2,
+    letterSpacing: 4,
     fontSize: 17,
     lineHeight: 22,
   },
