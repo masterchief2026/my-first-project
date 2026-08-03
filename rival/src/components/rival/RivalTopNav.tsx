@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { View, Text, TouchableOpacity, Image, StyleSheet, Platform, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -63,6 +64,33 @@ export function RivalTopNav({ active, centerSlot }: { active?: Section; centerSl
       setRankName(getLevel(seasonEffort).name);
     })();
   }, []);
+
+  // iOS Safari has a long-standing bug: `position: fixed` inside a nested
+  // scrolling container (which is what Expo Router's screen wrapper is, on
+  // web) doesn't stay pinned to the viewport — it scrolls along with that
+  // container instead, instead of staying pinned to the bottom of the
+  // screen. Rendering the bar as a portal directly under <body> sidesteps
+  // that nested container entirely, so `fixed` behaves the way it does
+  // everywhere else. Native has no such container, so it renders inline
+  // there as before (bottomNavPortalTarget is null on native).
+  const bottomNavPortalTarget = Platform.OS === 'web' && typeof document !== 'undefined' ? document.body : null;
+  const bottomNav = (
+    <View style={[styles.bottomNav, { bottom: insets.bottom + 12 } as any]}>
+      {LINKS.map((l) => {
+        const isActive = active === l.key;
+        return (
+          <TouchableOpacity
+            key={l.key}
+            onPress={() => router.push(l.route as any)}
+            style={[styles.bottomNavItem, isActive && styles.bottomNavItemActive]}
+          >
+            <RivalIcon name={l.icon} size={20} color={isActive ? RivalColors.accentText : RivalColors.textSecondary} />
+            <Text style={[styles.bottomNavLabel, isActive && styles.bottomNavLabelActive]}>{l.label}</Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
 
   return (
     <View style={[styles.bar, narrow && styles.barNarrow]}>
@@ -224,23 +252,7 @@ export function RivalTopNav({ active, centerSlot }: { active?: Section; centerSl
           </View>
         </View>
       </View>
-      {narrow && (
-        <View style={[styles.bottomNav, { bottom: insets.bottom + 12 } as any]}>
-          {LINKS.map((l) => {
-            const isActive = active === l.key;
-            return (
-              <TouchableOpacity
-                key={l.key}
-                onPress={() => router.push(l.route as any)}
-                style={[styles.bottomNavItem, isActive && styles.bottomNavItemActive]}
-              >
-                <RivalIcon name={l.icon} size={20} color={isActive ? RivalColors.accentText : RivalColors.textSecondary} />
-                <Text style={[styles.bottomNavLabel, isActive && styles.bottomNavLabelActive]}>{l.label}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      )}
+      {narrow && (bottomNavPortalTarget ? createPortal(bottomNav, bottomNavPortalTarget) : bottomNav)}
     </View>
   );
 }
