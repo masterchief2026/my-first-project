@@ -75,20 +75,28 @@ export function RivalTopNav({ active, centerSlot }: { active?: Section; centerSl
   // there as before (bottomNavPortalTarget is null on native).
   const bottomNavPortalTarget = Platform.OS === 'web' && typeof document !== 'undefined' ? document.body : null;
   const bottomNav = (
-    <View style={[styles.bottomNav, { bottom: 0, paddingBottom: insets.bottom + 4 } as any]}>
-      {LINKS.map((l) => {
-        const isActive = active === l.key;
-        return (
-          <TouchableOpacity
-            key={l.key}
-            onPress={() => router.push(l.route as any)}
-            style={[styles.bottomNavItem, isActive && styles.bottomNavItemActive]}
-          >
-            <RivalIcon name={l.icon} size={20} color={isActive ? RivalColors.accentText : RivalColors.textSecondary} />
-            <Text style={[styles.bottomNavLabel, isActive && styles.bottomNavLabelActive]}>{l.label}</Text>
-          </TouchableOpacity>
-        );
-      })}
+    // Outer wrapper is flush with the true edge and reserves the home-indicator
+    // clearance, but carries no visible chrome of its own — the pill's actual
+    // background/border/rounding lives on the INNER view, sized to hug just the
+    // icons/labels. Giving the clearance padding to the pill itself (as before)
+    // stretched its own visible background/border down through that empty
+    // space, reading as a tall bar with dead space inside it.
+    <View style={[styles.bottomNavOuter, { bottom: 0, paddingBottom: insets.bottom } as any]}>
+      <View style={styles.bottomNav}>
+        {LINKS.map((l) => {
+          const isActive = active === l.key;
+          return (
+            <TouchableOpacity
+              key={l.key}
+              onPress={() => router.push(l.route as any)}
+              style={[styles.bottomNavItem, isActive && styles.bottomNavItemActive]}
+            >
+              <RivalIcon name={l.icon} size={20} color={isActive ? RivalColors.accentText : RivalColors.textSecondary} />
+              <Text style={[styles.bottomNavLabel, isActive && styles.bottomNavLabelActive]}>{l.label}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
     </View>
   );
 
@@ -303,17 +311,21 @@ const styles = StyleSheet.create({
   // viewport regardless of where in the tree it renders (RivalTopNav itself
   // stays docked at the top), same trick used elsewhere in this app for
   // viewport-relative overlays. Flush with the true bottom edge (`bottom: 0`,
-  // set inline) rather than floating above it — the home indicator is
-  // cleared with inline paddingBottom (insets.bottom + 4) instead, so the
-  // pill's own shape still touches the edge.
-  bottomNav: {
+  // set inline) rather than floating above it. The home-indicator clearance
+  // lives on THIS outer wrapper (invisible, no chrome) rather than on the
+  // visible pill below — giving it to the pill directly stretched its own
+  // background/border down through that empty space, reading as a tall bar
+  // with dead space inside it instead of a snug pill sitting above the clearance.
+  bottomNavOuter: {
     position: 'fixed' as any,
     left: 16, right: 16,
+    zIndex: 200,
+  },
+  bottomNav: {
     flexDirection: 'row', justifyContent: 'space-between',
     backgroundColor: '#1c1c1c',
     borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
     paddingVertical: 4, paddingHorizontal: 6,
-    zIndex: 200,
     ...(Platform.OS === 'web' ? { backdropFilter: 'blur(20px)', boxShadow: '0 8px 24px rgba(0,0,0,0.4)' } as any : {}),
   },
   bottomNavItem: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 2, paddingVertical: 5, paddingHorizontal: 5, borderRadius: 16 },
