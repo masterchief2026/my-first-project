@@ -37,6 +37,33 @@ export function RivalTopNav({ active, centerSlot }: { active?: Section; centerSl
   const [rankName, setRankName] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
+  // TEMP DEBUG — visible readout of the actual viewport/inset numbers on
+  // Ricky's device, to replace guessing with real data after two fixes
+  // (portal, visualViewport clamp) didn't close the gap below the bottom
+  // nav. Remove once the real cause is found.
+  const [debugInfo, setDebugInfo] = useState('');
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+    const update = () => {
+      const nav = document.getElementById('rivalBottomNav');
+      const navRect = nav?.getBoundingClientRect();
+      setDebugInfo(
+        `innerH:${window.innerHeight} vvH:${Math.round(window.visualViewport?.height || 0)} ` +
+        `vvOff:${Math.round(window.visualViewport?.offsetTop || 0)} docH:${document.documentElement.clientHeight} ` +
+        `bodyH:${document.body.clientHeight} insB:${Math.round(insets.bottom)} ` +
+        `navTop:${Math.round(navRect?.top || 0)} navBot:${Math.round(navRect?.bottom || 0)} dpr:${window.devicePixelRatio}`
+      );
+    };
+    update();
+    window.visualViewport?.addEventListener('resize', update);
+    window.addEventListener('resize', update);
+    const t = setTimeout(update, 800);
+    return () => {
+      window.visualViewport?.removeEventListener('resize', update);
+      window.removeEventListener('resize', update);
+      clearTimeout(t);
+    };
+  }, [insets.bottom]);
 
   async function handleSignOut() {
     await supabase.auth.signOut();
@@ -75,7 +102,7 @@ export function RivalTopNav({ active, centerSlot }: { active?: Section; centerSl
   // there as before (bottomNavPortalTarget is null on native).
   const bottomNavPortalTarget = Platform.OS === 'web' && typeof document !== 'undefined' ? document.body : null;
   const bottomNav = (
-    <View style={[styles.bottomNav, { bottom: insets.bottom + 12 } as any]}>
+    <View nativeID="rivalBottomNav" style={[styles.bottomNav, { bottom: insets.bottom + 12 } as any]}>
       {LINKS.map((l) => {
         const isActive = active === l.key;
         return (
@@ -91,6 +118,13 @@ export function RivalTopNav({ active, centerSlot }: { active?: Section; centerSl
       })}
     </View>
   );
+  // TEMP DEBUG overlay — see debugInfo state above. Portaled to body too so
+  // it's guaranteed visible regardless of any layout issue being diagnosed.
+  const debugOverlay = Platform.OS === 'web' && debugInfo ? (
+    <View style={{ position: 'fixed', top: 90, left: 4, right: 4, zIndex: 999, backgroundColor: 'rgba(255,0,0,0.85)', padding: 6, borderRadius: 6 } as any}>
+      <Text style={{ color: '#fff', fontSize: 9 }}>{debugInfo}</Text>
+    </View>
+  ) : null;
 
   return (
     <View style={[styles.bar, narrow && styles.barNarrow]}>
@@ -253,6 +287,7 @@ export function RivalTopNav({ active, centerSlot }: { active?: Section; centerSl
         </View>
       </View>
       {narrow && (bottomNavPortalTarget ? createPortal(bottomNav, bottomNavPortalTarget) : bottomNav)}
+      {narrow && bottomNavPortalTarget && debugOverlay && createPortal(debugOverlay, bottomNavPortalTarget)}
     </View>
   );
 }
