@@ -31,6 +31,27 @@ export function RivalTopNav({ active, centerSlot }: { active?: Section; centerSl
   // row instead of overlapping text on top of text.
   const narrow = width < BREAKPOINT_MOBILE_NAV;
   const insets = useSafeAreaInsets();
+  // The bottom nav is portaled straight to document.body below (to dodge an
+  // iOS Safari `position:fixed`-inside-nested-scroll bug), which puts it
+  // OUTSIDE the height-clamped wrapper _layout.tsx uses to work around the
+  // iOS-standalone visualViewport bug (see that file's comment). A plain
+  // `bottom: 0` on this portaled pill still measures against the oversized
+  // layout viewport, landing below the true visible area with dead space
+  // above it. Track the live gap between the layout and visual viewports
+  // ourselves and offset by it, so the pill hugs the REAL bottom edge.
+  const [navBottomOffset, setNavBottomOffset] = useState(0);
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined' || !window.visualViewport) return;
+    const vv = window.visualViewport;
+    const update = () => setNavBottomOffset(Math.max(0, window.innerHeight - vv.height - vv.offsetTop));
+    update();
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    return () => {
+      vv.removeEventListener('resize', update);
+      vv.removeEventListener('scroll', update);
+    };
+  }, []);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [initial, setInitial] = useState('?');
   const [displayName, setDisplayName] = useState('');
@@ -81,7 +102,7 @@ export function RivalTopNav({ active, centerSlot }: { active?: Section; centerSl
     // icons/labels. Giving the clearance padding to the pill itself (as before)
     // stretched its own visible background/border down through that empty
     // space, reading as a tall bar with dead space inside it.
-    <View style={[styles.bottomNavOuter, { bottom: 0, paddingBottom: insets.bottom } as any]}>
+    <View style={[styles.bottomNavOuter, { bottom: navBottomOffset, paddingBottom: insets.bottom } as any]}>
       <View style={styles.bottomNav}>
         {LINKS.map((l) => {
           const isActive = active === l.key;
@@ -310,8 +331,11 @@ const styles = StyleSheet.create({
   // instead of up next to the logo. `position: 'fixed'` pins it to the
   // viewport regardless of where in the tree it renders (RivalTopNav itself
   // stays docked at the top), same trick used elsewhere in this app for
-  // viewport-relative overlays. Flush with the true bottom edge (`bottom: 0`,
-  // set inline) rather than floating above it. The home-indicator clearance
+  // viewport-relative overlays. Flush with the true bottom edge (`bottom:
+  // navBottomOffset`, set inline — 0 in a normal browser tab, but a live
+  // measured offset on iOS standalone where the layout viewport can report
+  // taller than what's actually visible) rather than floating above it.
+  // The home-indicator clearance
   // lives on THIS outer wrapper (invisible, no chrome) rather than on the
   // visible pill below — giving it to the pill directly stretched its own
   // background/border down through that empty space, reading as a tall bar
