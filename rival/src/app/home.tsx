@@ -728,18 +728,25 @@ export default function HomeScreen() {
                       </View>
 
                       <View style={styles.mPodiumMetaCapsule}>
-                        {selfIndex !== -1 && (() => {
-                          const story = weeklyRankStory(standings, selfIndex);
+                        {(() => {
+                          const story = selfIndex !== -1 ? weeklyRankStory(standings, selfIndex) : null;
                           return (
-                            <Text style={styles.mPodiumOutsideRow}>
-                              {story.before}
-                              {story.gap !== null && <Text style={{ color: RivalColors.accentText, fontWeight: '700', fontSize: 31 }}>{story.gap}</Text>}
-                              <Text style={{ position: 'relative', top: -12, marginLeft: 6 }}>{story.after}</Text>
-                            </Text>
+                            <>
+                              {story && (
+                                <Text style={styles.mPodiumOutsideRow}>
+                                  {story.before}
+                                  {story.gap !== null && <Text style={{ color: RivalColors.accentText, fontWeight: '700', fontSize: 31 }}>{story.gap}</Text>}
+                                  <Text style={{ position: 'relative', top: -12, marginLeft: 6 }}>{story.after}</Text>
+                                </Text>
+                              )}
+                              {/* The -18 pull-up is tuned against the 31px gap-number row above (e.g.
+                                  "49 Behind Sandy") — with no rival to compare against ("You're
+                                  leading" alone, story.gap === null), that row is a single normal-size
+                                  line, so the same pull-up overlaps this text directly on top of it. */}
+                              <Text style={[styles.mLeaderFooterMeta, story && story.gap === null && { marginTop: 2, marginLeft: 0 }]}>{endsLabel}</Text>
+                            </>
                           );
                         })()}
-
-                        <Text style={styles.mLeaderFooterMeta}>{endsLabel}</Text>
                       </View>
                     </>
                   );
@@ -798,7 +805,7 @@ export default function HomeScreen() {
                   <View style={[styles.mLegacyStatCell, styles.mLegacyStatCellBorder]}>
                     <RivalIcon name="bolt" size={16} color={RivalColors.accentFill} />
                     <Text style={[styles.mLegacyStatValue, styles.mLegacyStatValueLg]}>
-                      <Text style={{ position: 'relative', top: -2 }}>+</Text>
+                      <Text style={{ position: 'relative', top: -1 }}>+</Text>
                       <Text style={{ marginLeft: 3 }}>{Math.round(todayEffort)}</Text>
                     </Text>
                     <Text style={[styles.mLegacyStatLabel, styles.mLegacyStatLabelLg]}>Effort Today</Text>
