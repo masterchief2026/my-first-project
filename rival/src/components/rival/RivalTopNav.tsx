@@ -149,7 +149,7 @@ export function RivalTopNav({ active, centerSlot }: { active?: Section; centerSl
           <TouchableOpacity onPress={() => router.push('/profile?tab=notifications')} style={[styles.notifBtn, narrow && styles.notifBtnNarrow]}>
             {/* Mockup's mobile header uses the plain calm bell (ti-bell), not
                 the "ringing" bell desktop keeps for its own header. */}
-            <RivalIcon name={narrow ? 'notificationsOutline' : 'notificationsActive'} size={narrow ? 18 : 22} color={RivalColors.accentText} />
+            <RivalIcon name={narrow ? 'notificationsOutline' : 'notificationsActive'} size={narrow ? 21 : 22} color={RivalColors.accentText} />
           </TouchableOpacity>
           <View
             style={styles.avatarWrap}
@@ -277,7 +277,7 @@ const styles = StyleSheet.create({
   // the hero numbers/"Total time earned" value elsewhere — desktop's plain
   // flat accentText color is untouched, this only applies when narrow.
   logoNarrow: {
-    fontSize: 15, letterSpacing: 3,
+    fontSize: 17, letterSpacing: 3,
     ...(Platform.OS === 'web' ? {
       backgroundImage: 'linear-gradient(100deg, #D97757 0%, #ffb59e 45%, #F5B759 100%)',
       backgroundClip: 'text', WebkitBackgroundClip: 'text', color: 'transparent',
@@ -328,14 +328,15 @@ const styles = StyleSheet.create({
   rankLabel: { ...RivalType.labelCaps, fontSize: 9, color: RivalColors.textSecondary },
   rankValue: { fontSize: 14, fontWeight: '700' },
   notifBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  notifBtnNarrow: { width: 28, height: 28, borderRadius: 14 },
+  notifBtnNarrow: { width: 32, height: 32, borderRadius: 16 },
   avatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: RivalColors.accentFill, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  // Mockup's mobile avatar is a plain 28x28 filled circle, no ring border.
-  avatarNarrow: { width: 28, height: 28, borderRadius: 14 },
+  // Mockup's mobile avatar is a plain filled circle, no ring border. Sized
+  // 15% up from the mockup's literal 28px per Ricky's ask.
+  avatarNarrow: { width: 32, height: 32, borderRadius: 16 },
   avatarImg: { width: 42, height: 42, borderRadius: 21 },
-  avatarImgNarrow: { width: 28, height: 28, borderRadius: 14 },
+  avatarImgNarrow: { width: 32, height: 32, borderRadius: 16 },
   avatarInitial: { color: RivalColors.onAccentFill, fontWeight: '800', fontSize: 18 },
-  avatarInitialNarrow: { fontSize: 12 },
+  avatarInitialNarrow: { fontSize: 14 },
   // Thin ring as a separate, slightly larger circle rather than a border ON
   // the avatar — a border on the avatar's own fixed-size box would paint
   // over the outer rim of the photo instead of framing it. At 45x45 with a
@@ -344,7 +345,7 @@ const styles = StyleSheet.create({
   avatarRing: { width: 45, height: 45, borderRadius: 22.5, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.35)', alignItems: 'center', justifyContent: 'center' },
   // Mockup's mobile avatar has no ring at all — collapse the ring to exactly
   // the avatar's own size with no border, rather than restructuring the JSX.
-  avatarRingNarrow: { width: 28, height: 28, borderRadius: 14, borderWidth: 0 },
+  avatarRingNarrow: { width: 32, height: 32, borderRadius: 16, borderWidth: 0 },
   // Wraps the ring+avatar + its dropdown so the menu can be absolutely
   // positioned relative to just the avatar, not the whole nav row. zIndex
   // so the menu paints above the rank badge / page content instead of

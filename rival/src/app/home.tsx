@@ -57,9 +57,11 @@ function weeklyRankStory(standings: WeeklyLeaderEntry[], selfIndex: number): Ran
   const leader = standings[0];
   if (selfIndex === 0) {
     const second = standings[1];
-    return second
-      ? { rankIcon: 'medal', rankLabel: null, before: 'Leading by ', gap: Math.round(leader.points - second.points), after: '' }
-      : { rankIcon: 'medal', rankLabel: null, before: "You're leading", gap: null, after: '' };
+    if (!second) return { rankIcon: 'medal', rankLabel: null, before: "You're leading", gap: null, after: '' };
+    const gap = Math.round(leader.points - second.points);
+    return gap === 0
+      ? { rankIcon: 'medal', rankLabel: null, before: 'Will you take the lead?', gap: null, after: '' }
+      : { rankIcon: 'medal', rankLabel: null, before: 'Leading by ', gap, after: '' };
   }
   // Everyone else compares to whoever's directly ahead of them, not always
   // the leader — e.g. 3rd place should see the gap to 2nd, not to 1st, and
@@ -68,6 +70,7 @@ function weeklyRankStory(standings: WeeklyLeaderEntry[], selfIndex: number): Ran
   const gap = Math.round(front.points - standings[selfIndex].points);
   const rankIcon = selfIndex <= 2 ? 'medal' : null;
   const rankLabel = selfIndex <= 2 ? null : `${selfIndex + 1}th`;
+  if (gap === 0) return { rankIcon, rankLabel, before: `Tied with ${front.name}`, gap: null, after: '' };
   return { rankIcon, rankLabel, before: '', gap, after: ` Behind ${front.name}` };
 }
 
@@ -116,8 +119,8 @@ const SHARD_SLOPE: Record<number, [number, number]> = { 0: [0, 0.20], 1: [0.15, 
 // a curve gets closer to an actual tapered point without the hard facets.
 const PODIUM_LENS_CLIP =
   'polygon(0% 50%, 2% 32%, 5% 16%, 10% 6%, 18% 1%, 30% 0%, 70% 0%, 82% 1%, 90% 6%, 95% 16%, 98% 32%, 100% 50%, 98% 68%, 95% 84%, 90% 94%, 82% 99%, 70% 100%, 30% 100%, 18% 99%, 10% 94%, 5% 84%, 2% 68%)';
-function shardPoints(colIdx: number, height: number): string {
-  const [tl, tr] = SHARD_SLOPE[colIdx];
+function shardPoints(slope: [number, number], height: number): string {
+  const [tl, tr] = slope;
   return `0,${tl * height} 100,${tr * height} 100,${height} 0,${height}`;
 }
 // Team Momentum's status line — reuses the same weeklyLeader standings the
@@ -241,20 +244,11 @@ function heroValueFontSize(text: string, availableWidth: number): number {
 export default function HomeScreen() {
   const [stravaConnected, setStravaConnected] = useState(true);
   const [leagues, setLeagues] = useState<League[]>([]);
-  // TEMP DEBUG DATA — mirrors the mockup's own demo numbers so the mobile
-  // Today screen can be visually diffed against base-mockup-v3 pixel-by-pixel.
-  // Revert every field in this block before this session ends.
-  const [weeklyLeader, setWeeklyLeader] = useState<WeeklyLeader | null>({
-    // Real team/standings from Ricky's account (Sandy 232 / You 183) plus one
-    // fabricated 3rd teammate ("Jordan") so the 3-column podium can be
-    // previewed here without touching the real team's DB rows.
-    leagueId: 'debug', teamName: 'The Hidden Leaf', daysRemaining: 1,
-    standings: [
-      { userId: 's', name: 'Sandy', avatarUrl: null, points: 232, isSelf: false },
-      { userId: 'y', name: 'You', avatarUrl: null, points: 183, isSelf: true },
-      { userId: 'j', name: 'Jordan', avatarUrl: null, points: 146, isSelf: false },
-    ],
-  });
+  // Populated by loadAll() below from real account data. When the real
+  // standings are exactly 2 people, loadAll() fabricates a 3rd teammate
+  // ("Jordan") so the 3-column podium layout can still be previewed without
+  // a real 3rd teammate — see the previewStandings injection there.
+  const [weeklyLeader, setWeeklyLeader] = useState<WeeklyLeader | null>(null);
   const [momentumTrainers, setMomentumTrainers] = useState<MomentumTrainers | null>(null);
   const [nextRace, setNextRace] = useState<NextRace>({ name: 'Auckland Marathon', race_date: '2026-10-25' });
   const [totalDistanceKm, setTotalDistanceKm] = useState(1037);
@@ -592,11 +586,9 @@ export default function HomeScreen() {
                 {weeklyLeader === null ? (
                   <View style={{ alignItems: 'center', gap: 6, marginTop: 20 }}>
                     <View style={styles.medalRing}><RivalIcon name="medal" size={28} color="#ECC654" /></View>
-                    <Text style={styles.mLeaderEmptyTitle}>LEAD THIS WEEK</Text>
+                    <Text style={styles.mLeaderEmptyTitle}>TAKE THE LEAD</Text>
                     <Text style={styles.mLeaderEmptySub}>Earn the first Effort</Text>
-                    <TouchableOpacity onPress={() => router.push('/add-workout')}>
-                      <Text style={styles.mFocusViewLink}>Claim the Lead →</Text>
-                    </TouchableOpacity>
+                    <View style={styles.mLeaderEmptyDivider} />
                   </View>
                 ) : (() => {
                   const { standings, daysRemaining } = weeklyLeader;
@@ -604,6 +596,11 @@ export default function HomeScreen() {
                   const endsLabel = daysRemaining === 0 ? 'Last day' : daysRemaining === 1 ? 'Ends tomorrow' : `${daysRemaining} days remaining`;
                   const slots = podiumSlots(standings);
                   const maxPoints = standings[0]?.points || 1;
+                  // A tie for 1st consumes two of the podium's three "places" — the
+                  // next distinct score along is really 2nd place, not 3rd, even
+                  // though it still renders in the visually-3rd (right) column.
+                  const tiedForFirstCount = standings.filter((s) => s.points === maxPoints).length;
+                  const rankShift = Math.max(0, tiedForFirstCount - 1);
                   // Always use the fixed-width column treatment (never the
                   // flex:1-across-3-columns one) — Ricky wants pillars at
                   // the same generous width regardless of headcount, matching
@@ -635,7 +632,17 @@ export default function HomeScreen() {
                         {slots.map((slot, colIdx) => {
                           if (!slot) return sparse ? null : <View key={colIdx} style={{ flex: 1 }} />;
                           const { entry, rank } = slot;
-                          const rankStyle = PODIUM_RANK_STYLE[rank];
+                          // A tie for 1st should read as two co-leaders, not "1st place and a
+                          // runner-up who happens to match its score" — promote the tied slot to
+                          // the same gold styling/height/crown as rank 0. Column position (left/
+                          // center/right) and its shard slant are unaffected, only the rank-based
+                          // visual treatment.
+                          const isTiedForFirst = rank !== 0 && entry.points === maxPoints;
+                          // Shift a non-tied entry's style down by however many extra
+                          // places the tie ate (e.g. two tied for 1st → the 3rd-column
+                          // entry shows as 2nd-place styling, not 3rd).
+                          const effRank = (isTiedForFirst ? 0 : Math.max(0, rank - rankShift)) as 0 | 1 | 2;
+                          const rankStyle = PODIUM_RANK_STYLE[effRank];
                           const heightPct = Math.max(0.35, entry.points / maxPoints);
                           const pillarHeight = Math.round(rankStyle.minH + (rankStyle.maxH - rankStyle.minH) * heightPct);
                           // Mockup floats the crown a fixed distance above the
@@ -647,12 +654,20 @@ export default function HomeScreen() {
                           // real-data pillar can end up much shorter (e.g. a 3rd-place entry
                           // far behind 1st) — clamp it so the name+points+"pts" stack always
                           // has room, instead of squeezing the name text to ~0px tall.
-                          const MIN_CONTENT_H = rank === 0 ? 64 : 50;
+                          const MIN_CONTENT_H = effRank === 0 ? 64 : 50;
                           // The shard's top edge is slanted (SHARD_SLOPE), not flat — on the
                           // lower corner the colored fill doesn't start until partway down.
                           // padTop must clear that corner or the centered text renders partly
                           // in the empty wedge above the fill instead of inside the pillar.
-                          const [shardTl, shardTr] = SHARD_SLOPE[colIdx];
+                          // Tied-for-1st pillars use a matched slope magnitude (rank 0's own
+                          // 0.15) on whichever corner faces the other tied pillar — the default
+                          // per-column slopes differ (0.20/0.15/0.25), so two "equal height"
+                          // pillars with mismatched slopes still looked uneven at the edge
+                          // where they meet.
+                          const shardSlope: [number, number] = isTiedForFirst
+                            ? (colIdx === 0 ? [0, 0.15] : colIdx === 2 ? [0.15, 0] : SHARD_SLOPE[colIdx])
+                            : SHARD_SLOPE[colIdx];
+                          const [shardTl, shardTr] = shardSlope;
                           const slantClearance = Math.ceil(Math.max(shardTl, shardTr) * pillarHeight) + 4;
                           const effPadTop = Math.max(slantClearance, Math.min(rankStyle.padTop, pillarHeight - MIN_CONTENT_H - rankStyle.padBottom));
                           // Raising padTop to clear the slant can eat back into the room the
@@ -667,7 +682,7 @@ export default function HomeScreen() {
                                   Platform.OS === 'web' ? ({ filter: `drop-shadow(0 0 ${rankStyle.avatarGlowRadius}px ${rankStyle.avatarGlow})` } as any) : null,
                                 ]}
                               >
-                                {rank === 0 && (
+                                {effRank === 0 && (
                                   <View style={[styles.mPodiumCrownWrap, { top: -crownOffset }]}>
                                     <RivalIcon name="crown" size={24} color="#FFD700" />
                                   </View>
@@ -679,12 +694,20 @@ export default function HomeScreen() {
                                       width: rankStyle.avatarSize, height: rankStyle.avatarSize, borderRadius: rankStyle.avatarSize / 2,
                                       borderColor: rankStyle.tint,
                                       transform: [{ rotate: colIdx === 0 ? '-6deg' : colIdx === 2 ? '6deg' : '0deg' }],
+                                      overflow: 'hidden',
                                     },
                                   ]}
                                 >
-                                  <Text style={{ fontFamily: RivalFontFamily, color: rankStyle.tint, fontWeight: '800', fontSize: rankStyle.avatarSize * 0.32 }}>
-                                    {(entry.isSelf ? 'Y' : entry.name[0] || '?').toUpperCase()}
-                                  </Text>
+                                  {entry.avatarUrl ? (
+                                    <Image
+                                      source={{ uri: entry.avatarUrl }}
+                                      style={{ width: rankStyle.avatarSize, height: rankStyle.avatarSize, borderRadius: rankStyle.avatarSize / 2 }}
+                                    />
+                                  ) : (
+                                    <Text style={{ fontFamily: RivalFontFamily, color: rankStyle.tint, fontWeight: '800', fontSize: rankStyle.avatarSize * 0.32 }}>
+                                      {(entry.isSelf ? 'Y' : entry.name[0] || '?').toUpperCase()}
+                                    </Text>
+                                  )}
                                 </View>
                               </View>
                               <View
@@ -701,7 +724,7 @@ export default function HomeScreen() {
                                     </LinearGradient>
                                   </Defs>
                                   <Polygon
-                                    points={shardPoints(colIdx, pillarHeight)}
+                                    points={shardPoints(shardSlope, pillarHeight)}
                                     fill={`url(#podiumGrad${colIdx})`}
                                     stroke={rankStyle.tint}
                                     strokeWidth={1.25}
@@ -727,29 +750,33 @@ export default function HomeScreen() {
                         </View>
                       </View>
 
-                      <View style={styles.mPodiumMetaCapsule}>
-                        {(() => {
-                          const story = selfIndex !== -1 ? weeklyRankStory(standings, selfIndex) : null;
-                          return (
-                            <>
-                              {story && (
-                                <Text style={styles.mPodiumOutsideRow}>
-                                  {story.before}
-                                  {story.gap !== null && <Text style={{ color: RivalColors.accentText, fontWeight: '700', fontSize: 31 }}>{story.gap}</Text>}
-                                  <Text style={{ position: 'relative', top: -12, marginLeft: 6 }}>{story.after}</Text>
-                                </Text>
-                              )}
-                              {/* The -18 pull-up is tuned against rows that have trailing "Behind
-                                  Sandy" text after the number — that trailing text is what actually
-                                  gives the row its taller rendered height. Both "leading" branches
-                                  (solo, or "Leading by N") have no trailing text, so the row is
-                                  shorter and the same pull-up overlaps this text on top of it —
-                                  regardless of whether a gap number is present. */}
-                              <Text style={[styles.mLeaderFooterMeta, story && !story.after && { marginTop: 2, marginLeft: 0 }]}>{endsLabel}</Text>
-                            </>
-                          );
-                        })()}
-                      </View>
+                      {(() => {
+                        const story = selfIndex !== -1 ? weeklyRankStory(standings, selfIndex) : null;
+                        // With no gap number, the title is just a short line of text
+                        // ("Who's taking it?" / "You're leading") rather than a big
+                        // number anchoring the row on the left — center both lines in
+                        // the capsule instead of left-aligning them against its
+                        // number-driven width.
+                        const centered = !!story && story.gap === null;
+                        return (
+                          <View style={[styles.mPodiumMetaCapsule, centered && { alignItems: 'center' }]}>
+                            {story && (
+                              <Text style={[styles.mPodiumOutsideRow, centered && { textAlign: 'center' }]}>
+                                {story.before}
+                                {story.gap !== null && <Text style={{ color: RivalColors.accentText, fontWeight: '700', fontSize: 31 }}>{story.gap}</Text>}
+                                <Text style={{ position: 'relative', top: -12, marginLeft: 6 }}>{story.after}</Text>
+                              </Text>
+                            )}
+                            {/* The -18 pull-up is tuned against rows that have trailing "Behind
+                                Sandy" text after the number — that trailing text is what actually
+                                gives the row its taller rendered height. Both "leading" branches
+                                (solo, or "Leading by N") have no trailing text, so the row is
+                                shorter and the same pull-up overlaps this text on top of it —
+                                regardless of whether a gap number is present. */}
+                            <Text style={[styles.mLeaderFooterMeta, story && !story.after && { marginTop: -3, marginLeft: 0 }, centered && { textAlign: 'center' }]}>{endsLabel}</Text>
+                          </View>
+                        );
+                      })()}
                     </>
                   );
                 })()}
@@ -807,7 +834,7 @@ export default function HomeScreen() {
                   <View style={[styles.mLegacyStatCell, styles.mLegacyStatCellBorder]}>
                     <RivalIcon name="bolt" size={16} color={RivalColors.accentFill} />
                     <Text style={[styles.mLegacyStatValue, styles.mLegacyStatValueLg]}>
-                      <Text style={{ position: 'relative', top: 1, left: 2 }}>+</Text>
+                      <Text style={{ position: 'relative', top: 0, left: 1 }}>+</Text>
                       <Text style={{ marginLeft: 3 }}>{Math.round(todayEffort)}</Text>
                     </Text>
                     <Text style={[styles.mLegacyStatLabel, styles.mLegacyStatLabelLg]}>Effort Today</Text>
@@ -1829,7 +1856,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center', marginTop: 19, paddingTop: 5, paddingBottom: 8, paddingHorizontal: 20, borderRadius: RivalRadius.lg,
     alignItems: 'flex-start', backgroundColor: 'rgba(19,19,19,0.55)', borderWidth: 1, borderColor: RivalColors.surfaceBright,
   },
-  mPodiumOutsideRow: { fontFamily: RivalFontFamily, fontSize: 15, color: '#FFFFFF', textAlign: 'left' },
+  mPodiumOutsideRow: { fontFamily: RivalFontFamily, fontSize: 15, fontWeight: '600', color: '#FFFFFF', textAlign: 'left', letterSpacing: 0.5 },
   // marginLeft lines "Ends tomorrow" up under "Behind" on the line above —
   // tuned by measuring where "Behind" actually starts, not a guess.
   mLeaderFooterMeta: { fontFamily: RivalFontFamily, fontSize: 11, color: RivalColors.textSecondary, marginTop: -18, marginLeft: 46 },
@@ -1859,7 +1886,7 @@ const styles = StyleSheet.create({
   // Negative marginTop pulls this up specifically closer to the Weekly
   // Leader card above it — content's own gap:20 is shared by every card on
   // this screen, so trim just this one gap here rather than globally.
-  mAddActivityOverride: { backgroundColor: RivalColors.accentText, width: '80%', minWidth: 0, paddingHorizontal: 13, paddingVertical: 13, marginBottom: 16, marginTop: -38 },
+  mAddActivityOverride: { backgroundColor: RivalColors.accentText, width: '80%', minWidth: 0, paddingHorizontal: 13, paddingVertical: 13, marginBottom: 16, marginTop: -43 },
   // The base label style's lineHeight:28 (sized for titleMd's 20px font)
   // survives unless reset here, padding the pill out ~10px taller than the
   // mockup's tightly-set 15px text.
@@ -1906,6 +1933,9 @@ const styles = StyleSheet.create({
   },
   mLegacyHeroLabel: { ...RivalType.labelCaps, fontSize: 10, letterSpacing: 2, color: RivalColors.accentFill },
   mLegacyDivider: { width: 1, height: 56, alignSelf: 'center', backgroundColor: RivalColors.accentFill, opacity: 0.4, marginTop: 8, marginBottom: 6 },
+  // Half the Legacy divider's length — leads the eye down toward the Add
+  // Activity button below the empty-state card instead of just floating copy.
+  mLeaderEmptyDivider: { width: 1, height: 36, alignSelf: 'center', backgroundColor: RivalColors.accentFill, opacity: 0.4, marginTop: 4 },
   mLegacyViewAllLink: { fontFamily: RivalFontFamily, fontSize: 13, fontWeight: '500', color: RivalColors.textSecondary },
 
 });
