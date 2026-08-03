@@ -566,7 +566,7 @@ export default function HomeScreen() {
         />
 
         <ScrollView
-          contentContainerStyle={styles.content}
+          contentContainerStyle={[styles.content, mobile && styles.contentMobile]}
           // iOS standalone (home-screen) web apps have a known WebKit quirk:
           // position:fixed siblings of a nested SCROLLING div (this one —
           // the actual page <body> deliberately doesn't scroll, see
@@ -580,6 +580,11 @@ export default function HomeScreen() {
             <>
               {/* Weekly Leader podium */}
               <RivalCard style={styles.mLeaderCard}>
+                <Image
+                  source={require('../../assets/images/backgrounds/optimized/podium-smoke.png')}
+                  style={styles.mPodiumSmoke}
+                  resizeMode="cover"
+                />
                 <Text style={styles.mLeaderKicker}>WEEKLY LEADER</Text>
                 {weeklyLeader && <Text style={styles.mLeaderTeamName}>{weeklyLeader.teamName}</Text>}
 
@@ -1538,7 +1543,16 @@ const styles = StyleSheet.create({
   // Mobile Today's flat background — mockup has no hero photo, just #131313
   // plus a subtle warm radial glow anchored bottom-right.
   mBgFixed: {
-    position: 'fixed' as any, top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%',
+    position: 'fixed' as any, top: 0, left: 0, right: 0, width: '100%',
+    // 100vh, not 100%/bottom:0 — confirmed via on-device Web Inspector that
+    // standalone iOS PWAs still have the small/large viewport split despite
+    // having no browser chrome to explain it (window.innerHeight comes back
+    // 59px short of the real screen). height:100% resolves against the
+    // small one and stops 59px above the true bottom edge; 100vh is the
+    // large one and reaches it. Same fix already used by bgFixed/scrim
+    // below and RivalFixedBackground.tsx — this was the one style that
+    // deviated from that pattern.
+    height: '100vh' as any,
     backgroundColor: '#131313',
     ...(Platform.OS === 'web' ? { backgroundImage: 'radial-gradient(ellipse 140% 90% at 88% 105%, rgba(217,119,87,0.10) 0%, rgba(19,19,19,0) 55%)' } as any : {}),
   },
@@ -1546,6 +1560,11 @@ const styles = StyleSheet.create({
   // Max-width + auto margins keep desktop content centered with the photo
   // breathing on both sides, like the mockup (Yoga supports 'auto' margins).
   content: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 48, gap: 20, width: '100%', maxWidth: 1200, marginHorizontal: 'auto' },
+  // Mobile's bottom nav is a floating pill overlaying content (RivalTopNav),
+  // not part of the layout flow, so the scroll content needs its own
+  // clearance or the last card ends up hidden behind it — the 48 above is
+  // sized for desktop, which has no floating nav to clear.
+  contentMobile: { paddingBottom: 120 },
 
   navBar: { width: '100%', backgroundColor: 'rgba(14,14,14,0.65)', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' },
   navRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', maxWidth: 1200, marginHorizontal: 'auto', paddingHorizontal: 24, paddingVertical: 12 },
@@ -1818,6 +1837,40 @@ const styles = StyleSheet.create({
           filter: 'blur(1.5px)',
         } as any
       : { backgroundColor: 'rgba(255,205,90,0.4)' }),
+  },
+  // Real smoke photo behind the whole Weekly Leader card, kept subtle (low
+  // opacity) — bleeds all the way to the card's outer edges and up under
+  // the title, not just boxed around the pillars.
+  // RN's Image doesn't size itself from inset offsets alone — without an
+  // explicit width/height it renders at the source's native pixel size
+  // (1024x1024 here), so width/height:100% is required. That 100% is
+  // computed against the card's PADDED content box though, so reaching the
+  // true outer edge needs negative margins matching the card's own padding
+  // (paddingHorizontal:16, paddingTop:17, paddingBottom:38) on top of that,
+  // the same bleed technique mLeaderCard itself uses against the ScrollView.
+  // Height is a measured constant (title + podium down to the stage glow),
+  // not '100%' of the card — the card's own box also contains the capsule
+  // text below the pillars, so 100% stretched this well past the glow into
+  // the capsule area. Since the source is square and this box is much
+  // taller than wide, cover-fit scales to match the box's HEIGHT with no
+  // vertical cropping at all — the full image height always maps across
+  // whatever height is given, so getting the glow-aligned bottom edge right
+  // requires sizing the box itself, not an objectPosition crop-anchor (which
+  // has nothing to shift when nothing is being cropped vertically).
+  mPodiumSmoke: {
+    position: 'absolute', width: '100%', height: 353,
+    marginLeft: -16, marginRight: -16, marginTop: -26,
+    opacity: 0.28,
+    // The box's own bottom edge was a hard cutoff against the card's dark
+    // bg — a mask-image fade (not just lowering opacity further, which
+    // would dim the whole photo) fades out just the bottom ~30% so it
+    // blends into the surrounding card instead of reading as a cropped photo.
+    ...(Platform.OS === 'web'
+      ? ({
+          maskImage: 'linear-gradient(to bottom, black 0%, black 65%, transparent 100%)',
+          WebkitMaskImage: 'linear-gradient(to bottom, black 0%, black 65%, transparent 100%)',
+        } as any)
+      : {}),
   },
   // Fewer than 3 people on the board — center the real column(s) at a fixed
   // width instead of stretching flex:1 across the full card width.
