@@ -739,11 +739,13 @@ export default function HomeScreen() {
                                   <Text style={{ position: 'relative', top: -12, marginLeft: 6 }}>{story.after}</Text>
                                 </Text>
                               )}
-                              {/* The -18 pull-up is tuned against the 31px gap-number row above (e.g.
-                                  "49 Behind Sandy") — with no rival to compare against ("You're
-                                  leading" alone, story.gap === null), that row is a single normal-size
-                                  line, so the same pull-up overlaps this text directly on top of it. */}
-                              <Text style={[styles.mLeaderFooterMeta, story && story.gap === null && { marginTop: 2, marginLeft: 0 }]}>{endsLabel}</Text>
+                              {/* The -18 pull-up is tuned against rows that have trailing "Behind
+                                  Sandy" text after the number — that trailing text is what actually
+                                  gives the row its taller rendered height. Both "leading" branches
+                                  (solo, or "Leading by N") have no trailing text, so the row is
+                                  shorter and the same pull-up overlaps this text on top of it —
+                                  regardless of whether a gap number is present. */}
+                              <Text style={[styles.mLeaderFooterMeta, story && !story.after && { marginTop: 2, marginLeft: 0 }]}>{endsLabel}</Text>
                             </>
                           );
                         })()}
@@ -805,7 +807,7 @@ export default function HomeScreen() {
                   <View style={[styles.mLegacyStatCell, styles.mLegacyStatCellBorder]}>
                     <RivalIcon name="bolt" size={16} color={RivalColors.accentFill} />
                     <Text style={[styles.mLegacyStatValue, styles.mLegacyStatValueLg]}>
-                      <Text style={{ position: 'relative', top: -1 }}>+</Text>
+                      <Text style={{ position: 'relative', top: 1, left: 2 }}>+</Text>
                       <Text style={{ marginLeft: 3 }}>{Math.round(todayEffort)}</Text>
                     </Text>
                     <Text style={[styles.mLegacyStatLabel, styles.mLegacyStatLabelLg]}>Effort Today</Text>
