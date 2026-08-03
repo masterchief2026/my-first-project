@@ -1,17 +1,18 @@
 import { useState, useCallback } from 'react';
 import { StyleSheet, TouchableOpacity, View, Text, Platform, ScrollView, Image, ImageBackground, useWindowDimensions } from 'react-native';
+import Svg, { Defs, LinearGradient, Polygon, Stop } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { supabase } from '../lib/supabase';
 import { fetchAllActivities } from '../lib/fetchAllActivities';
 import { notify } from '../lib/notify';
-import { getDailyQuote, QuoteTone } from '../lib/quotes';
 import { getMondayOfWeek, calculateStreak } from '../lib/streak';
 import { getCurrentSeasonYear, daysUntilSeasonEnd, getSeasonStartISO } from '../lib/season';
 import { getLevel } from '../lib/xp';
 import { computeGoalProgress, goalUnit, GoalRow } from '../lib/goalProgress';
 import { RivalButton, RivalCard, RivalProgressBar, RivalIcon, RivalTopNav } from '../components/rival';
-import { RivalColors, RivalRadius, RivalType } from '../constants/rivalTheme';
+import { RivalColors, RivalRadius, RivalType, RivalFontFamily } from '../constants/rivalTheme';
+import { BREAKPOINT_WIDE_LAYOUT } from '../constants/breakpoints';
 
 type League = { id: string; name: string; invite_code: string; logo_url: string | null; recentCount?: number };
 type NextRace = { name: string; race_date: string } | null;
@@ -60,17 +61,64 @@ function weeklyRankStory(standings: WeeklyLeaderEntry[], selfIndex: number): Ran
       ? { rankIcon: 'medal', rankLabel: null, before: 'Leading by ', gap: Math.round(leader.points - second.points), after: '' }
       : { rankIcon: 'medal', rankLabel: null, before: "You're leading", gap: null, after: '' };
   }
-  if (selfIndex === 1) {
-    const gap = Math.round(leader.points - standings[1].points);
-    return { rankIcon: 'medal', rankLabel: null, before: '', gap, after: ` behind ${leader.name}` };
-  }
-  if (selfIndex === 2) {
-    const gap = Math.round(leader.points - standings[2].points);
-    return { rankIcon: 'medal', rankLabel: null, before: '', gap, after: ' from first' };
-  }
-  const podiumCutoff = standings[2] || leader;
-  const gap = Math.round(podiumCutoff.points - standings[selfIndex].points);
-  return { rankIcon: null, rankLabel: `${selfIndex + 1}th`, before: '', gap, after: ' to reach the podium' };
+  // Everyone else compares to whoever's directly ahead of them, not always
+  // the leader — e.g. 3rd place should see the gap to 2nd, not to 1st, and
+  // 5th place should see the gap to 4th, not to 3rd/the podium cutoff.
+  const front = standings[selfIndex - 1];
+  const gap = Math.round(front.points - standings[selfIndex].points);
+  const rankIcon = selfIndex <= 2 ? 'medal' : null;
+  const rankLabel = selfIndex <= 2 ? null : `${selfIndex + 1}th`;
+  return { rankIcon, rankLabel, before: '', gap, after: ` Behind ${front.name}` };
+}
+
+// Mobile Weekly Leader podium — mockup's exact left-to-right arrangement is
+// silver(2nd)/gold(1st)/bronze(3rd), NOT rank order. A slot is null (renders
+// as empty flex space) when standings.length is under 3, rather than
+// fabricating a slot.
+type PodiumSlot = { entry: WeeklyLeaderEntry; rank: 0 | 1 | 2 } | null;
+function podiumSlots(standings: WeeklyLeaderEntry[]): PodiumSlot[] {
+  const slot = (i: number, rank: 0 | 1 | 2): PodiumSlot => (standings[i] ? { entry: standings[i], rank } : null);
+  return [slot(1, 1), slot(0, 0), slot(2, 2)];
+}
+// Gradient fill (top→bottom, matching mockup's 165deg .km-shard-* CSS
+// gradients exactly) + glow color/radius per rank, plus label/height/avatar
+// sizing. avatarGlow is the avatar circle's own soft drop-shadow, separate
+// from the shard's glow — the mockup gives each avatar one too. maxH matches
+// the mockup's fixed reference heights (189/131/107) exactly so a big lead
+// looks as tall as the mockup; minH is a floor for low scorers, not a mockup
+// value (the mockup's heights are static demo numbers, ours scale with
+// real points — an intentional deviation, see the port's design plan).
+// Sized at 85% of the mockup's literal px values — Ricky asked to shrink the
+// whole Weekly Leader card ~15% after seeing it next to the other cards.
+const PODIUM_RANK_STYLE = [
+  {
+    gradFrom: 'rgba(255,215,0,0.4)', gradTo: 'rgba(180,140,10,0.1)', glow: 'rgba(255,215,0,0.28)', glowRadius: 10,
+    avatarGlow: 'rgba(255,215,0,0.25)', avatarGlowRadius: 7,
+    tint: '#FFD700', ptsColor: '#FFD700', ptsTint: 'rgba(255,215,0,0.7)', minH: 119, maxH: 161, avatarSize: 58, nameSize: 11, nameLetterSpacing: 1.5, ptsSize: 31, padTop: 29, padBottom: 20,
+  },
+  {
+    gradFrom: 'rgba(150,130,110,0.32)', gradTo: 'rgba(60,50,45,0.08)', glow: 'rgba(180,150,120,0.18)', glowRadius: 7,
+    avatarGlow: 'rgba(255,181,158,0.3)', avatarGlowRadius: 5,
+    tint: RivalColors.accentText, ptsColor: '#FFFFFF', ptsTint: 'rgba(255,181,158,0.7)', minH: 81, maxH: 111, avatarSize: 41, nameSize: 10, nameLetterSpacing: 1.5, ptsSize: 20, padTop: 26, padBottom: 14,
+  },
+  {
+    gradFrom: 'rgba(94,218,199,0.25)', gradTo: 'rgba(0,80,71,0.05)', glow: 'rgba(217,119,87,0.15)', glowRadius: 7,
+    avatarGlow: 'rgba(94,218,199,0.15)', avatarGlowRadius: 5,
+    tint: RivalColors.tertiary, ptsColor: '#FFFFFF', ptsTint: 'rgba(94,218,199,0.6)', minH: 66, maxH: 91, avatarSize: 41, nameSize: 10, nameLetterSpacing: 1.5, ptsSize: 20, padTop: 26, padBottom: 14,
+  },
+] as const;
+// Sloped-top-edge fraction pairs [topLeft, topRight] per column position
+// (0=left/silver, 1=center/gold, 2=right/bronze) — same angles as the
+// mockup's CSS clip-path shards, reproduced as an SVG polygon since RN has
+// no clip-path equivalent.
+const SHARD_SLOPE: Record<number, [number, number]> = { 0: [0, 0.20], 1: [0.15, 0], 2: [0.25, 0] };
+// A 6-point lens polygon reads as faceted/cut at the tip — more points along
+// a curve gets closer to an actual tapered point without the hard facets.
+const PODIUM_LENS_CLIP =
+  'polygon(0% 50%, 2% 32%, 5% 16%, 10% 6%, 18% 1%, 30% 0%, 70% 0%, 82% 1%, 90% 6%, 95% 16%, 98% 32%, 100% 50%, 98% 68%, 95% 84%, 90% 94%, 82% 99%, 70% 100%, 30% 100%, 18% 99%, 10% 94%, 5% 84%, 2% 68%)';
+function shardPoints(colIdx: number, height: number): string {
+  const [tl, tr] = SHARD_SLOPE[colIdx];
+  return `0,${tl * height} 100,${tr * height} 100,${height} 0,${height}`;
 }
 // Team Momentum's status line — reuses the same weeklyLeader standings the
 // Weekly Leader card computes for this same team (leagues[0], the most
@@ -105,6 +153,10 @@ function momentumStory(trainers: MomentumTrainers | null, weeklyLeader: WeeklyLe
 type FeaturedGoal = {
   id: string;
   title: string;
+  // Bare activity name ("Run"), no "• target unit" suffix — the mobile Focus
+  // card's mockup shows the target only once, in the hero number row, so it
+  // reuses this instead of `title` (which desktop's card still uses as-is).
+  activityLabel: string;
   progress: number;
   target: number;
   unit: string;
@@ -128,6 +180,16 @@ function daysUntil(dateStr: string): number {
   const race = new Date(y, m - 1, d);
   const now = new Date(); now.setHours(0, 0, 0, 0);
   return Math.ceil((race.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+// "Sun 25 Oct" — mobile Next Event card's date format (no existing formatter
+// in dateFormat.ts covers this shape, that file is DD/MM/YYYY <-> ISO only).
+function formatRaceDateShort(dateStr: string): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  const weekday = date.toLocaleDateString('en-US', { weekday: 'short' });
+  const month = date.toLocaleDateString('en-US', { month: 'short' });
+  return `${weekday} ${d} ${month}`;
 }
 
 // Scales the hero number down as it gets longer so "186h 10m" still fits on
@@ -156,53 +218,67 @@ function focusProgressPhrase(pct: number): string {
   return "Let's do this";
 }
 
-function heroValueFontSize(text: string): number {
-  if (text.length <= 4) return 132;
-  if (text.length <= 6) return 114;
-  if (text.length <= 8) return 94;
-  if (text.length <= 10) return 76;
-  return 60;
+// Rough advance width for a single glyph at a given font size — digits/"h"/"m"
+// in this typeface run about 0.58em wide on average. Good enough to size
+// against without an actual text-measurement pass.
+const CHAR_WIDTH_RATIO = 0.58;
+
+// Length-based buckets alone assumed a wide desktop card; on a narrow phone
+// the same string ("188h 33m") can overflow the card at that bucket's font
+// size and get clipped by the value's numberOfLines={1}. Start from the same
+// buckets, then shrink further if the estimate still doesn't fit the card's
+// actual available width.
+function heroValueFontSize(text: string, availableWidth: number): number {
+  let size = text.length <= 4 ? 132 : text.length <= 6 ? 114 : text.length <= 8 ? 94 : text.length <= 10 ? 76 : 60;
+  while (size > 40 && text.length * size * CHAR_WIDTH_RATIO > availableWidth) {
+    size -= 2;
+  }
+  return size;
 }
 
-// Same dead-space lesson as heroValueFontSize, applied to the other side of
-// this problem: a name is unbounded ("Sam Lee" vs "Maximilian von
-// Hohenberg-Smith"), so fixed wide tracking that looks great on a short name
-// turns unwieldy or wraps badly on a long one. Tightens automatically as
-// names get longer instead of needing a per-user retune — the current
-// name's own length (<=22, e.g. "Ricky Jackson-Lewis") keeps the exact
-// current look (14.5, the 0.5em ratio), only longer names taper further.
-function greetingLetterSpacing(name: string): number {
-  if (name.length <= 22) return 14.5;
-  if (name.length <= 30) return 9.41;
-  if (name.length <= 40) return 5.88;
-  return 3.53;
-}
 
 
 export default function HomeScreen() {
-  const [displayName, setDisplayName] = useState('');
-  const [stravaConnected, setStravaConnected] = useState(false);
+  const [stravaConnected, setStravaConnected] = useState(true);
   const [leagues, setLeagues] = useState<League[]>([]);
-  const [weeklyLeader, setWeeklyLeader] = useState<WeeklyLeader | null>(null);
+  // TEMP DEBUG DATA — mirrors the mockup's own demo numbers so the mobile
+  // Today screen can be visually diffed against base-mockup-v3 pixel-by-pixel.
+  // Revert every field in this block before this session ends.
+  const [weeklyLeader, setWeeklyLeader] = useState<WeeklyLeader | null>({
+    // Real team/standings from Ricky's account (Sandy 232 / You 183) plus one
+    // fabricated 3rd teammate ("Jordan") so the 3-column podium can be
+    // previewed here without touching the real team's DB rows.
+    leagueId: 'debug', teamName: 'The Hidden Leaf', daysRemaining: 1,
+    standings: [
+      { userId: 's', name: 'Sandy', avatarUrl: null, points: 232, isSelf: false },
+      { userId: 'y', name: 'You', avatarUrl: null, points: 183, isSelf: true },
+      { userId: 'j', name: 'Jordan', avatarUrl: null, points: 146, isSelf: false },
+    ],
+  });
   const [momentumTrainers, setMomentumTrainers] = useState<MomentumTrainers | null>(null);
-  const [nextRace, setNextRace] = useState<NextRace>(null);
-  const [totalDistanceKm, setTotalDistanceKm] = useState(0);
-  const [totalElevationM, setTotalElevationM] = useState(0);
-  const [totalTimeMinutes, setTotalTimeMinutes] = useState(0);
+  const [nextRace, setNextRace] = useState<NextRace>({ name: 'Auckland Marathon', race_date: '2026-10-25' });
+  const [totalDistanceKm, setTotalDistanceKm] = useState(1037);
+  const [totalElevationM, setTotalElevationM] = useState(20937);
+  const [totalTimeMinutes, setTotalTimeMinutes] = useState(188 * 60 + 33);
   // Lifetime effort/activity counts — kept separate from totalXp (season-
   // scoped, drives getLevel()) so the LEGACY card's four numbers are all the
   // same timeframe without changing what powers the user's rank.
-  const [lifetimeXp, setLifetimeXp] = useState(0);
-  const [lifetimeActivityCount, setLifetimeActivityCount] = useState(0);
-  const [weeklyStreak, setWeeklyStreak] = useState(0);
-  const [rankName, setRankName] = useState<string | null>(null);
-  const [featuredGoal, setFeaturedGoal] = useState<FeaturedGoal | null>(null);
+  const [lifetimeXp, setLifetimeXp] = useState(13038);
+  const [lifetimeActivityCount, setLifetimeActivityCount] = useState(223);
+  const [weeklyStreak, setWeeklyStreak] = useState(16);
+  // Today-only Effort — new, mobile Legacy section's "Effort today" stat.
+  // Derived from the same `activities` array loadAll() already fetches, not
+  // a new query.
+  const [todayEffort, setTodayEffort] = useState(42);
+  const [rankName, setRankName] = useState<string | null>('Legend');
+  const [featuredGoal, setFeaturedGoal] = useState<FeaturedGoal | null>({
+    id: 'debug', title: 'Run • 100 km', activityLabel: 'Run', progress: 24.6, target: 100, unit: 'km', pct: 0.246, daysLeft: 3,
+  });
   const [goalsCardHovered, setGoalsCardHovered] = useState(false);
   const [leaderCardHovered, setLeaderCardHovered] = useState(false);
   const [momentumCardHovered, setMomentumCardHovered] = useState(false);
   const [statsCardHovered, setStatsCardHovered] = useState(false);
   const [addActivityHovered, setAddActivityHovered] = useState(false);
-  const [quote, setQuote] = useState(() => getDailyQuote());
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   useFocusEffect(useCallback(() => {
@@ -214,8 +290,6 @@ export default function HomeScreen() {
     if (!user) return;
 
     const uId = user.id;
-    const uName = user.user_metadata?.display_name || 'Athlete';
-    setDisplayName(uName);
 
     const today = todayLocalStr();
 
@@ -225,7 +299,7 @@ export default function HomeScreen() {
       fetchAllActivities(uId, 'id, started_at, effort_score, distance_meters, elevation_meters, activity_type, duration_seconds'),
       supabase.from('league_members').select('league_id, leagues(id, name, invite_code, logo_url)').eq('user_id', uId).eq('status', 'active'),
       supabase.from('races').select('name, race_date').eq('user_id', uId).gte('race_date', today).order('race_date', { ascending: true }).limit(1).maybeSingle(),
-      supabase.from('users').select('avatar_url, quote_tone').eq('id', uId).single(),
+      supabase.from('users').select('avatar_url').eq('id', uId).single(),
       supabase.from('goals').select('*').eq('user_id', uId),
     ]);
 
@@ -233,8 +307,6 @@ export default function HomeScreen() {
     setNextRace(raceRes.data ?? null);
     const myAvatarUrl: string | null = userProfileRes.data?.avatar_url || null;
     setAvatarUrl(myAvatarUrl);
-    const savedTone = userProfileRes.data?.quote_tone as QuoteTone | undefined;
-    if (savedTone && savedTone !== 'balanced') setQuote(getDailyQuote(savedTone));
 
     const leagueList = leaguesRes.data?.map((m: any) => m.leagues).filter(Boolean) ?? [];
     setLeagues(leagueList);
@@ -247,6 +319,9 @@ export default function HomeScreen() {
     setLifetimeXp(activities.reduce((s, a) => s + (a.effort_score || 0), 0));
     setLifetimeActivityCount(activities.length);
     setWeeklyStreak(calculateStreak(activities).current);
+    // Same local-day-boundary approach as the league "recentCount" teaser
+    // below — additive filter over the array already fetched above, no new query.
+    setTodayEffort(activities.filter(a => dateLocalStr(new Date(a.started_at)) === today).reduce((s, a) => s + (a.effort_score || 0), 0));
 
     // Rank = level from this season's Effort — same definition the nav bar uses.
     const seasonStart = new Date(getSeasonStartISO());
@@ -279,6 +354,7 @@ export default function HomeScreen() {
       setFeaturedGoal({
         id: top.goal.id,
         title: featuredGoalTitle(top.goal),
+        activityLabel: top.goal.goal_type === 'gym_sessions' ? 'Gym Sessions' : (top.goal.activity_filter ?? 'All Activities'),
         progress: top.progress,
         target: top.goal.target_value,
         unit: goalUnit(top.goal.goal_type),
@@ -411,7 +487,13 @@ export default function HomeScreen() {
             isSelf: id === uId,
           }));
 
-          setWeeklyLeader({ leagueId: pulseLeague.id, teamName: pulseLeague.name, daysRemaining, standings });
+          // TEMP DEBUG — injects a fake 3rd teammate into the REAL standings
+          // (Ricky's real account only has 2) purely so the 3-column podium
+          // can be previewed on his own logged-in device. Revert this block.
+          const previewStandings = standings.length === 2
+            ? [...standings, { userId: 'debug-3rd', name: 'Jordan', avatarUrl: null, points: Math.max(1, Math.round(standings[1].points * 0.8)), isSelf: false }]
+            : standings;
+          setWeeklyLeader({ leagueId: pulseLeague.id, teamName: pulseLeague.name, daysRemaining, standings: previewStandings });
         } else {
           setWeeklyLeader(null);
         }
@@ -443,7 +525,11 @@ export default function HomeScreen() {
   // The mockup's 4-card row must stay 4-across on desktop — explicit quarter
   // widths above the breakpoint, natural wrapping (2-up/stacked) below it.
   const { width: windowWidth } = useWindowDimensions();
-  const fourUp = windowWidth >= 840;
+  const fourUp = windowWidth >= BREAKPOINT_WIDE_LAYOUT;
+  // Mobile-only redesign branch — see rival/design/today-redesign. Desktop
+  // (below) is untouched: same width check the 4-up grid already uses, just
+  // inverted, so the two never overlap.
+  const mobile = windowWidth < BREAKPOINT_WIDE_LAYOUT;
   const gridCardStyle = fourUp ? [styles.gridCard, styles.gridCardQuarter] : styles.gridCard;
   const days = nextRace ? daysUntil(nextRace.race_date) : null;
   const seasonYear = getCurrentSeasonYear();
@@ -451,45 +537,352 @@ export default function HomeScreen() {
   const heroHours = Math.floor(totalTimeMinutes / 60);
   const heroMins = totalTimeMinutes % 60;
   const heroTimeText = `${heroHours > 0 ? `${heroHours}h ` : ''}${heroMins}m`;
+  // `content`'s horizontal padding (24 each side) minus heroCard's own maxWidth
+  // (92%) and internal padding (16 each side) — see styles below.
+  const heroCardAvailableWidth = Math.min(windowWidth - 48, 1200) * 0.92 - 32;
 
   return (
     <View style={{ flex: 1 }}>
       {/* Fixed viewport-covering background, decoupled from content height —
           a long team/stats list scrolling taller than one screen must never
-          outgrow the photo (same fix as league.tsx). */}
-      <ImageBackground
-        source={require('../../assets/images/backgrounds/optimized/a-single-solo-athlete-standing-on.jpg')}
-        style={styles.bgFixed}
-        resizeMode="cover"
-      />
-      <View style={styles.scrim} />
+          outgrow the photo (same fix as league.tsx). Desktop only — the
+          mockup's mobile redesign has no hero photo, just a flat dark
+          background (#131313 + a subtle warm radial glow), so mobile skips
+          both the photo and its scrim entirely. */}
+      {!mobile && (
+        <>
+          <ImageBackground
+            source={require('../../assets/images/backgrounds/optimized/a-single-solo-athlete-standing-on.jpg')}
+            style={styles.bgFixed}
+            resizeMode="cover"
+          />
+          <View style={styles.scrim} />
+        </>
+      )}
+      {mobile && <View style={styles.mBgFixed} />}
       <SafeAreaView style={styles.container}>
-        <RivalTopNav active="today" />
+        <RivalTopNav
+          active="today"
+          centerSlot={mobile ? (
+            <View style={{ alignItems: 'center' }}>
+              <Text style={styles.mTimeEarnedLabel}>TOTAL TIME EARNED</Text>
+              <Text style={styles.mTimeEarnedValue} numberOfLines={1}>{heroTimeText}</Text>
+            </View>
+          ) : undefined}
+        />
 
         <ScrollView contentContainerStyle={styles.content}>
 
-          {/* Greeting */}
-          <View style={styles.greetingBlock}>
-            <Text style={[styles.greeting, { letterSpacing: greetingLetterSpacing(displayName) }]}>{displayName}</Text>
-            <Text style={styles.greetingSub}>{quote.text}</Text>
-          </View>
+          {mobile ? (
+            <>
+              {/* Weekly Leader podium */}
+              <RivalCard style={styles.mLeaderCard}>
+                <Text style={styles.mLeaderKicker}>WEEKLY LEADER</Text>
+                {weeklyLeader && <Text style={styles.mLeaderTeamName}>{weeklyLeader.teamName}</Text>}
 
+                {weeklyLeader === null ? (
+                  <View style={{ alignItems: 'center', gap: 6, marginTop: 20 }}>
+                    <View style={styles.medalRing}><RivalIcon name="medal" size={28} color="#ECC654" /></View>
+                    <Text style={styles.mLeaderEmptyTitle}>LEAD THIS WEEK</Text>
+                    <Text style={styles.mLeaderEmptySub}>Earn the first Effort</Text>
+                    <TouchableOpacity onPress={() => router.push('/add-workout')}>
+                      <Text style={styles.mFocusViewLink}>Claim the Lead →</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (() => {
+                  const { standings, daysRemaining } = weeklyLeader;
+                  const selfIndex = standings.findIndex((e) => e.isSelf);
+                  const endsLabel = daysRemaining === 0 ? 'Last day' : daysRemaining === 1 ? 'Ends tomorrow' : `${daysRemaining} days remaining`;
+                  const slots = podiumSlots(standings);
+                  const maxPoints = standings[0]?.points || 1;
+                  // Always use the fixed-width column treatment (never the
+                  // flex:1-across-3-columns one) — Ricky wants pillars at
+                  // the same generous width regardless of headcount, matching
+                  // how they looked with just 2 people on the board.
+                  const activeCount = slots.filter(Boolean).length;
+                  const sparse = true;
+                  return (
+                    <>
+                      {/* Capped/centered to match mPodiumGrid's own cap — otherwise the
+                          absolutely-positioned stage line (inset relative to THIS wrapper)
+                          would stay full bleed-width while the pillars sit centered and
+                          narrower, drifting out of alignment on wide viewports. */}
+                      <View style={{ position: 'relative', maxWidth: 360, alignSelf: 'center' }}>
+                        {(() => {
+                          // The static left:20/right:20 inset is tuned for the full
+                          // 3-column row. When sparse, the pillars are centered at a
+                          // fixed width with empty flex space on either side, so that
+                          // same inset stretched the line far past the actual pillar
+                          // footprint. Size and center it to the real footprint instead.
+                          if (!sparse) return <View style={styles.mPodiumStageLine} pointerEvents="none" />;
+                          const COLUMN_W = 82;
+                          const GAP = 12;
+                          const BLEED = 36;
+                          const footprint = activeCount * COLUMN_W + Math.max(0, activeCount - 1) * GAP + BLEED * 2;
+                          const sparseInset: any = { left: '50%', right: undefined, width: footprint, marginLeft: -footprint / 2 };
+                          return <View style={[styles.mPodiumStageLine, sparseInset]} pointerEvents="none" />;
+                        })()}
+                        <View style={[styles.mPodiumGrid, sparse && styles.mPodiumGridSparse]}>
+                        {slots.map((slot, colIdx) => {
+                          if (!slot) return sparse ? null : <View key={colIdx} style={{ flex: 1 }} />;
+                          const { entry, rank } = slot;
+                          const rankStyle = PODIUM_RANK_STYLE[rank];
+                          const heightPct = Math.max(0.35, entry.points / maxPoints);
+                          const pillarHeight = Math.round(rankStyle.minH + (rankStyle.maxH - rankStyle.minH) * heightPct);
+                          // Mockup floats the crown a fixed distance above the
+                          // avatar (not in normal flow, doesn't push it down)
+                          // — same ~0.44x-of-avatar-size ratio as the mockup's
+                          // 30px-above-a-68px-avatar spacing, scaled to ours.
+                          const crownOffset = Math.round(rankStyle.avatarSize * 0.44);
+                          // padTop is tuned for this rank's mockup-reference height, but a
+                          // real-data pillar can end up much shorter (e.g. a 3rd-place entry
+                          // far behind 1st) — clamp it so the name+points+"pts" stack always
+                          // has room, instead of squeezing the name text to ~0px tall.
+                          const MIN_CONTENT_H = rank === 0 ? 64 : 50;
+                          // The shard's top edge is slanted (SHARD_SLOPE), not flat — on the
+                          // lower corner the colored fill doesn't start until partway down.
+                          // padTop must clear that corner or the centered text renders partly
+                          // in the empty wedge above the fill instead of inside the pillar.
+                          const [shardTl, shardTr] = SHARD_SLOPE[colIdx];
+                          const slantClearance = Math.ceil(Math.max(shardTl, shardTr) * pillarHeight) + 4;
+                          const effPadTop = Math.max(slantClearance, Math.min(rankStyle.padTop, pillarHeight - MIN_CONTENT_H - rankStyle.padBottom));
+                          // Raising padTop to clear the slant can eat back into the room the
+                          // MIN_CONTENT_H clamp above just freed up — give padBottom first
+                          // before the content stack itself gets squeezed again.
+                          const effPadBottom = Math.max(8, Math.min(rankStyle.padBottom, pillarHeight - effPadTop - MIN_CONTENT_H));
+                          return (
+                            <View key={entry.userId} style={[styles.mPodiumColumn, sparse && styles.mPodiumColumnSparse]}>
+                              <View
+                                style={[
+                                  { position: 'relative' },
+                                  Platform.OS === 'web' ? ({ filter: `drop-shadow(0 0 ${rankStyle.avatarGlowRadius}px ${rankStyle.avatarGlow})` } as any) : null,
+                                ]}
+                              >
+                                {rank === 0 && (
+                                  <View style={[styles.mPodiumCrownWrap, { top: -crownOffset }]}>
+                                    <RivalIcon name="crown" size={24} color="#FFD700" />
+                                  </View>
+                                )}
+                                <View
+                                  style={[
+                                    styles.mPodiumAvatar,
+                                    {
+                                      width: rankStyle.avatarSize, height: rankStyle.avatarSize, borderRadius: rankStyle.avatarSize / 2,
+                                      borderColor: rankStyle.tint,
+                                      transform: [{ rotate: colIdx === 0 ? '-6deg' : colIdx === 2 ? '6deg' : '0deg' }],
+                                    },
+                                  ]}
+                                >
+                                  <Text style={{ fontFamily: RivalFontFamily, color: rankStyle.tint, fontWeight: '800', fontSize: rankStyle.avatarSize * 0.32 }}>
+                                    {(entry.isSelf ? 'Y' : entry.name[0] || '?').toUpperCase()}
+                                  </Text>
+                                </View>
+                              </View>
+                              <View
+                                style={[
+                                  { width: '100%', height: pillarHeight, marginTop: 2 },
+                                  Platform.OS === 'web' ? ({ filter: `drop-shadow(0 0 ${rankStyle.glowRadius}px ${rankStyle.glow})` } as any) : null,
+                                ]}
+                              >
+                                <Svg width="100%" height="100%" viewBox={`0 0 100 ${pillarHeight}`} preserveAspectRatio="none" style={{ position: 'absolute' }}>
+                                  <Defs>
+                                    <LinearGradient id={`podiumGrad${colIdx}`} x1="0" y1="0" x2="0" y2="1">
+                                      <Stop offset="0" stopColor={rankStyle.gradFrom} />
+                                      <Stop offset="1" stopColor={rankStyle.gradTo} />
+                                    </LinearGradient>
+                                  </Defs>
+                                  <Polygon
+                                    points={shardPoints(colIdx, pillarHeight)}
+                                    fill={`url(#podiumGrad${colIdx})`}
+                                    stroke={rankStyle.tint}
+                                    strokeWidth={1.25}
+                                    strokeOpacity={0.85}
+                                    strokeLinejoin="miter"
+                                    // The viewBox's non-uniform x/y scaling (preserveAspectRatio="none")
+                                    // otherwise stretches the stroke unevenly, blunting the sharp
+                                    // corners at the shard's tips instead of a clean miter point.
+                                    vectorEffect="non-scaling-stroke"
+                                  />
+                                </Svg>
+                                <View style={{ flex: 1, alignItems: 'center', paddingTop: effPadTop, paddingBottom: effPadBottom }}>
+                                  <Text style={[styles.mPodiumName, { color: rankStyle.tint, fontSize: rankStyle.nameSize, lineHeight: Math.round(rankStyle.nameSize * 1.15), letterSpacing: rankStyle.nameLetterSpacing }]} numberOfLines={1}>
+                                    {entry.isSelf ? 'You' : entry.name}
+                                  </Text>
+                                  <Text style={[styles.mPodiumPoints, { fontSize: rankStyle.ptsSize, lineHeight: Math.round(rankStyle.ptsSize * 1.15), color: rankStyle.ptsColor }]}>{entry.points}</Text>
+                                  <Text style={{ fontSize: 10, lineHeight: 12, color: rankStyle.ptsTint, fontWeight: '500', flexShrink: 0 }}>pts</Text>
+                                </View>
+                              </View>
+                            </View>
+                          );
+                        })}
+                        </View>
+                      </View>
+
+                      <View style={styles.mPodiumMetaCapsule}>
+                        {selfIndex !== -1 && (() => {
+                          const story = weeklyRankStory(standings, selfIndex);
+                          return (
+                            <Text style={styles.mPodiumOutsideRow}>
+                              {story.before}
+                              {story.gap !== null && <Text style={{ color: RivalColors.accentText, fontWeight: '700', fontSize: 31 }}>{story.gap}</Text>}
+                              <Text style={{ position: 'relative', top: -12, marginLeft: 6 }}>{story.after}</Text>
+                            </Text>
+                          );
+                        })()}
+
+                        <Text style={styles.mLeaderFooterMeta}>{endsLabel}</Text>
+                      </View>
+                    </>
+                  );
+                })()}
+              </RivalCard>
+
+              {/* Add Activity */}
+              <RivalButton
+                label="Add Activity"
+                onPress={() => router.push('/add-workout')}
+                style={[styles.addWorkoutPill, styles.mAddActivityOverride]}
+                labelStyle={styles.mAddActivityLabel}
+              />
+
+              {/* Focus card */}
+              <RivalCard style={styles.mFocusCard}>
+                <View style={styles.mFocusGlowTL} pointerEvents="none" />
+                <View style={styles.mFocusGlowBottom} pointerEvents="none" />
+                <Text style={styles.mFocusKicker}>FOCUS</Text>
+                {featuredGoal ? (
+                  <>
+                    <Text style={styles.mFocusTitle}>{featuredGoal.activityLabel}</Text>
+                    <View style={styles.mFocusHeroRow}>
+                      <Text style={styles.mFocusHeroNumber}>{featuredGoal.progress.toLocaleString()}</Text>
+                      <Text style={styles.mFocusHeroUnit}>/ {featuredGoal.target.toLocaleString()} {featuredGoal.unit}</Text>
+                    </View>
+                    <View style={{ position: 'relative', width: '100%' }}>
+                      <RivalProgressBar
+                        pct={featuredGoal.pct}
+                        height={10}
+                        radius={5}
+                        gradientColors={[RivalColors.accentFill, RivalColors.accentGold]}
+                      />
+                      <Text style={[styles.focusProgressPctOnBar, styles.mFocusProgressPctOverride]}>{Math.round(featuredGoal.pct * 100)}%</Text>
+                    </View>
+                    <Text style={styles.mFocusDaysRemaining}>
+                      {featuredGoal.daysLeft === 0 ? 'Last Day' : `${featuredGoal.daysLeft} Day${featuredGoal.daysLeft === 1 ? '' : 's'} Remaining`}
+                    </Text>
+                    <TouchableOpacity onPress={() => router.push('/goals')}>
+                      <Text style={styles.mFocusViewLink}>View Focus →</Text>
+                    </TouchableOpacity>
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.mFocusEmptyTitle}>Choose something worth chasing.</Text>
+                    <TouchableOpacity onPress={() => router.push('/goals')}>
+                      <Text style={styles.mFocusViewLink}>Set Focus →</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
+              </RivalCard>
+
+              {/* Legacy section — borderless, shared warm glow background */}
+              <View style={styles.mLegacySection}>
+                <View style={styles.mLegacyStatBox}>
+                  <View style={[styles.mLegacyStatCell, styles.mLegacyStatCellBorder]}>
+                    <RivalIcon name="bolt" size={16} color={RivalColors.accentFill} />
+                    <Text style={[styles.mLegacyStatValue, styles.mLegacyStatValueLg]}>
+                      <Text style={{ position: 'relative', top: -2 }}>+</Text>
+                      <Text style={{ marginLeft: 3 }}>{Math.round(todayEffort)}</Text>
+                    </Text>
+                    <Text style={[styles.mLegacyStatLabel, styles.mLegacyStatLabelLg]}>Effort Today</Text>
+                  </View>
+                  <View style={[styles.mLegacyStatCell, styles.mLegacyStatCellBorder]}>
+                    <RivalIcon name="doubleChevronUp" size={16} color="#FFD700" />
+                    <Text style={[styles.mLegacyStatValue, styles.mLegacyStatValueGold]} numberOfLines={1}>{rankName || '—'}</Text>
+                    <Text style={[styles.mLegacyStatLabel, styles.mLegacyStatLabelLg]}>Rank</Text>
+                  </View>
+                  <View style={styles.mLegacyStatCell}>
+                    <RivalIcon name="fire" size={16} color={RivalColors.accentFill} />
+                    <Text style={[styles.mLegacyStatValue, styles.mLegacyStatValueLg]}>{weeklyStreak}</Text>
+                    <Text style={[styles.mLegacyStatLabel, styles.mLegacyStatLabelLg]}>Week Streak</Text>
+                  </View>
+                </View>
+
+                <View style={{ alignItems: 'center', marginTop: 24 }}>
+                  <Text style={styles.mLegacyKicker}>LEGACY</Text>
+                  <Text style={styles.mLegacySubtitle}>Everything you've earned</Text>
+                </View>
+
+                <View style={{ alignItems: 'center', marginTop: 20 }}>
+                  <Text style={styles.mLegacyHeroNumber}>{Math.round(lifetimeXp).toLocaleString()}</Text>
+                  <Text style={styles.mLegacyHeroLabel}>Total Effort</Text>
+                </View>
+
+                <View style={styles.mLegacyDivider} />
+
+                <View style={styles.mLegacyStatBox}>
+                  <View style={[styles.mLegacyStatCell, styles.mLegacyStatCellBorder]}>
+                    <RivalIcon name="fire" size={16} color={RivalColors.accentFill} />
+                    <Text style={styles.mLegacyStatValue}>{lifetimeActivityCount.toLocaleString()}</Text>
+                    <Text style={styles.mLegacyStatLabel}>Activities</Text>
+                  </View>
+                  <View style={[styles.mLegacyStatCell, styles.mLegacyStatCellBorder]}>
+                    <RivalIcon name="distance" size={16} color={RivalColors.accentFill} />
+                    <Text style={styles.mLegacyStatValue}>{totalDistanceKm.toLocaleString()} <Text style={styles.mLegacyStatUnit}>km</Text></Text>
+                    <Text style={styles.mLegacyStatLabel}>Distance</Text>
+                  </View>
+                  <View style={styles.mLegacyStatCell}>
+                    <RivalIcon name="elevation" size={16} color={RivalColors.accentFill} />
+                    <Text style={styles.mLegacyStatValue}>{totalElevationM.toLocaleString()} <Text style={styles.mLegacyStatUnit}>m</Text></Text>
+                    <Text style={styles.mLegacyStatLabel}>Elevation</Text>
+                  </View>
+                </View>
+
+                <TouchableOpacity onPress={() => router.push('/stats')} style={{ alignSelf: 'center', marginTop: 16 }}>
+                  <Text style={styles.mLegacyViewAllLink}>View all legacy →</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Next Event */}
+              <RivalCard style={styles.mNextEventCard}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.mNextEventKicker}>NEXT EVENT</Text>
+                  {nextRace ? (
+                    <>
+                      <Text style={styles.mNextEventName}>{nextRace.name}</Text>
+                      <Text style={styles.mNextEventDate}>{formatRaceDateShort(nextRace.race_date)}</Text>
+                    </>
+                  ) : (
+                    <TouchableOpacity onPress={() => router.push('/races?add=true')}>
+                      <Text style={styles.mNextEventEmptyLine}>No race scheduled</Text>
+                      <Text style={styles.mFocusViewLink}>Add Race →</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+                {nextRace && days !== null && (
+                  <View style={{ alignItems: 'center' }}>
+                    <Text style={styles.mNextEventDaysNumber}>{days}</Text>
+                    <Text style={styles.mNextEventDaysLabel}>Days</Text>
+                  </View>
+                )}
+              </RivalCard>
+            </>
+          ) : (
+          <>
           {/* Hero: Total Time Earned — narrower + centered like the mockup */}
           <RivalCard glass style={styles.heroCard}>
             <Text style={[styles.heroLabel, { marginBottom: 4 }]}>TOTAL TIME EARNED</Text>
             <Text
-              style={[styles.heroValue, { fontSize: heroValueFontSize(heroTimeText), lineHeight: heroValueFontSize(heroTimeText) * 1.1 }]}
+              style={[styles.heroValue, { fontSize: heroValueFontSize(heroTimeText, heroCardAvailableWidth), lineHeight: heroValueFontSize(heroTimeText, heroCardAvailableWidth) * 1.1 }]}
               numberOfLines={1}
             >
               {heroHours > 0 && (
                 <>
                   {heroHours}
-                  <Text style={[styles.heroValueUnit, { fontSize: heroValueFontSize(heroTimeText) * 0.42 }]}>h</Text>
+                  <Text style={[styles.heroValueUnit, { fontSize: heroValueFontSize(heroTimeText, heroCardAvailableWidth) * 0.42 }]}>h</Text>
                   {' '}
                 </>
               )}
               {heroMins}
-              <Text style={[styles.heroValueUnit, { fontSize: heroValueFontSize(heroTimeText) * 0.42 }]}>m</Text>
+              <Text style={[styles.heroValueUnit, { fontSize: heroValueFontSize(heroTimeText, heroCardAvailableWidth) * 0.42 }]}>m</Text>
             </Text>
             <View style={{ marginTop: -10, alignItems: 'center' }}>
               <Text style={styles.heroSub}>Every minute in here is yours.</Text>
@@ -1070,6 +1463,8 @@ export default function HomeScreen() {
               <View style={{ alignItems: 'center' }}><Text style={styles.gridCardLabel}>WEEKLY STREAK</Text><Text style={styles.seasonWrapValue}>{weeklyStreak}</Text></View>
             </View>
           </RivalCard>
+          </>
+          )}
 
           {/* Strava connection prompt — only shown pre-connection. Once
               connected, status/sync/disconnect live on the profile page
@@ -1095,6 +1490,13 @@ const styles = StyleSheet.create({
   bg: { flex: 1 },
   bgFixed: { position: 'fixed' as any, top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%' },
   scrim: { position: 'fixed' as any, top: 0, left: 0, right: 0, height: '100vh' as any, backgroundColor: 'rgba(14,14,14,0.55)' },
+  // Mobile Today's flat background — mockup has no hero photo, just #131313
+  // plus a subtle warm radial glow anchored bottom-right.
+  mBgFixed: {
+    position: 'fixed' as any, top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%',
+    backgroundColor: '#131313',
+    ...(Platform.OS === 'web' ? { backgroundImage: 'radial-gradient(ellipse 140% 90% at 88% 105%, rgba(217,119,87,0.10) 0%, rgba(19,19,19,0) 55%)' } as any : {}),
+  },
   container: { flex: 1 },
   // Max-width + auto margins keep desktop content centered with the photo
   // breathing on both sides, like the mockup (Yoga supports 'auto' margins).
@@ -1114,12 +1516,6 @@ const styles = StyleSheet.create({
   headerAvatarFallback: { width: 34, height: 34, borderRadius: 17, backgroundColor: RivalColors.accentFill, alignItems: 'center', justifyContent: 'center' },
   headerAvatarText: { fontSize: 14, fontWeight: '800', color: RivalColors.onAccentFill },
 
-  greetingBlock: { alignItems: 'center', gap: 6, marginTop: 28, marginBottom: 44 },
-  // Tracking matches the "Your Event" hero title treatment (create-league.tsx's
-  // previewName / stitch-export-22's 0.5em ratio) — same recipe applied here.
-  greeting: { ...RivalType.headlineLg, fontSize: 29, lineHeight: 35, letterSpacing: 14.5, textTransform: 'uppercase', color: RivalColors.textPrimary, opacity: 0.8 },
-  greetingSub: { ...RivalType.bodyMd, fontSize: 14, fontStyle: 'italic', color: RivalColors.onSurfaceVariant, textAlign: 'center', maxWidth: 420, opacity: 0.9 },
-
   // maxWidth pulled in from 660 — the card was a wide box with a narrow
   // centered column inside it, leaving big flanking gaps. Hugging the
   // content width instead reads as one solid hero, not a box floating in a box.
@@ -1128,7 +1524,7 @@ const styles = StyleSheet.create({
   // currently widest, instead of a manually-tuned width that either leaves
   // dead space beside short numbers or clips long ones. maxWidth is only a
   // safety cap for narrow mobile viewports, not a target size.
-  heroCard: { alignItems: 'center', gap: 6, alignSelf: 'center', maxWidth: '92%', paddingVertical: 28, borderRadius: 28 },
+  heroCard: { alignItems: 'center', gap: 6, alignSelf: 'center', maxWidth: '92%', marginTop: 24, paddingVertical: 28, borderRadius: 28 },
   iconDisc: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
   // Swapped from marginTop:40 — that made the button sit farther from the
   // hero card (60 total: 20 parent gap + 40) and closer to the row below
@@ -1260,5 +1656,238 @@ const styles = StyleSheet.create({
   stravaCardTitle: { fontSize: 15, fontWeight: '700', color: RivalColors.textPrimary },
   stravaCardSub: { fontSize: 12, color: RivalColors.textSecondary, marginTop: 2 },
   stravaCardArrow: { fontSize: 20, color: RivalColors.accentText },
+
+  // ===== Mobile Today redesign (base-mockup-v3-warm-light-source.html) =====
+  // `m`-prefixed to avoid colliding with the desktop style keys above, since
+  // both trees coexist in this one StyleSheet.
+
+  // Header center slot
+  // labelCaps bakes in a fixed lineHeight:16 sized for its default 12px —
+  // left as-is at fontSize:9 it pads ~5px of unwanted extra header height.
+  mTimeEarnedLabel: { ...RivalType.labelCaps, fontSize: 9, lineHeight: 11, letterSpacing: 1, color: RivalColors.textSecondary },
+  mTimeEarnedValue: {
+    fontFamily: RivalFontFamily, fontSize: 22, fontWeight: '800', lineHeight: 22, color: RivalColors.accentFill,
+    ...(Platform.OS === 'web' ? {
+      backgroundImage: 'linear-gradient(100deg, #D97757 0%, #ffb59e 45%, #F5B759 100%)',
+      backgroundClip: 'text', WebkitBackgroundClip: 'text', color: 'transparent',
+    } as any : {}),
+  },
+
+  // Focus card
+  mFocusCard: {
+    borderRadius: RivalRadius.lg, paddingVertical: 20, paddingBottom: 30, paddingHorizontal: 16, alignItems: 'center', position: 'relative', overflow: 'hidden',
+    backgroundColor: '#2d241f',
+    ...(Platform.OS === 'web' ? { backgroundImage: 'linear-gradient(135deg, #231e1b 0%, #2d241f 55%, #3b2821 100%)' } as any : {}),
+  },
+  // Mockup uses a soft radial-gradient blob fading to transparent (a real
+  // glow), not a flat hard-edged tinted circle — the flat color was a much
+  // more visible/blunt shape than the mockup's soft blend.
+  // Web: gradient-only (no flat backgroundColor underneath) — a flat color
+  // there fills the whole shape uniformly and shows as a hard-edged solid
+  // circle where the radial gradient has faded to transparent. Native has
+  // no backgroundImage support, so it keeps a flat (much subtler) fallback.
+  mFocusGlowTL: {
+    position: 'absolute', top: -30, left: -30, width: 140, height: 140, borderRadius: 70,
+    ...(Platform.OS === 'web'
+      ? { backgroundImage: 'radial-gradient(circle, rgba(255,209,190,0.14) 0%, rgba(255,209,190,0) 70%)' } as any
+      : { backgroundColor: 'rgba(255,209,190,0.10)' }),
+  },
+  // Mockup covers the WHOLE card (inset: 0) with a radial ellipse anchored
+  // near the bottom-center — not a thin band at the bottom edge.
+  mFocusGlowBottom: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    ...(Platform.OS === 'web'
+      ? { backgroundImage: 'radial-gradient(ellipse 130% 100% at 50% 120%, rgba(217,119,87,0.12) 0%, rgba(0,0,0,0) 60%)' } as any
+      : { backgroundColor: 'rgba(217,119,87,0.08)' }),
+  },
+  mFocusKicker: { ...RivalType.labelCaps, fontSize: 11, letterSpacing: 2, color: 'rgba(255,181,158,0.65)' },
+  mFocusTitle: { ...RivalType.bodyMd, fontSize: 15, color: RivalColors.textPrimary, marginTop: 6, marginBottom: 24 },
+  mFocusHeroRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginBottom: 4 },
+  mFocusHeroNumber: {
+    fontFamily: RivalFontFamily, fontSize: 44, fontWeight: '800', letterSpacing: -0.4, color: RivalColors.accentFill,
+    ...(Platform.OS === 'web' ? {
+      backgroundImage: 'linear-gradient(180deg, #FFFFFF 0%, #D97757 150%)',
+      backgroundClip: 'text', WebkitBackgroundClip: 'text', color: 'transparent',
+    } as any : {}),
+  },
+  mFocusHeroUnit: { fontFamily: RivalFontFamily, fontSize: 15, color: RivalColors.textPrimary },
+  // Override for the shared focusProgressPctOnBar label (desktop keeps its
+  // own subtler treatment) — mockup's on-bar percentage is bolder/brighter.
+  mFocusProgressPctOverride: { fontFamily: RivalFontFamily, fontSize: 10, fontWeight: '700', color: 'rgba(255,255,255,0.85)' },
+  mFocusDaysRemaining: { fontFamily: RivalFontFamily, fontSize: 13, fontWeight: '700', color: RivalColors.accentText, marginTop: 10, marginBottom: 18 },
+  mFocusViewLink: { fontFamily: RivalFontFamily, fontSize: 13, fontWeight: '500', color: RivalColors.textSecondary, marginTop: 12, top: 8 },
+  mFocusEmptyTitle: { ...RivalType.bodyMd, fontSize: 15, color: RivalColors.textPrimary, textAlign: 'center', marginTop: 24, marginBottom: 12 },
+
+  // Weekly Leader podium
+  // Layers the Legacy section's warm radial glow (CSS supports comma-separated
+  // background-image layers) on top of the card's existing dark gradient —
+  // Ricky asked for the same background treatment as Legacy on this card too.
+  // Also borderless and bled edge-to-edge like Legacy (marginHorizontal
+  // cancels the ScrollView content's 24px padding — same technique as
+  // mLegacySection) rather than staying a bordered, inset card.
+  mLeaderCard: {
+    borderRadius: 0, borderWidth: 0,
+    marginHorizontal: -24, paddingHorizontal: 16, paddingTop: 17, paddingBottom: 38, alignItems: 'center',
+    backgroundColor: '#181312',
+    ...(Platform.OS === 'web'
+      ? { backgroundImage: 'radial-gradient(ellipse 90% 65% at 50% 55%, rgba(217,119,87,0.16) 0%, rgba(19,19,19,0) 75%), linear-gradient(135deg, #111214 0%, #181312 100%)' } as any
+      : {}),
+  },
+  mLeaderKicker: { ...RivalType.labelCaps, fontSize: 11, letterSpacing: 2, color: 'rgba(255,181,158,0.65)' },
+  mLeaderTeamName: { ...RivalType.bodyMd, fontSize: 13, fontWeight: '500', color: RivalColors.textPrimary, marginTop: 6, marginBottom: 20 },
+  // Capped at the mockup's own reference width — without this, a wide
+  // "mobile" viewport (the mobile branch covers anything under 840px, which
+  // includes tablets) stretches the flex:1 columns wide while pillarHeight
+  // stays a fixed px value, squashing the shard shapes' proportions.
+  mPodiumGrid: { flexDirection: 'row', alignItems: 'flex-end', width: '100%', maxWidth: 360, alignSelf: 'center', gap: 5, paddingTop: 31, minHeight: 221 },
+  // Warm stage-light pool the pillars sit on — a wide soft radial glow plus
+  // a brighter, tighter gradient line right at the pillar bases, instead of
+  // a flat uniform border (which read as a plain ruled line, not a stage).
+  // Tighter, brighter pool than a first pass — reference is a saturated,
+  // well-defined spotlight, not a wide hazy wash. Narrower ellipse + a hot
+  // near-white/gold core keeps it reading as an actual light source.
+  // Bled slightly past the pillars' own edges (negative inset) and dropped a
+  // little below their base (negative bottom) — Ricky wants it read as a
+  // stage the pillars sit ON, not a rule flush against their bottom edge.
+  // One shape, one gradient, one clip-path — a separate highlight/line/face
+  // stacked as independent clipped layers never quite lined up at the
+  // tapered tip (each shape's curve is computed against its own bounding
+  // box), leaving a visible seam. Baking the specular sheen in as the
+  // gradient's own top stop guarantees every layer shares the same edge.
+  mPodiumStageLine: {
+    position: 'absolute', left: -18, right: -18, bottom: -12, height: 6,
+    ...(Platform.OS === 'web'
+      ? {
+          // Radial, anchored at top-center, so it reads as one glow source
+          // brightest at the top and fading outward in every direction,
+          // rather than a horizontal band with a separate vertical fade.
+          // More tonal steps between the bright core and the transparent
+          // edge (rather than a straight two-stop fade) reads as a glow
+          // with real depth instead of a flat disc dimming outward.
+          backgroundImage:
+            'radial-gradient(ellipse 70% 130% at 50% 0%, rgba(255,232,150,0.65) 0%, rgba(255,232,150,0.65) 22%, rgba(255,232,150,0.55) 40%, rgba(255,232,150,0.33) 58%, rgba(255,232,150,0.13) 75%, rgba(255,232,150,0) 100%)',
+          clipPath: PODIUM_LENS_CLIP,
+          // clip-path always cuts a hard edge, no matter how faded the color
+          // is right at the boundary — blur feathers that edge into a soft
+          // glow instead of a visible outline.
+          filter: 'blur(1.5px)',
+        } as any
+      : { backgroundColor: 'rgba(255,205,90,0.4)' }),
+  },
+  // Fewer than 3 people on the board — center the real column(s) at a fixed
+  // width instead of stretching flex:1 across the full card width.
+  mPodiumGridSparse: { justifyContent: 'center', gap: 12 },
+  mPodiumColumn: { flex: 1, alignItems: 'center' },
+  // Must override ALL THREE longhand flex properties, not just grow/shrink —
+  // the base mPodiumColumn's `flex: 1` shorthand expands to `flexBasis: 0%`,
+  // and an explicit flexBasis wins over `width` for main-axis sizing in CSS.
+  // Without resetting it to 'auto' here, that inherited 0% survived the style
+  // merge and silently zeroed this column's width regardless of `width: 110`.
+  mPodiumColumnSparse: { flexGrow: 0, flexShrink: 0, flexBasis: 'auto', width: 82 },
+  mPodiumAvatar: { borderWidth: 2, backgroundColor: '#332e2a', alignItems: 'center', justifyContent: 'center' },
+  // Floats above the avatar without pushing it down — same technique as the
+  // mockup's absolutely-positioned crown (`top` offset set inline per avatar size).
+  mPodiumCrownWrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
+  // flexShrink:0 matters here — a flex child with overflow:hidden (which
+  // numberOfLines={1} sets under the hood) defaults to a min-height of 0 in
+  // CSS flexbox, so a tight column was squeezing this text well below its
+  // natural glyph height (clipping the tops of letters) instead of just
+  // overflowing the box. Refusing to shrink keeps it fully legible.
+  mPodiumName: { fontFamily: RivalFontFamily, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, flexShrink: 0 },
+  mPodiumPoints: { fontFamily: RivalFontFamily, fontSize: 18, fontWeight: '800', color: RivalColors.textPrimary, marginTop: 2, flexShrink: 0 },
+  // Pill wrapping the "X pts behind Y" + "Ends tomorrow" lines — a subtle
+  // dark capsule matching the card's own palette, so this reads as a piece
+  // of the podium rather than two loose lines floating under it.
+  // Matches the Legacy section's stat-box treatment (wide rounded rect,
+  // visible hairline border) instead of a tight pill — same family look as
+  // the rest of the card, per Ricky's reference.
+  // Sized to its content (not full-width) — shrinks the box's own footprint
+  // instead of leaving a lot of empty padding around a short line of text.
+  // marginTop clears the platform's own footprint (an absolutely-positioned
+  // sibling that extends 19px below the pillar row) plus real breathing
+  // room — the platform doesn't affect layout since it's out of flow, so
+  // this has to be sized by hand rather than a plain small gap.
+  mPodiumMetaCapsule: {
+    alignSelf: 'center', marginTop: 19, paddingTop: 5, paddingBottom: 8, paddingHorizontal: 20, borderRadius: RivalRadius.lg,
+    alignItems: 'flex-start', backgroundColor: 'rgba(19,19,19,0.55)', borderWidth: 1, borderColor: RivalColors.surfaceBright,
+  },
+  mPodiumOutsideRow: { fontFamily: RivalFontFamily, fontSize: 15, color: '#FFFFFF', textAlign: 'left' },
+  // marginLeft lines "Ends tomorrow" up under "Behind" on the line above —
+  // tuned by measuring where "Behind" actually starts, not a guess.
+  mLeaderFooterMeta: { fontFamily: RivalFontFamily, fontSize: 11, color: RivalColors.textSecondary, marginTop: -18, marginLeft: 46 },
+  mLeaderEmptyTitle: { fontFamily: RivalFontFamily, fontSize: 14, fontWeight: '500', letterSpacing: 3, color: RivalColors.textPrimary, textAlign: 'center' },
+  mLeaderEmptySub: { fontFamily: RivalFontFamily, fontSize: 11, fontWeight: '500', color: '#ffcabb', letterSpacing: 1, marginTop: 3, textAlign: 'center' },
+
+  // Next Event card
+  mNextEventCard: {
+    borderRadius: RivalRadius.lg, paddingVertical: 12, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    borderWidth: 1, borderColor: 'rgba(255,181,158,0.14)',
+    backgroundColor: '#241c17',
+    ...(Platform.OS === 'web' ? { backgroundImage: 'linear-gradient(135deg, #1c1a19 0%, #241c17 100%)' } as any : {}),
+  },
+  mNextEventKicker: { ...RivalType.labelCaps, fontSize: 11, letterSpacing: 2, color: 'rgba(255,181,158,0.65)' },
+  mNextEventName: { ...RivalType.bodyMd, fontSize: 15, fontWeight: '700', color: RivalColors.textPrimary, marginTop: 4 },
+  mNextEventDate: { fontFamily: RivalFontFamily, fontSize: 12, color: RivalColors.textPrimary, marginTop: 2 },
+  mNextEventDaysNumber: { fontFamily: RivalFontFamily, fontSize: 30, fontWeight: '800', color: RivalColors.accentText, lineHeight: 30 },
+  // Mockup's "DAYS" label has no explicit font-weight (regular, unlike the
+  // bold orange kickers) — labelCaps defaults to 700, reset it here.
+  mNextEventDaysLabel: { ...RivalType.labelCaps, fontSize: 10, fontWeight: '400', color: RivalColors.textSecondary, marginTop: 2 },
+  mNextEventEmptyLine: { fontFamily: RivalFontFamily, fontSize: 13, color: RivalColors.textSecondary, marginTop: 6, marginBottom: 6 },
+
+  // Add Activity override — mockup's accentText pill (not the default
+  // accentFill primary), sized/padded/spaced to the mockup's exact spec
+  // rather than the shared desktop pill's (width 80%, uniform 13px padding,
+  // 16px bottom margin instead of the desktop-tuned 56px).
+  // Negative marginTop pulls this up specifically closer to the Weekly
+  // Leader card above it — content's own gap:20 is shared by every card on
+  // this screen, so trim just this one gap here rather than globally.
+  mAddActivityOverride: { backgroundColor: RivalColors.accentText, width: '80%', minWidth: 0, paddingHorizontal: 13, paddingVertical: 13, marginBottom: 16, marginTop: -38 },
+  // The base label style's lineHeight:28 (sized for titleMd's 20px font)
+  // survives unless reset here, padding the pill out ~10px taller than the
+  // mockup's tightly-set 15px text.
+  mAddActivityLabel: { fontFamily: RivalFontFamily, fontSize: 15, fontWeight: '700', lineHeight: 18 },
+
+  // Legacy borderless section
+  // Mockup bleeds this section edge-to-edge (`margin:0 -16px` against its
+  // 16px-padded parent) — the ScrollView content pads 24px, so cancel that.
+  mLegacySection: {
+    marginHorizontal: -24, paddingTop: 20, paddingHorizontal: 16, paddingBottom: 16,
+    // Web: gradient-only, no flat backgroundColor underneath — a flat color
+    // there would fill the whole rect uniformly and show as a hard edge
+    // where the gradient itself has faded to transparent. Native has no
+    // backgroundImage support, so it keeps a flat (much subtler) tint.
+    ...(Platform.OS === 'web'
+      ? { backgroundImage: 'radial-gradient(ellipse 90% 65% at 50% 55%, rgba(217,119,87,0.16) 0%, rgba(19,19,19,0) 75%)' } as any
+      : { backgroundColor: 'rgba(217,119,87,0.05)' }),
+  },
+  mLegacyStatBox: { flexDirection: 'row', backgroundColor: 'rgba(19,19,19,0.55)', borderWidth: 1, borderColor: RivalColors.surfaceBright, borderRadius: RivalRadius.lg, paddingVertical: 16 },
+  mLegacyStatCell: { flex: 1, alignItems: 'center', paddingHorizontal: 4 },
+  mLegacyStatCellBorder: { borderRightWidth: 1, borderRightColor: 'rgba(50,50,50,0.5)' },
+  mLegacyStatIcon: { marginBottom: 8 },
+  // Row 2 (Activities/Distance/Elevation) default size — mockup uses smaller
+  // type here than row 1 (Effort Today/Rank/Week Streak), not one shared size.
+  mLegacyStatValue: { fontFamily: RivalFontFamily, fontSize: 17, fontWeight: '700', color: RivalColors.textPrimary, marginTop: 8 },
+  mLegacyStatValueLg: { fontSize: 20, fontWeight: '800' },
+  // Literal #FFD700 (same gold as the podium's #1 rank) — NOT accentGold
+  // (#F5B759), which is a softer peach-gold used for gradient stops
+  // elsewhere. Mockup's "LEGEND" text is pure gold.
+  mLegacyStatValueGold: { fontFamily: RivalFontFamily, fontStyle: 'italic', textTransform: 'uppercase', color: '#FFD700', fontSize: 18, letterSpacing: 1.44 },
+  mLegacyStatUnit: { fontFamily: RivalFontFamily, fontSize: 9, color: RivalColors.textSecondary, fontWeight: '700' },
+  // Mockup's small gray labels are regular weight, not bold — labelCaps
+  // defaults to 700, so both label styles explicitly reset it to 400.
+  mLegacyStatLabel: { ...RivalType.labelCaps, fontSize: 9, fontWeight: '400', letterSpacing: 0.9, color: RivalColors.textSecondary, marginTop: 5 },
+  mLegacyStatLabelLg: { fontSize: 10, letterSpacing: 0.6 },
+  mLegacyKicker: { ...RivalType.labelCaps, fontSize: 11, letterSpacing: 3, color: RivalColors.accentFill },
+  mLegacySubtitle: { fontFamily: RivalFontFamily, fontSize: 13, color: RivalColors.textSecondary, marginTop: 4 },
+  mLegacyHeroNumber: {
+    fontFamily: RivalFontFamily, fontSize: 44, fontWeight: '800', letterSpacing: -0.4, color: RivalColors.accentFill,
+    ...(Platform.OS === 'web' ? {
+      backgroundImage: 'linear-gradient(180deg, #FFFFFF 0%, #D97757 150%)',
+      backgroundClip: 'text', WebkitBackgroundClip: 'text', color: 'transparent',
+    } as any : {}),
+  },
+  mLegacyHeroLabel: { ...RivalType.labelCaps, fontSize: 10, letterSpacing: 2, color: RivalColors.accentFill },
+  mLegacyDivider: { width: 1, height: 56, alignSelf: 'center', backgroundColor: RivalColors.accentFill, opacity: 0.4, marginTop: 8, marginBottom: 6 },
+  mLegacyViewAllLink: { fontFamily: RivalFontFamily, fontSize: 13, fontWeight: '500', color: RivalColors.textSecondary },
 
 });

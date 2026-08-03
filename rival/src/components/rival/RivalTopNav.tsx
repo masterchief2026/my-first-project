@@ -1,11 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { View, Text, TouchableOpacity, Image, StyleSheet, Platform, useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { getLevel } from '../../lib/xp';
 import { getSeasonStartISO } from '../../lib/season';
 import { RivalColors, RivalType } from '../../constants/rivalTheme';
-import { RivalIcon } from './RivalIcon';
+import { BREAKPOINT_MOBILE_NAV } from '../../constants/breakpoints';
+import { RivalIcon, RivalIconName } from './RivalIcon';
 
 // Shared persistent top navigation, matching the Stitch mockups. Drop it in at
 // the top of a screen (outside the ScrollView so it stays put) and pass the
@@ -13,20 +15,21 @@ import { RivalIcon } from './RivalIcon';
 // itself so it needs no props beyond `active`.
 type Section = 'today' | 'activity' | 'teams';
 
-const LINKS: Array<{ key: Section; label: string; route: string }> = [
-  { key: 'today', label: 'Today', route: '/home' },
-  { key: 'activity', label: 'Activity', route: '/my-activities' },
+const LINKS: Array<{ key: Section; label: string; route: string; icon: RivalIconName }> = [
+  { key: 'today', label: 'Today', route: '/home', icon: 'home' },
+  { key: 'activity', label: 'Activity', route: '/my-activities', icon: 'stats' },
   // Interim: no dedicated "your teams" list yet — points at Discover for now.
-  { key: 'teams', label: 'Teams', route: '/discover-leagues' },
+  { key: 'teams', label: 'Teams', route: '/discover-leagues', icon: 'groups' },
 ];
 
-export function RivalTopNav({ active }: { active?: Section }) {
+export function RivalTopNav({ active, centerSlot }: { active?: Section; centerSlot?: ReactNode }) {
   const { width } = useWindowDimensions();
   // Below this, the absolutely-centered links row (built for desktop, where the
   // logo and the RANK/bell/avatar cluster are far apart) collides with the right
   // cluster instead of sitting in genuine empty space. Drop to a second in-flow
   // row instead of overlapping text on top of text.
-  const narrow = width < 640;
+  const narrow = width < BREAKPOINT_MOBILE_NAV;
+  const insets = useSafeAreaInsets();
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [initial, setInitial] = useState('?');
   const [displayName, setDisplayName] = useState('');
@@ -62,10 +65,10 @@ export function RivalTopNav({ active }: { active?: Section }) {
   }, []);
 
   return (
-    <View style={styles.bar}>
-      <View style={styles.row}>
+    <View style={[styles.bar, narrow && styles.barNarrow]}>
+      <View style={[styles.row, narrow && styles.rowNarrow]}>
         <TouchableOpacity onPress={() => router.push('/home')}>
-          <Text style={styles.logo}>RIVAL</Text>
+          <Text style={[styles.logo, narrow && styles.logoNarrow]}>RIVAL</Text>
         </TouchableOpacity>
 
         {!narrow && (
@@ -78,8 +81,22 @@ export function RivalTopNav({ active }: { active?: Section }) {
           </View>
         )}
 
+        {/* Mobile-only center slot (e.g. Today's "Total time earned") — desktop
+            keeps its existing links row above, unaffected when this prop is
+            omitted by every other screen. In-flow (not absolutely centered
+            like the desktop links row) so it shares space with the logo and
+            right cluster instead of overlapping them on a narrow screen. */}
+        {narrow && centerSlot ? (
+          <View style={styles.centerSlot}>
+            {centerSlot}
+          </View>
+        ) : null}
+
         <View style={styles.right}>
-          {rankName && (
+          {/* RANK badge is desktop-only on this bar — mobile shows the same
+              rank name inside the Today screen's own Legacy section instead,
+              so it doesn't fight the center slot for space here. */}
+          {rankName && !narrow && (
             <TouchableOpacity style={styles.rankBadge} onPress={() => router.push('/ranks')}>
               <Text style={styles.rankLabel}>RANK</Text>
               <Text
@@ -101,8 +118,10 @@ export function RivalTopNav({ active }: { active?: Section }) {
               </Text>
             </TouchableOpacity>
           )}
-          <TouchableOpacity onPress={() => router.push('/profile?tab=notifications')} style={styles.notifBtn}>
-            <RivalIcon name="notificationsActive" size={22} color={RivalColors.accentText} />
+          <TouchableOpacity onPress={() => router.push('/profile?tab=notifications')} style={[styles.notifBtn, narrow && styles.notifBtnNarrow]}>
+            {/* Mockup's mobile header uses the plain calm bell (ti-bell), not
+                the "ringing" bell desktop keeps for its own header. */}
+            <RivalIcon name={narrow ? 'notificationsOutline' : 'notificationsActive'} size={narrow ? 18 : 22} color={RivalColors.accentText} />
           </TouchableOpacity>
           <View
             style={styles.avatarWrap}
@@ -110,12 +129,12 @@ export function RivalTopNav({ active }: { active?: Section }) {
               ? { onMouseEnter: () => setMenuOpen(true), onMouseLeave: () => setMenuOpen(false) } as any
               : {})}
           >
-            <View style={styles.avatarRing}>
-              <TouchableOpacity onPress={() => router.push('/profile')} style={styles.avatar}>
+            <View style={[styles.avatarRing, narrow && styles.avatarRingNarrow]}>
+              <TouchableOpacity onPress={() => router.push('/profile')} style={[styles.avatar, narrow && styles.avatarNarrow]}>
                 {avatarUrl ? (
-                  <Image source={{ uri: avatarUrl }} style={styles.avatarImg} />
+                  <Image source={{ uri: avatarUrl }} style={[styles.avatarImg, narrow && styles.avatarImgNarrow]} />
                 ) : (
-                  <Text style={styles.avatarInitial}>{initial}</Text>
+                  <Text style={[styles.avatarInitial, narrow && styles.avatarInitialNarrow]}>{initial}</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -206,12 +225,20 @@ export function RivalTopNav({ active }: { active?: Section }) {
         </View>
       </View>
       {narrow && (
-        <View style={styles.linksRowNarrow}>
-          {LINKS.map((l) => (
-            <TouchableOpacity key={l.key} onPress={() => router.push(l.route as any)}>
-              <Text style={[styles.link, active === l.key && styles.linkActive]}>{l.label}</Text>
-            </TouchableOpacity>
-          ))}
+        <View style={[styles.bottomNav, { bottom: insets.bottom + 12 } as any]}>
+          {LINKS.map((l) => {
+            const isActive = active === l.key;
+            return (
+              <TouchableOpacity
+                key={l.key}
+                onPress={() => router.push(l.route as any)}
+                style={[styles.bottomNavItem, isActive && styles.bottomNavItemActive]}
+              >
+                <RivalIcon name={l.icon} size={20} color={isActive ? RivalColors.accentText : RivalColors.textSecondary} />
+                <Text style={[styles.bottomNavLabel, isActive && styles.bottomNavLabelActive]}>{l.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
       )}
     </View>
@@ -220,8 +247,30 @@ export function RivalTopNav({ active }: { active?: Section }) {
 
 const styles = StyleSheet.create({
   bar: { width: '100%', backgroundColor: 'rgba(14,14,14,0.55)', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)', zIndex: 100 },
+  // Mockup's mobile header is a warm pink-tinted gradient wash, not the
+  // desktop bar's flat dark translucent fill — desktop keeps `bar` as-is.
+  barNarrow: {
+    backgroundColor: 'rgba(255,209,190,0.06)',
+    borderBottomColor: 'rgba(255,209,190,0.12)',
+    ...(Platform.OS === 'web'
+      ? { backgroundImage: 'linear-gradient(180deg, rgba(255,209,190,0.10) 0%, rgba(255,209,190,0.03) 100%)' } as any
+      : {}),
+  },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', maxWidth: 1200, marginHorizontal: 'auto', paddingHorizontal: 20, paddingVertical: 8, position: 'relative' },
+  // Mockup's mobile header padding (14px 8px) is narrower than the desktop
+  // bar built for a 1200px-wide row — desktop keeps its own spacing.
+  rowNarrow: { paddingHorizontal: 8, paddingVertical: 14 },
   logo: { ...RivalType.titleMd, color: RivalColors.accentText, letterSpacing: 4, fontWeight: '800' },
+  // Mockup's mobile wordmark uses the same tri-color gradient-text recipe as
+  // the hero numbers/"Total time earned" value elsewhere — desktop's plain
+  // flat accentText color is untouched, this only applies when narrow.
+  logoNarrow: {
+    fontSize: 15, letterSpacing: 3,
+    ...(Platform.OS === 'web' ? {
+      backgroundImage: 'linear-gradient(100deg, #D97757 0%, #ffb59e 45%, #F5B759 100%)',
+      backgroundClip: 'text', WebkitBackgroundClip: 'text', color: 'transparent',
+    } as any : {}),
+  },
   links: { flexDirection: 'row', gap: 32 },
   // The logo (left) and RANK/bell/avatar cluster (right) aren't the same
   // width — RANK badge + notif button + avatar is much wider than "RIVAL" —
@@ -232,10 +281,31 @@ const styles = StyleSheet.create({
   // this is web-only; native keeps the old (slightly off-center) flow,
   // which is an acceptable fallback since this app runs primarily on web.
   linksCentered: { position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)' },
-  // Second in-flow row below the logo/rank/avatar row, only rendered under the
-  // `narrow` breakpoint above — keeps nav links reachable without overlapping
-  // the right-side cluster the way the absolutely-centered desktop row would.
-  linksRowNarrow: { flexDirection: 'row', justifyContent: 'center', gap: 28, paddingBottom: 10, paddingTop: 2 },
+  // Mobile-only slot for a screen-supplied center element (e.g. Today's
+  // "Total time earned"). minWidth:0 lets its content shrink/truncate
+  // instead of pushing the logo/right cluster apart.
+  centerSlot: { flex: 1, alignItems: 'center', minWidth: 0 },
+  // Floating bottom tab bar, mobile only (`narrow` breakpoint above) — replaces
+  // the old in-flow links row so the primary nav sits within thumb reach
+  // instead of up next to the logo. `position: 'fixed'` pins it to the
+  // viewport regardless of where in the tree it renders (RivalTopNav itself
+  // stays docked at the top), same trick used elsewhere in this app for
+  // viewport-relative overlays. `bottom` is set inline per-render from
+  // useSafeAreaInsets so it clears the home indicator on notched phones.
+  bottomNav: {
+    position: 'fixed' as any,
+    left: 16, right: 16,
+    flexDirection: 'row', justifyContent: 'space-between',
+    backgroundColor: '#1c1c1c',
+    borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    paddingVertical: 4, paddingHorizontal: 6,
+    zIndex: 200,
+    ...(Platform.OS === 'web' ? { backdropFilter: 'blur(20px)', boxShadow: '0 8px 24px rgba(0,0,0,0.4)' } as any : {}),
+  },
+  bottomNavItem: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 2, paddingVertical: 5, paddingHorizontal: 5, borderRadius: 16 },
+  bottomNavItemActive: { backgroundColor: `${RivalColors.accentFill}22` },
+  bottomNavLabel: { fontSize: 11, fontWeight: '600', color: RivalColors.textSecondary },
+  bottomNavLabelActive: { color: RivalColors.accentText },
   // Smaller, more letter-spacing, lighter weight — quieter and closer to an
   // Apple-style minimal nav, without going all the way to "near-invisible"
   // (this is core navigation people tap constantly, not a utility bar).
@@ -246,15 +316,23 @@ const styles = StyleSheet.create({
   rankLabel: { ...RivalType.labelCaps, fontSize: 9, color: RivalColors.textSecondary },
   rankValue: { fontSize: 14, fontWeight: '700' },
   notifBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  notifBtnNarrow: { width: 28, height: 28, borderRadius: 14 },
   avatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: RivalColors.accentFill, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  // Mockup's mobile avatar is a plain 28x28 filled circle, no ring border.
+  avatarNarrow: { width: 28, height: 28, borderRadius: 14 },
   avatarImg: { width: 42, height: 42, borderRadius: 21 },
+  avatarImgNarrow: { width: 28, height: 28, borderRadius: 14 },
   avatarInitial: { color: RivalColors.onAccentFill, fontWeight: '800', fontSize: 18 },
+  avatarInitialNarrow: { fontSize: 12 },
   // Thin ring as a separate, slightly larger circle rather than a border ON
   // the avatar — a border on the avatar's own fixed-size box would paint
   // over the outer rim of the photo instead of framing it. At 45x45 with a
   // 1.5px border, the inner content box is exactly 42x42, so the avatar
   // photo sits fully inside, untouched.
   avatarRing: { width: 45, height: 45, borderRadius: 22.5, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.35)', alignItems: 'center', justifyContent: 'center' },
+  // Mockup's mobile avatar has no ring at all — collapse the ring to exactly
+  // the avatar's own size with no border, rather than restructuring the JSX.
+  avatarRingNarrow: { width: 28, height: 28, borderRadius: 14, borderWidth: 0 },
   // Wraps the ring+avatar + its dropdown so the menu can be absolutely
   // positioned relative to just the avatar, not the whole nav row. zIndex
   // so the menu paints above the rank badge / page content instead of
