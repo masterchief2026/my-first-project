@@ -40,6 +40,11 @@ export const RivalColors = {
   accentText: '#ffb59e',
   accentFill: '#D97757',
   onAccentFill: '#5c1902', // text/icon color ON a filled accent button — dark, not white (see screenshots: "Sign In", "Resume Mission" button labels are dark brown, not white)
+  // Gradient-gold end color for the Today mobile redesign's hero-number/progress-bar
+  // gradients (base-mockup-v3-warm-light-source.html). Deliberately distinct from
+  // rankAnchors.unrivaled (#FFD700) and the ad-hoc #D8A81D RivalTopNav hardcodes for
+  // rank text — three golds now coexist; reconciling them is a separate follow-up.
+  accentGold: '#F5B759',
 
   // Secondary tone (used sparingly — chips, muted UI)
   secondary: '#c8c6c5',

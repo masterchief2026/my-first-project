@@ -10,6 +10,7 @@ import { isoToDisplayDate, displayToIsoDate } from '../lib/dateFormat';
 import { getSeasonStartISO, daysUntilSeasonEnd } from '../lib/season';
 import { matchCanonicalLift } from './scan-workout';
 import { RivalColors } from '../constants/rivalTheme';
+import { BREAKPOINT_WIDE_LAYOUT } from '../constants/breakpoints';
 import { ACTIVITY_ICONS } from '../constants/activityIcons';
 import { formatDuration } from '../lib/format';
 import { computeActivityInsight, ActivityInsight, InsightActivity, InsightTone } from '../lib/activityInsights';
@@ -1359,7 +1360,7 @@ export default function LeagueScreen() {
 
   // Desktop = the Stitch 3-column Team Hub; narrow = the existing stacked mobile layout.
   const { width: windowWidth } = useWindowDimensions();
-  const wide = windowWidth >= 840;
+  const wide = windowWidth >= BREAKPOINT_WIDE_LAYOUT;
 
   if (loading) {
     return (
@@ -2635,7 +2636,7 @@ const styles = StyleSheet.create({
   // ── Desktop Team Hub shell (Stitch 3-column layout) ──
   bodyRow: { flex: 1, flexDirection: 'row', width: '100%', maxWidth: 1400, marginHorizontal: 'auto', gap: 14, paddingHorizontal: 16, paddingTop: 16 },
   bodyFill: { flex: 1 },
-  sidebar: { width: 200, flexGrow: 0, flexShrink: 0, paddingBottom: 24, gap: 6 },
+  sidebar: { width: '18%', minWidth: 160, maxWidth: 220, flexGrow: 0, flexShrink: 0, paddingBottom: 24, gap: 6 },
   sidebarTeamRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 18 },
   sidebarLogoImg: { width: 40, height: 40, borderRadius: 10 },
   sidebarLogoPh: { width: 40, height: 40, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center' },
@@ -2657,7 +2658,7 @@ const styles = StyleSheet.create({
   centerHeader: { marginBottom: 14 },
   centerTitle: { fontSize: 28, fontWeight: '700', color: RivalColors.textPrimary, fontFamily: 'Manrope' },
   centerSub: { fontSize: 14, color: RivalColors.onSurfaceVariant, marginTop: 2 },
-  rightRail: { width: 280, flexGrow: 0, flexShrink: 0, maxWidth: 280 },
+  rightRail: { width: '24%', minWidth: 220, flexGrow: 0, flexShrink: 0, maxWidth: 300 },
   rightRailContent: { paddingBottom: 80, gap: 4 },
   chatPill: { position: 'absolute', bottom: 28, right: 28, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(20,20,20,0.8)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', borderRadius: 18, paddingHorizontal: 22, paddingVertical: 16 },
   chatPillIcon: { fontSize: 22 },

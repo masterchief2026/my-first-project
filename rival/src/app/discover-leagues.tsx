@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabase';
 import { RivalTopNav, RivalIcon, RivalFixedBackground } from '../components/rival';
 import type { RivalIconName } from '../components/rival/RivalIcon';
 import { RivalColors, RivalRadius, RivalType } from '../constants/rivalTheme';
+import { BREAKPOINT_TWO_UP_GRID } from '../constants/breakpoints';
 
 type MembershipState = 'none' | 'pending' | 'active';
 
@@ -56,7 +57,7 @@ function getMondayStart(date: Date) {
 // them, and fake chips don't earn their place.
 export default function DiscoverLeaguesScreen() {
   const { width: windowWidth } = useWindowDimensions();
-  const wide = windowWidth >= 760;
+  const wide = windowWidth >= BREAKPOINT_TWO_UP_GRID;
 
   const [myTeams, setMyTeams] = useState<TeamRow[]>([]);
   const [publicTeams, setPublicTeams] = useState<TeamRow[]>([]);

@@ -3,6 +3,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { RivalButton, RivalCard, RivalIcon, RivalIconName, RivalTopNav } from '../components/rival';
 import { RivalColors, RivalRadius, RivalType } from '../constants/rivalTheme';
+import { BREAKPOINT_WIDE_LAYOUT } from '../constants/breakpoints';
 
 const PROCESS_STEPS: Array<{ icon: RivalIconName; title: string; body: string }> = [
   { icon: 'addPhoto', title: '1. Add a photo', body: 'Snap your training app screen, gym whiteboard, or workout card — in good light.' },
@@ -12,7 +13,7 @@ const PROCESS_STEPS: Array<{ icon: RivalIconName; title: string; body: string }>
 
 export default function AddWorkoutScreen() {
   const { width } = useWindowDimensions();
-  const wide = width >= 840;
+  const wide = width >= BREAKPOINT_WIDE_LAYOUT;
 
   const card = (
     icon: RivalIconName,

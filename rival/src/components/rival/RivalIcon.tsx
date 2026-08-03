@@ -32,6 +32,9 @@ const ICONS = {
   upload: 'file-upload',
   notifications: 'notifications',
   notificationsActive: ['mci', 'bell-ring-outline'] as const,
+  // Plain outline bell (mockup's ti-bell) — distinct from `notifications`
+  // above, which is the filled glyph other screens already depend on.
+  notificationsOutline: 'notifications-none',
   settings: 'settings',
   logout: 'logout',
   delete: 'delete-outline',
@@ -40,6 +43,7 @@ const ICONS = {
   apps: 'apps',
   person: 'person',
   groups: 'groups',
+  home: 'home',
   flag: 'flag',
   key: 'vpn-key',
   globe: 'public',
@@ -61,7 +65,9 @@ const ICONS = {
   trophy: 'emoji-events',
   fire: 'local-fire-department',
   medal: 'military-tech',
-  crown: 'workspace-premium', // "Unrivaled" max rank
+  // Literal crown shape (no other call site depends on this glyph today —
+  // verified via a repo-wide grep before changing it).
+  crown: ['mci', 'crown-outline'] as const,
   lock: 'lock',               // locked milestone/achievement
   bolt: 'bolt',
   rest: 'bedtime',            // idle / no recent activity
@@ -69,11 +75,15 @@ const ICONS = {
   trendDown: 'trending-down',
   location: 'place',
   elevation: 'terrain',
-  distance: 'straighten',
+  // Route/path glyph (no other call site depends on this today — verified
+  // via a repo-wide grep) — was 'straighten' (a ruler), which reads as
+  // measuring-tool rather than distance-traveled.
+  distance: 'route',
   timer: 'timer',
   stats: 'bar-chart',
   race: 'sports-score',
   impact: 'auto-awesome',
+  doubleChevronUp: 'keyboard-double-arrow-up',
 
   // Activity types
   run: 'directions-run',

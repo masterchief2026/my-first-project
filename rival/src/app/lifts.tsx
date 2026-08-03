@@ -6,13 +6,14 @@ import { supabase } from '../lib/supabase';
 import { CANONICAL_LIFTS, matchCanonicalLift } from './scan-workout';
 import { RivalIcon, RivalTopNav, RivalFixedBackground } from '../components/rival';
 import { RivalColors, RivalRadius, RivalType } from '../constants/rivalTheme';
+import { BREAKPOINT_WIDE_LAYOUT } from '../constants/breakpoints';
 
 type Entry = { id: string; exercise_name: string; weight_kg: number; reps: number | null; performed_at: string };
 type LiftCard = { name: string; pb: number; goal: number | null; goalStart: number | null; history: Entry[] };
 
 export default function LiftsScreen() {
   const { width } = useWindowDimensions();
-  const wide = width >= 840;
+  const wide = width >= BREAKPOINT_WIDE_LAYOUT;
 
   const [cards, setCards] = useState<LiftCard[]>([]);
   const [loading, setLoading] = useState(true);

@@ -8,6 +8,7 @@ import { isValidUsername } from '../lib/identity';
 import { getQuote, QuoteTone } from '../lib/quotes';
 import { RivalButton, RivalCard, RivalIcon, RivalIconName, RivalTopNav } from '../components/rival';
 import { RivalColors, RivalRadius, RivalType } from '../constants/rivalTheme';
+import { BREAKPOINT_WIDE_LAYOUT } from '../constants/breakpoints';
 
 const DISPLAY_STYLES: Array<{ value: string; label: string; sample: (name: string, username: string | null) => string }> = [
   { value: 'real_name_username', label: 'Real name + Username', sample: (name, u) => u ? `${name}  ·  @${u}` : name },
@@ -35,7 +36,7 @@ const TABS: Array<{ id: TabId; label: string; icon: RivalIconName }> = [
 export default function ProfileScreen() {
   const { userId: viewedUserId, tab: tabParam } = useLocalSearchParams<{ userId?: string; tab?: TabId }>();
   const { width: windowWidth } = useWindowDimensions();
-  const wide = windowWidth >= 840;
+  const wide = windowWidth >= BREAKPOINT_WIDE_LAYOUT;
 
   const [currentAuthUserId, setCurrentAuthUserId] = useState('');
   const isOwnProfile = !viewedUserId || viewedUserId === currentAuthUserId;
@@ -735,7 +736,7 @@ const styles = StyleSheet.create({
 
   // Sidebar
   sidebar: { gap: 8 },
-  sidebarWide: { width: 240, flexGrow: 0, flexShrink: 0 },
+  sidebarWide: { width: '22%', minWidth: 200, maxWidth: 280, flexGrow: 0, flexShrink: 0 },
   tabScroll: { marginBottom: 16, flexGrow: 0 },
   tabScrollContent: { flexDirection: 'row', gap: 8 },
   sidebarBtn: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12, borderRadius: RivalRadius.DEFAULT, backgroundColor: RivalColors.surfaceContainer },

@@ -1,4 +1,4 @@
-import { ActivityIndicator, Pressable, StyleProp, StyleSheet, Text, ViewStyle } from 'react-native';
+import { ActivityIndicator, Pressable, StyleProp, StyleSheet, Text, TextStyle, ViewStyle } from 'react-native';
 import { RivalColors, RivalRadius, RivalType } from '../../constants/rivalTheme';
 
 type Variant = 'primary' | 'secondary' | 'destructive' | 'text';
@@ -10,6 +10,7 @@ export function RivalButton({
   disabled,
   loading,
   style,
+  labelStyle,
   onMouseEnter,
   onMouseLeave,
 }: {
@@ -19,6 +20,9 @@ export function RivalButton({
   disabled?: boolean;
   loading?: boolean;
   style?: StyleProp<ViewStyle>;
+  // Optional label override — additive, every existing call site is
+  // unaffected when omitted.
+  labelStyle?: StyleProp<TextStyle>;
   // Web-only hover hooks — Pressable forwards unrecognized props straight to
   // the underlying host element (same mechanism the hover cards elsewhere
   // use via TouchableOpacity), so the caller can drive its own hover style.
@@ -52,6 +56,7 @@ export function RivalButton({
             variant === 'secondary' && styles.labelSecondary,
             variant === 'destructive' && styles.labelDestructive,
             variant === 'text' && styles.labelText,
+            labelStyle,
           ]}
         >
           {label}

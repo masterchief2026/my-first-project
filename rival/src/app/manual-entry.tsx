@@ -10,6 +10,7 @@ import { formatDuration } from '../lib/format';
 import { CANONICAL_LIFTS, matchCanonicalLift } from './scan-workout';
 import { RivalButton, RivalCard, RivalIcon, activityIconName } from '../components/rival';
 import { RivalColors, RivalRadius, RivalType } from '../constants/rivalTheme';
+import { BREAKPOINT_WIDE_LAYOUT } from '../constants/breakpoints';
 
 type MediaItem = { blob: Blob; uri: string; type: 'photo' | 'video'; mimeType: string; ext: string };
 type Exercise = { name: string; sets?: number; reps?: number; weight?: number };
@@ -45,7 +46,7 @@ function todayDisplay(): string {
 
 export default function ManualEntryScreen() {
   const { width } = useWindowDimensions();
-  const wide = width >= 840;
+  const wide = width >= BREAKPOINT_WIDE_LAYOUT;
 
   const [workoutType, setWorkoutType] = useState('Run');
   const [workoutName, setWorkoutName] = useState('');
@@ -580,7 +581,7 @@ const styles = StyleSheet.create({
   doneText: { color: RivalColors.textSecondary, fontSize: 14 },
 
   twoCol: { flexDirection: 'row', gap: 16, alignItems: 'flex-start' },
-  leftCol: { width: 360, flexGrow: 0, flexShrink: 0, gap: 16 },
+  leftCol: { width: '38%', minWidth: 300, maxWidth: 420, flexGrow: 0, flexShrink: 0, gap: 16 },
   rightCol: { flex: 1, gap: 16 },
 
   panel: { padding: 20, gap: 14, marginBottom: 16 },

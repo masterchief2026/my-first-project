@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { StyleSheet, TouchableOpacity, View, Text, TextInput, ScrollView, Image, Platform, ImageBackground, useWindowDimensions } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { supabase } from '../lib/supabase';
 import { formatDuration, formatDurationClock } from '../lib/format';
@@ -8,6 +8,7 @@ import { calculateStreak } from '../lib/streak';
 import { computeActivityInsight, InsightTone } from '../lib/activityInsights';
 import { RivalTopNav, RivalIcon, activityIconName, RivalFixedBackground } from '../components/rival';
 import { RivalColors, RivalRadius, RivalType } from '../constants/rivalTheme';
+import { BREAKPOINT_TWO_UP_GRID, BREAKPOINT_SPACIOUS_GALLERY, BREAKPOINT_MOBILE_NAV } from '../constants/breakpoints';
 
 type ExerciseEntry = {
   name: string;
@@ -92,13 +93,17 @@ function getMondayStart(date: Date) {
 
 export default function MyActivitiesScreen() {
   const { width: windowWidth } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  // Below this, RivalTopNav shows its floating bottom tab bar instead of the
+  // desktop link row — the FAB needs to clear it, not sit underneath it.
+  const mobileNav = windowWidth < BREAKPOINT_MOBILE_NAV;
   // Two-up card grid only kicks in with room for it; below this everything stacks.
-  const wide = windowWidth >= 760;
+  const wide = windowWidth >= BREAKPOINT_TWO_UP_GRID;
   // Inline gallery placement needs real room beside the stat column, which
   // only the widest cards have. In the 2-up grid (48% flexBasis + flexGrow),
   // the only card that renders full-row is the LAST card of a week with an
   // odd activity count — that's decidable at render time, no measuring needed.
-  const spaciousWindow = windowWidth >= 900;
+  const spaciousWindow = windowWidth >= BREAKPOINT_SPACIOUS_GALLERY;
   const [allActivities, setAllActivities] = useState<Activity[]>([]);
   const [thisWeekTotal, setThisWeekTotal] = useState(0);
   const [pbs, setPbs] = useState<Record<string, string>>({});
@@ -1003,7 +1008,10 @@ export default function MyActivitiesScreen() {
 
       </ScrollView>
 
-        <TouchableOpacity style={styles.fab} onPress={() => router.push('/add-workout')}>
+        <TouchableOpacity
+          style={[styles.fab, mobileNav && { bottom: insets.bottom + 88 }]}
+          onPress={() => router.push('/add-workout')}
+        >
           <RivalIcon name="add" size={18} color={RivalColors.onAccentFill} />
           <Text style={styles.fabText}>Add Activity</Text>
         </TouchableOpacity>
@@ -1035,7 +1043,7 @@ const styles = StyleSheet.create({
   heroBodyWide: { flexDirection: 'row', alignItems: 'stretch' },
   heroMain: { flex: 1, justifyContent: 'space-between' },
   heroSide: { gap: 12, width: '100%' },
-  heroSideWide: { width: 260, flexGrow: 0, flexShrink: 0 },
+  heroSideWide: { width: '28%', minWidth: 220, maxWidth: 320, flexGrow: 0, flexShrink: 0 },
   heroEyebrow: { ...RivalType.labelCaps, fontSize: 11, letterSpacing: 3, color: RivalColors.accentText, marginBottom: 6 },
   heroScoreRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 16, marginBottom: 22 },
   heroScore: { ...RivalType.displayHero, fontSize: 100, lineHeight: 96, color: RivalColors.textPrimary },
@@ -1174,7 +1182,11 @@ const styles = StyleSheet.create({
 
   inlineUploadError: { color: RivalColors.error, fontSize: 12, fontWeight: '600' },
 
-  fab: { position: 'absolute', bottom: 28, right: 24, flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 14, paddingHorizontal: 20, borderRadius: RivalRadius.full, backgroundColor: RivalColors.accentFill, shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 6 },
+  // `fixed` (not `absolute`) so it stays pinned to the viewport — on web,
+  // `absolute` here was relative to a container whose height grows with
+  // scrollable content, so the button drifted upward as the page scrolled
+  // instead of staying put. Same fix as RivalTopNav's bottom tab bar.
+  fab: { position: 'fixed' as any, bottom: 28, right: 24, flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 14, paddingHorizontal: 20, borderRadius: RivalRadius.full, backgroundColor: RivalColors.accentFill, shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 6, zIndex: 150 },
   fabText: { fontSize: 15, fontWeight: '700', color: RivalColors.onAccentFill },
 });
 
