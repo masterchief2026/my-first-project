@@ -571,7 +571,16 @@ export default function HomeScreen() {
           ) : undefined}
         />
 
-        <ScrollView contentContainerStyle={styles.content}>
+        <ScrollView
+          contentContainerStyle={styles.content}
+          // iOS standalone (home-screen) web apps have a known WebKit quirk:
+          // position:fixed siblings of a nested SCROLLING div (this one —
+          // the actual page <body> deliberately doesn't scroll, see
+          // +html.tsx) can fail to stay pinned to the viewport during/after
+          // that div's scroll. This is the standard compositing fix for
+          // that exact case.
+          style={Platform.OS === 'web' ? ({ WebkitOverflowScrolling: 'touch' } as any) : undefined}
+        >
 
           {mobile ? (
             <>
