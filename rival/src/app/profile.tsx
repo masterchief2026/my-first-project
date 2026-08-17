@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { StyleSheet, TouchableOpacity, View, Text, TextInput, ScrollView, Image, Platform, useWindowDimensions } from 'react-native';
+import { StyleSheet, TouchableOpacity, View, Text, TextInput, ScrollView, Image, Platform, useWindowDimensions, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { supabase } from '../lib/supabase';
@@ -82,9 +82,17 @@ export default function ProfileScreen() {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  const [refreshing, setRefreshing] = useState(false);
+
   useEffect(() => {
     loadProfile();
   }, []);
+
+  async function handlePullToRefresh() {
+    setRefreshing(true);
+    await loadProfile();
+    setRefreshing(false);
+  }
 
   async function loadProfile() {
     const { data: { user } } = await supabase.auth.getUser();
@@ -549,6 +557,15 @@ export default function ProfileScreen() {
         <Text style={styles.statsLinkText}>See your stats — rank, milestones, Impact & more</Text>
         <Text style={styles.statsLinkArrow}>→</Text>
       </TouchableOpacity>
+
+      {/* Moved here from the Activity Journal screen — a settings-style link
+          out, same as the stats link above, fits better here than sitting
+          inline in the activity feed. */}
+      <TouchableOpacity style={styles.statsLink} onPress={() => router.push('/lifts')}>
+        <RivalIcon name="target" size={16} color={RivalColors.textPrimary} />
+        <Text style={styles.statsLinkText}>View Personal Bests</Text>
+        <Text style={styles.statsLinkArrow}>→</Text>
+      </TouchableOpacity>
     </RivalCard>
   );
 
@@ -694,7 +711,10 @@ export default function ProfileScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <RivalTopNav />
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handlePullToRefresh} tintColor={RivalColors.accentText} colors={[RivalColors.accentFill]} />}
+      >
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.replace('/home')}>
             <Text style={styles.back}>← Back</Text>

@@ -1,6 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { resolveCanonicalActivityId, linkNewActivitySource } from '../_shared/activityDedup.ts'
+import { findMatchingRaceId } from '../_shared/raceMatch.ts'
 import { calculateEffortScore, loadMultipliers } from '../_shared/effortScore.ts'
 import { getFreshStravaToken } from '../_shared/stravaAuth.ts'
 
@@ -118,6 +119,9 @@ serve(async (req) => {
           started_at: activity.start_date,
           effort_score: effortScore,
           raw_effort_score: effortScore,
+          // start_date_local (not start_date) — races.race_date is a bare calendar
+          // date, so matching needs the athlete's local day, not the UTC one.
+          race_id: await findMatchingRaceId(supabase, user.id, activity.start_date_local),
         }
 
         if (canonicalId) {

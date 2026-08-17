@@ -20,3 +20,9 @@ export function formatDisplayName(u: IdentityUser | null | undefined, fallback =
 
   return realName;
 }
+
+// Mirrors rival/src/lib/identity.ts formatTeamName — keep in sync.
+export function formatTeamName(name: string | null | undefined): string {
+  if (!name) return '';
+  return name.replace(/\S+/g, (word) => word.charAt(0).toUpperCase() + word.slice(1));
+}

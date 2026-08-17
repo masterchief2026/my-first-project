@@ -8,4 +8,8 @@ export { RivalAvatar } from './RivalAvatar';
 export { RivalIcon, activityIconName } from './RivalIcon';
 export { RivalTopNav } from './RivalTopNav';
 export { RivalFixedBackground } from './RivalFixedBackground';
+export { ActivityDiaryViewer } from './ActivityDiaryViewer';
+export { PhotoPositioner } from './PhotoPositioner';
+export { CoverImage } from './CoverImage';
+export type { DiaryActivity } from './ActivityDiaryViewer';
 export type { RivalIconName } from './RivalIcon';

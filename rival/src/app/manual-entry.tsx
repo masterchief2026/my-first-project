@@ -1,11 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { StyleSheet, TouchableOpacity, View, Text, TextInput, ScrollView, Image, Platform, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../lib/supabase';
 import { calculateEffortScore, loadScoringMultipliers } from '../lib/effort';
 import { isoToDisplayDate, displayToIsoDate } from '../lib/dateFormat';
+import { findMatchingRaceId } from '../lib/raceMatch';
 import { formatDuration } from '../lib/format';
 import { CANONICAL_LIFTS, matchCanonicalLift } from './scan-workout';
 import { RivalButton, RivalCard, RivalIcon, activityIconName } from '../components/rival';
@@ -47,10 +48,16 @@ function todayDisplay(): string {
 export default function ManualEntryScreen() {
   const { width } = useWindowDimensions();
   const wide = width >= BREAKPOINT_WIDE_LAYOUT;
+  // Prefills the date when opened from the Month calendar ("tap a logged-
+  // looking empty day" → jump straight to logging that day), passed as
+  // ?date=YYYY-MM-DD. Falls back to today for every other entry point
+  // (the FAB, "Add Workout" screen, etc. never pass this param).
+  const { date: prefillDateIso, editId } = useLocalSearchParams<{ date?: string; editId?: string }>();
+  const isEditMode = !!editId;
 
   const [workoutType, setWorkoutType] = useState('Run');
   const [workoutName, setWorkoutName] = useState('');
-  const [dateStr, setDateStr] = useState(todayDisplay());
+  const [dateStr, setDateStr] = useState(() => (prefillDateIso ? isoToDisplayDate(prefillDateIso) || todayDisplay() : todayDisplay()));
   const [durationMin, setDurationMin] = useState('');
   const [distanceKm, setDistanceKm] = useState('');
   const [elevationM, setElevationM] = useState('');
@@ -61,9 +68,34 @@ export default function ManualEntryScreen() {
   const [nameSuggestIndex, setNameSuggestIndex] = useState<number | null>(null);
   const [media, setMedia] = useState<MediaItem[]>([]);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [savedActivityId, setSavedActivityId] = useState<string | null>(null);
   const [savedHasPhoto, setSavedHasPhoto] = useState(false);
+  const [loadingEdit, setLoadingEdit] = useState(isEditMode);
+  // Preserves the original time-of-day (not just the date) when editing, so
+  // changing only the date field doesn't quietly reset an activity logged at
+  // 6am to whatever time you happen to be editing it.
+  const [originalStartedAt, setOriginalStartedAt] = useState<Date | null>(null);
+
+  useEffect(() => {
+    if (!editId) return;
+    (async () => {
+      const { data, error } = await supabase.from('activities').select('*').eq('id', editId).single();
+      if (error || !data) { setErrorMsg('Could not load this activity'); setLoadingEdit(false); return; }
+      setWorkoutType(data.activity_type || 'Run');
+      setWorkoutName(data.name || '');
+      const started = new Date(data.started_at);
+      setOriginalStartedAt(started);
+      setDateStr(isoToDisplayDate(`${started.getFullYear()}-${String(started.getMonth() + 1).padStart(2, '0')}-${String(started.getDate()).padStart(2, '0')}`) || todayDisplay());
+      setDurationMin(data.duration_seconds > 0 ? String(Math.round(data.duration_seconds / 60)) : '');
+      setDistanceKm(data.distance_meters > 0 ? String(data.distance_meters / 1000) : '');
+      setElevationM(data.elevation_meters > 0 ? String(Math.round(data.elevation_meters)) : '');
+      setNotes(data.notes || '');
+      if (Array.isArray(data.exercises)) setExercises(data.exercises);
+      setLoadingEdit(false);
+    })();
+  }, [editId]);
 
   // Projected effort so the user gets immediate feedback before saving.
   const durationSeconds = (() => {
@@ -173,6 +205,23 @@ export default function ManualEntryScreen() {
     return CANONICAL_LIFTS.filter((lift) => lift.toLowerCase().includes(q)).slice(0, 6);
   }
 
+  // "Discard Workout" only makes sense for a not-yet-saved entry (router.back()
+  // with nothing written). In edit mode there's an existing saved activity —
+  // this actually deletes it (activity_media cascades; exercise_entries are
+  // ON DELETE SET NULL, harmless orphans left behind on a row that's gone).
+  async function deleteActivity() {
+    if (!editId) return;
+    if (Platform.OS === 'web' && !window.confirm('Delete this activity? This can\'t be undone.')) return;
+    setDeleting(true);
+    const { error } = await supabase.from('activities').delete().eq('id', editId);
+    if (error) {
+      setErrorMsg(`Delete failed: ${error.message}`);
+      setDeleting(false);
+      return;
+    }
+    router.back();
+  }
+
   async function saveSession() {
     if (!workoutName.trim()) { setErrorMsg('Give your session a name'); return; }
     if (durationSeconds <= 0) { setErrorMsg('Add how long you trained (minutes)'); return; }
@@ -196,8 +245,11 @@ export default function ManualEntryScreen() {
       );
 
       const [y, m, d] = isoDate.split('-').map(Number);
-      const now = new Date();
-      const startedAt = new Date(y, m - 1, d, now.getHours(), now.getMinutes(), now.getSeconds());
+      // Editing keeps the activity's original time-of-day — only the
+      // date portion is replaceable here, so a 6am run stays a 6am run
+      // even if you only meant to fix its distance.
+      const timeSource = isEditMode && originalStartedAt ? originalStartedAt : new Date();
+      const startedAt = new Date(y, m - 1, d, timeSource.getHours(), timeSource.getMinutes(), timeSource.getSeconds());
 
       // Only keep exercises the user actually named; tag canonical lifts so
       // they group with existing PR history in the feed/activity record.
@@ -209,34 +261,66 @@ export default function ManualEntryScreen() {
           })
         : null;
 
-      const { data: inserted, error } = await supabase
-        .from('activities')
-        .insert({
-          user_id: user.id,
-          name: workoutName.trim(),
-          activity_type: workoutType,
-          distance_meters: distance * 1000,
-          duration_seconds: durationSeconds,
-          elevation_meters: elevation,
-          started_at: startedAt.toISOString(),
-          effort_score: effortScore,
-          raw_effort_score: effortScore,
-          notes: notes.trim() || null,
-          exercises: exercisesPayload,
-          provider: 'rival_manual',
-          provider_activity_id: `manual-${Date.now()}`,
-        })
-        .select('id')
-        .single();
+      const raceId = await findMatchingRaceId(user.id, startedAt.toISOString());
 
-      if (error || !inserted) {
-        setErrorMsg(error?.message?.includes('activities_started_at_not_future')
-          ? "That date is in the future — activities can't be logged ahead of time."
-          : `Save failed: ${error?.message ?? 'unknown error'}`);
-        setSaving(false);
-        return;
+      let activityId: string;
+      if (isEditMode) {
+        const { error } = await supabase
+          .from('activities')
+          .update({
+            name: workoutName.trim(),
+            activity_type: workoutType,
+            distance_meters: distance * 1000,
+            duration_seconds: durationSeconds,
+            elevation_meters: elevation,
+            started_at: startedAt.toISOString(),
+            effort_score: effortScore,
+            raw_effort_score: effortScore,
+            notes: notes.trim() || null,
+            exercises: exercisesPayload,
+            race_id: raceId,
+          })
+          .eq('id', editId);
+        if (error) {
+          setErrorMsg(`Save failed: ${error.message}`);
+          setSaving(false);
+          return;
+        }
+        activityId = editId as string;
+        // Re-sync the PR tracker's lift rows with whatever's now in the form
+        // — simplest correct approach is drop-and-reinsert rather than diffing.
+        await supabase.from('exercise_entries').delete().eq('activity_id', activityId);
+      } else {
+        const { data: inserted, error } = await supabase
+          .from('activities')
+          .insert({
+            user_id: user.id,
+            name: workoutName.trim(),
+            activity_type: workoutType,
+            distance_meters: distance * 1000,
+            duration_seconds: durationSeconds,
+            elevation_meters: elevation,
+            started_at: startedAt.toISOString(),
+            effort_score: effortScore,
+            raw_effort_score: effortScore,
+            notes: notes.trim() || null,
+            exercises: exercisesPayload,
+            provider: 'rival_manual',
+            provider_activity_id: `manual-${Date.now()}`,
+            race_id: raceId,
+          })
+          .select('id')
+          .single();
+
+        if (error || !inserted) {
+          setErrorMsg(error?.message?.includes('activities_started_at_not_future')
+            ? "That date is in the future — activities can't be logged ahead of time."
+            : `Save failed: ${error?.message ?? 'unknown error'}`);
+          setSaving(false);
+          return;
+        }
+        activityId = inserted.id;
       }
-      const activityId = inserted.id;
 
       // Lift entries feed the PR tracker. Use the canonical name when we
       // recognise the lift (so it groups with existing history), else the
@@ -280,6 +364,10 @@ export default function ManualEntryScreen() {
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}`, 'apikey': process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY! },
       }).catch(() => {});
 
+      if (isEditMode) {
+        router.replace('/my-activities');
+        return;
+      }
       setSavedActivityId(activityId);
       setSavedHasPhoto(!!firstPhotoUrl);
       // With a photo, offer to AI-enhance before leaving; otherwise head to the feed.
@@ -374,14 +462,20 @@ export default function ManualEntryScreen() {
         <Text style={styles.classHint}>CrossFit/Hyrox/HIIT sessions are counted as a full class (45 min) — include warm-up & skill work, not just the timed piece.</Text>
       )}
       <RivalButton
-        label={saving ? 'Saving…' : 'Complete Session'}
+        label={saving ? 'Saving…' : isEditMode ? 'Save Changes' : 'Complete Session'}
         onPress={saveSession}
         disabled={saving || !!savedActivityId}
         style={styles.completeBtn}
       />
-      <TouchableOpacity onPress={() => router.back()} disabled={saving}>
-        <Text style={styles.discard}>Discard Workout</Text>
-      </TouchableOpacity>
+      {isEditMode ? (
+        <TouchableOpacity onPress={deleteActivity} disabled={saving || deleting}>
+          <Text style={styles.discard}>{deleting ? 'Deleting…' : 'Delete Activity'}</Text>
+        </TouchableOpacity>
+      ) : (
+        <TouchableOpacity onPress={() => router.back()} disabled={saving}>
+          <Text style={styles.discard}>Discard Workout</Text>
+        </TouchableOpacity>
+      )}
     </RivalCard>
   );
 
@@ -514,8 +608,12 @@ export default function ManualEntryScreen() {
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.title}>Log Your Session</Text>
-        <Text style={styles.subtitle}>Capture your session so it counts toward your Effort and your team.</Text>
+        <Text style={styles.title}>{isEditMode ? 'Edit Your Session' : 'Log Your Session'}</Text>
+        <Text style={styles.subtitle}>
+          {isEditMode ? 'Update the details below — changes recalculate your Effort automatically.' : 'Capture your session so it counts toward your Effort and your team.'}
+        </Text>
+
+        {loadingEdit && <Text style={styles.subtitle}>Loading activity…</Text>}
 
         {saved && (
           <View style={styles.successBanner}>
@@ -536,18 +634,20 @@ export default function ManualEntryScreen() {
           </View>
         )}
 
-        <View style={[wide && styles.twoCol]}>
-          <View style={[wide && styles.leftCol]}>
-            {typeCard}
-            {detailsCard}
+        {!loadingEdit && (
+          <View style={[wide && styles.twoCol]}>
+            <View style={[wide && styles.leftCol]}>
+              {typeCard}
+              {detailsCard}
+            </View>
+            <View style={[wide && styles.rightCol]}>
+              {metricsCard}
+              {commentsCard}
+              {exercisesCard}
+              {mediaCard}
+            </View>
           </View>
-          <View style={[wide && styles.rightCol]}>
-            {metricsCard}
-            {commentsCard}
-            {exercisesCard}
-            {mediaCard}
-          </View>
-        </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );

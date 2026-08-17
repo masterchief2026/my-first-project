@@ -21,11 +21,18 @@ const ICONS = {
   yearBack: 'keyboard-double-arrow-left',
   yearForward: 'keyboard-double-arrow-right',
   chevronRight: 'chevron-right',
+  chevronDown: 'keyboard-arrow-down',
   edit: 'edit',
+  more: 'more-vert',
   close: 'close',
   add: 'add',
   check: 'check',
+  refresh: 'refresh',
   checkCircle: 'check-circle',
+  checkCircleOutline: 'check-circle-outline',
+  // Bare heartbeat waveform, no monitor-screen frame around it — MaterialIcons'
+  // only pulse-shaped glyph (monitor-heart) bakes in that rounded-rect frame.
+  pulse: ['mci', 'pulse'] as const,
   target: 'adjust',
   search: 'search',
   camera: 'photo-camera',
@@ -50,6 +57,7 @@ const ICONS = {
   chat: 'chat-bubble',
   pin: 'push-pin',
   star: 'star',
+  starOutline: 'star-border',
 
   // Add Workout / logging
   scan: 'document-scanner',
@@ -60,6 +68,7 @@ const ICONS = {
   verified: 'verified',
   ai: 'auto-awesome',
   calendar: 'calendar-today',
+  calendarMonth: 'calendar-view-month',
 
   // Stats / metrics
   trophy: 'emoji-events',
@@ -80,6 +89,10 @@ const ICONS = {
   // measuring-tool rather than distance-traveled.
   distance: 'route',
   timer: 'timer',
+  // MaterialIcons' plain "timer" renders with a solid-filled button/hand —
+  // this outline variant for spots that need a lighter, unfilled stopwatch.
+  timerOutline: ['mci', 'timer-outline'] as const,
+  schedule: 'schedule',
   stats: 'bar-chart',
   race: 'sports-score',
   impact: 'auto-awesome',
@@ -91,7 +104,10 @@ const ICONS = {
   swim: 'pool',
   rowing: 'rowing',
   weights: 'fitness-center',
-  crossfit: 'sports-gymnastics',
+  // MaterialIcons' 'sports-gymnastics' reads as a gymnast/ballet pose, not
+  // a workout — this is the classic Olympic-lifting pictogram (barbell
+  // overhead), a closer match for CrossFit's actual training style.
+  crossfit: ['mci', 'weight-lifter'] as const,
   hyrox: 'local-fire-department',
   hiit: 'bolt',
   hike: 'hiking',

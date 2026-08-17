@@ -1,6 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { formatDisplayName } from '../_shared/formatName.ts'
+import { formatDisplayName, formatTeamName } from '../_shared/formatName.ts'
 import { sendPushMessages } from '../_shared/push.ts';
 
 const corsHeaders = {
@@ -71,7 +71,7 @@ serve(async (req) => {
       if (!c) return new Response(JSON.stringify({ sent: 0 }), { status: 200, headers: corsHeaders });
 
       const { data: challengerLeague } = await supabase.from('leagues').select('name').eq('id', c.challenger_league_id).single();
-      const challengerName = (challengerLeague as any)?.name ?? 'Another team';
+      const challengerName = formatTeamName((challengerLeague as any)?.name) || 'Another team';
 
       // Notify ALL members of the opponent league
       const { data: opponentMembers } = await supabase.from('league_members').select('user_id').eq('league_id', c.opponent_league_id).eq('status', 'active');
@@ -99,7 +99,7 @@ serve(async (req) => {
       if (!c) return new Response(JSON.stringify({ sent: 0 }), { status: 200, headers: corsHeaders });
 
       const { data: opponentLeague } = await supabase.from('leagues').select('name').eq('id', c.opponent_league_id).single();
-      const opponentName = (opponentLeague as any)?.name ?? 'The opponent';
+      const opponentName = formatTeamName((opponentLeague as any)?.name) || 'The opponent';
 
       // Notify all challenger league members
       const { data: challengerMembers } = await supabase.from('league_members').select('user_id').eq('league_id', c.challenger_league_id).eq('status', 'active');

@@ -266,6 +266,10 @@ export default function CreateLeagueScreen() {
   // screen instead of navigating straight to the team feed, so the crest
   // (the one thing every team gets, unique, one-time) gets its own moment.
   const [revealCrestUrl, setRevealCrestUrl] = useState<string | null>(null);
+  // 3 candidates come back from one generation call; the admin picks one
+  // before it's written to the league (see chooseCrest below).
+  const [crestCandidates, setCrestCandidates] = useState<string[] | null>(null);
+  const [confirmingCrest, setConfirmingCrest] = useState(false);
 
   // Add-race: full parity with races.tsx's own Add Race form (same fields,
   // same per-type disciplines) so nothing is left out — reached inline here
@@ -548,7 +552,24 @@ export default function CreateLeagueScreen() {
     }
 
     setLoading(false);
-    setRevealCrestUrl(data.url);
+    setCrestCandidates(data.urls);
+  }
+
+  async function chooseCrest(url: string) {
+    if (!leagueId) return;
+    setConfirmingCrest(true);
+    setError('');
+    const { error } = await supabase
+      .from('leagues')
+      .update({ logo_url: url, crest_generated_at: new Date().toISOString() })
+      .eq('id', leagueId);
+    setConfirmingCrest(false);
+    if (error) {
+      setError('Failed to save your crest. Please try again.');
+      return;
+    }
+    setCrestCandidates(null);
+    setRevealCrestUrl(url);
   }
 
   function enterTeam() {
@@ -607,7 +628,26 @@ export default function CreateLeagueScreen() {
         <RivalTopNav active="teams" />
         <ScrollView contentContainerStyle={styles.content}>
           <View style={styles.panel}>
-            {revealCrestUrl ? (
+            {crestCandidates ? (
+              <View style={styles.revealBlock}>
+                <Text style={styles.revealEyebrow}>Pick Your Crest</Text>
+                <Text style={styles.subtitle}>Three takes on {name.trim()} — choose the one that's your team.</Text>
+                <View style={styles.crestPickRow}>
+                  {crestCandidates.map((url, i) => (
+                    <TouchableOpacity
+                      key={i}
+                      style={styles.crestPickFrame}
+                      onPress={() => chooseCrest(url)}
+                      disabled={confirmingCrest}
+                    >
+                      <Image source={{ uri: url }} style={styles.crestPickImg} resizeMode="cover" />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                {confirmingCrest ? <Text style={styles.subtitle}>Saving your pick…</Text> : null}
+                {error ? <Text style={styles.error}>{error}</Text> : null}
+              </View>
+            ) : revealCrestUrl ? (
               <View style={styles.revealBlock}>
                 <Text style={styles.revealEyebrow}>Your Crest</Text>
                 <View style={styles.revealCrestFrame}>
@@ -1227,6 +1267,17 @@ const styles = StyleSheet.create({
     ...(Platform.OS === 'web' ? { boxShadow: '0 0 40px rgba(217,119,87,0.35)' } as any : {}),
   },
   revealCrestImg: { width: '100%', height: '100%' },
+
+  crestPickRow: { flexDirection: 'row', gap: 10, marginVertical: 8 },
+  crestPickFrame: {
+    width: 100,
+    height: 100,
+    borderRadius: RivalRadius.lg,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.2)',
+    overflow: 'hidden',
+  },
+  crestPickImg: { width: '100%', height: '100%' },
 
   // RN Web's Modal portal renders with `position: absolute`, inheriting
   // whatever position it happens to land at in the DOM rather than covering

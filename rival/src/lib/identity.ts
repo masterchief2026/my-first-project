@@ -30,3 +30,12 @@ export function formatUsernameSuffix(u: IdentityUser | null | undefined): string
 export function isValidUsername(username: string): boolean {
   return /^[a-z0-9_]{3,20}$/.test(username);
 }
+
+// Team names are free-typed by whoever created the team, so display them
+// title-cased everywhere regardless of how they were entered
+// ("squampton crreew" -> "Squampton Crreew"). Never store this — only the
+// display layer title-cases, the DB keeps exactly what was typed.
+export function formatTeamName(name: string | null | undefined): string {
+  if (!name) return '';
+  return name.replace(/\S+/g, (word) => word.charAt(0).toUpperCase() + word.slice(1));
+}

@@ -5,6 +5,7 @@ import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../lib/supabase';
 import { calculateEffortScore, loadScoringMultipliers } from '../lib/effort';
+import { findMatchingRaceId } from '../lib/raceMatch';
 import { matchCanonicalLift } from './scan-workout';
 
 type DayImage = { uri: string; base64: string; mimeType: string };
@@ -182,6 +183,8 @@ export default function WeeklyScanScreen() {
         const intensity = workout.intensity ?? 50;
         const effortScore = calculateEffortScore(workoutType, duration, distance * 1000, await loadScoringMultipliers(), intensity);
 
+        const raceId = await findMatchingRaceId(user.id, day.date.toISOString());
+
         const { data: inserted, error: insertErr } = await supabase.from('activities').insert({
           user_id: user.id,
           provider: 'rival_scan',
@@ -195,6 +198,7 @@ export default function WeeklyScanScreen() {
           effort_score: effortScore,
           raw_effort_score: effortScore,
           exercises: workout.exercises?.length > 0 ? workout.exercises : null,
+          race_id: raceId,
         }).select('id').single();
 
         if (insertErr || !inserted) {

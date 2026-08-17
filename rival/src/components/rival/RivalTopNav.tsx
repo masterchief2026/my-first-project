@@ -19,11 +19,14 @@ type Section = 'today' | 'activity' | 'teams';
 const LINKS: Array<{ key: Section; label: string; route: string; icon: RivalIconName }> = [
   { key: 'today', label: 'Today', route: '/home', icon: 'home' },
   { key: 'activity', label: 'Activity', route: '/my-activities', icon: 'stats' },
-  // Interim: no dedicated "your teams" list yet — points at Discover for now.
-  { key: 'teams', label: 'Teams', route: '/discover-leagues', icon: 'groups' },
+  // Team Feed is now the Teams tab's landing screen (Ricky's call,
+  // 2026-08-10) — team-feed.tsx is still static sample data, not wired to
+  // real teams yet. discover-leagues.tsx (the old "My Teams" list) needs a
+  // new home; Ricky's thinking the top of this feed.
+  { key: 'teams', label: 'Teams', route: '/team-feed', icon: 'groups' },
 ];
 
-export function RivalTopNav({ active, centerSlot }: { active?: Section; centerSlot?: ReactNode }) {
+export function RivalTopNav({ active, centerSlot, hideBar }: { active?: Section; centerSlot?: ReactNode; hideBar?: boolean }) {
   const { width } = useWindowDimensions();
   // Below this, the absolutely-centered links row (built for desktop, where the
   // logo and the RANK/bell/avatar cluster are far apart) collides with the right
@@ -52,6 +55,31 @@ export function RivalTopNav({ active, centerSlot }: { active?: Section; centerSl
       vv.removeEventListener('scroll', update);
     };
   }, []);
+  // Instagram-style: shrink the pill while scrolling down, restore it on the
+  // way back up. The scrollable element is a per-screen ScrollView (a plain
+  // div on web), not window itself — but "scroll" events don't bubble, so a
+  // normal window listener never sees them. A CAPTURING window listener does:
+  // capture phase reaches every ancestor on the way down to the actual
+  // target, regardless of bubbling. That's what lets this live once here,
+  // self-contained, instead of wiring onScroll into every mobile screen.
+  // Native has no DOM window, so this stays a no-op there.
+  const [navShrunk, setNavShrunk] = useState(false);
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined' || !narrow) return;
+    const lastY = new Map<EventTarget, number>();
+    const onScroll = (e: Event) => {
+      const target = e.target as HTMLElement;
+      const y = target.scrollTop ?? 0;
+      const prevY = lastY.get(target) ?? y;
+      const delta = y - prevY;
+      lastY.set(target, y);
+      if (y <= 4) { setNavShrunk(false); return; }
+      if (delta > 6) setNavShrunk(true);
+      else if (delta < -6) setNavShrunk(false);
+    };
+    window.addEventListener('scroll', onScroll, { capture: true, passive: true });
+    return () => window.removeEventListener('scroll', onScroll, { capture: true } as any);
+  }, [narrow]);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [initial, setInitial] = useState('?');
   const [displayName, setDisplayName] = useState('');
@@ -102,18 +130,18 @@ export function RivalTopNav({ active, centerSlot }: { active?: Section; centerSl
     // icons/labels. Giving the clearance padding to the pill itself (as before)
     // stretched its own visible background/border down through that empty
     // space, reading as a tall bar with dead space inside it.
-    <View style={[styles.bottomNavOuter, { bottom: navBottomOffset, paddingBottom: insets.bottom } as any]}>
-      <View style={styles.bottomNav}>
+    <View style={[styles.bottomNavOuter, { bottom: navBottomOffset, paddingBottom: insets.bottom + 6 } as any]}>
+      <View style={[styles.bottomNav, navShrunk && styles.bottomNavShrunk]}>
         {LINKS.map((l) => {
           const isActive = active === l.key;
           return (
             <TouchableOpacity
               key={l.key}
               onPress={() => router.push(l.route as any)}
-              style={[styles.bottomNavItem, isActive && styles.bottomNavItemActive]}
+              style={[styles.bottomNavItem, isActive && styles.bottomNavItemActive, navShrunk && styles.bottomNavItemShrunk]}
             >
-              <RivalIcon name={l.icon} size={20} color={isActive ? RivalColors.accentText : RivalColors.textSecondary} />
-              <Text style={[styles.bottomNavLabel, isActive && styles.bottomNavLabelActive]}>{l.label}</Text>
+              <RivalIcon name={l.icon} size={navShrunk ? 22 : 20} color={isActive ? RivalColors.accentText : RivalColors.textSecondary} />
+              <Text style={[styles.bottomNavLabel, isActive && styles.bottomNavLabelActive, navShrunk && styles.bottomNavLabelShrunk]}>{l.label}</Text>
             </TouchableOpacity>
           );
         })}
@@ -121,10 +149,23 @@ export function RivalTopNav({ active, centerSlot }: { active?: Section; centerSl
     </View>
   );
 
+  // hideBar drops the top row (logo/links/avatar cluster) for screens that
+  // want their own hero to own the top of the page (e.g. team-feed.tsx),
+  // while still keeping the floating bottom tab pill — that pill is the only
+  // way to switch tabs on mobile, so it must survive even when the bar above
+  // it doesn't. Desktop has no bottom pill (narrow-only), so hideBar means no
+  // nav chrome at all there; acceptable since this app is mobile-first.
+  if (hideBar) {
+    return narrow ? (bottomNavPortalTarget ? createPortal(bottomNav, bottomNavPortalTarget) : bottomNav) : null;
+  }
+
   return (
     <View style={[styles.bar, narrow && styles.barNarrow]}>
       <View style={[styles.row, narrow && styles.rowNarrow]}>
-        <TouchableOpacity onPress={() => router.push('/home')}>
+        <TouchableOpacity
+          onPress={() => router.push('/home')}
+          style={narrow && centerSlot ? styles.logoWrapBalanced : undefined}
+        >
           <Text style={[styles.logo, narrow && styles.logoNarrow]}>RIVAL</Text>
         </TouchableOpacity>
 
@@ -149,7 +190,7 @@ export function RivalTopNav({ active, centerSlot }: { active?: Section; centerSl
           </View>
         ) : null}
 
-        <View style={styles.right}>
+        <View style={[styles.right, narrow && !!centerSlot && styles.rightBalanced]}>
           {/* RANK badge is desktop-only on this bar — mobile shows the same
               rank name inside the Today screen's own Legacy section instead,
               so it doesn't fight the center slot for space here. */}
@@ -175,6 +216,12 @@ export function RivalTopNav({ active, centerSlot }: { active?: Section; centerSl
               </Text>
             </TouchableOpacity>
           )}
+          {/* Messages list (messages.tsx) — one row per team, each opening
+              that team's existing Chat tab in league.tsx. Sits left of the
+              bell per the Team Feed mockup. */}
+          <TouchableOpacity onPress={() => router.push('/messages')} style={[styles.notifBtn, narrow && styles.notifBtnNarrow]}>
+            <RivalIcon name="chat" size={narrow ? 19 : 20} color={RivalColors.accentText} />
+          </TouchableOpacity>
           <TouchableOpacity onPress={() => router.push('/profile?tab=notifications')} style={[styles.notifBtn, narrow && styles.notifBtnNarrow]}>
             {/* Mockup's mobile header uses the plain calm bell (ti-bell), not
                 the "ringing" bell desktop keeps for its own header. */}
@@ -326,6 +373,13 @@ const styles = StyleSheet.create({
   // "Total time earned"). minWidth:0 lets its content shrink/truncate
   // instead of pushing the logo/right cluster apart.
   centerSlot: { flex: 1, alignItems: 'center', minWidth: 0 },
+  // With centerSlot active, giving the logo and the (much wider) right
+  // cluster equal flex turns the row into a symmetric 3-column split, so
+  // centerSlot's alignItems:'center' lands on the row's true midpoint
+  // instead of the midpoint of the leftover gap (which skewed toward the
+  // narrower logo side, since the right cluster is visibly wider).
+  logoWrapBalanced: { flex: 1 },
+  rightBalanced: { flex: 1, justifyContent: 'flex-end' },
   // Floating bottom tab bar, mobile only (`narrow` breakpoint above) — replaces
   // the old in-flow links row so the primary nav sits within thumb reach
   // instead of up next to the logo. `position: 'fixed'` pins it to the
@@ -350,12 +404,28 @@ const styles = StyleSheet.create({
     backgroundColor: '#1c1c1c',
     borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
     paddingVertical: 4, paddingHorizontal: 6,
-    ...(Platform.OS === 'web' ? { backdropFilter: 'blur(20px)', boxShadow: '0 8px 24px rgba(0,0,0,0.4)' } as any : {}),
+    // overflow:hidden clips backdropFilter to the border-radius — without it,
+    // some browsers render the blur as an unclipped rectangle that bleeds
+    // past the pill's rounded corners as a faint square halo. box-shadow is
+    // unaffected (it paints outside the border box regardless of overflow).
+    overflow: 'hidden',
+    ...(Platform.OS === 'web'
+      ? { backdropFilter: 'blur(20px)', boxShadow: '0 8px 24px rgba(0,0,0,0.4)', transition: 'transform 0.22s ease, opacity 0.22s ease' } as any
+      : {}),
+  },
+  // Instagram-style shrink while scrolling down — scales the whole pill down
+  // and nudges it toward the bottom edge (transform-origin) so it reads as
+  // settling out of the way, not just uniformly resizing in place.
+  bottomNavShrunk: {
+    transform: [{ scale: 0.8 }],
+    ...(Platform.OS === 'web' ? { transformOrigin: 'center bottom' } as any : {}),
   },
   bottomNavItem: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 2, paddingVertical: 5, paddingHorizontal: 5, borderRadius: 16 },
   bottomNavItemActive: { backgroundColor: `${RivalColors.accentFill}22` },
+  bottomNavItemShrunk: { paddingVertical: 8, gap: 0 },
   bottomNavLabel: { fontSize: 11, fontWeight: '600', color: RivalColors.textSecondary },
   bottomNavLabelActive: { color: RivalColors.accentText },
+  bottomNavLabelShrunk: { opacity: 0, height: 0, lineHeight: 0, fontSize: 0 },
   // Smaller, more letter-spacing, lighter weight — quieter and closer to an
   // Apple-style minimal nav, without going all the way to "near-invisible"
   // (this is core navigation people tap constantly, not a utility bar).

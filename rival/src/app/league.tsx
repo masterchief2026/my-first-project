@@ -2,10 +2,11 @@ import { useEffect, useState, useRef } from 'react';
 import { StyleSheet, TouchableOpacity, View, Text, Share, Platform, ScrollView, Image, TextInput, Linking, Alert, ImageBackground, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
+import { Asset } from 'expo-asset';
 import { supabase } from '../lib/supabase';
 import { notify } from '../lib/notify';
 import { getLevel } from '../lib/xp';
-import { formatDisplayName } from '../lib/identity';
+import { formatDisplayName, formatTeamName } from '../lib/identity';
 import { isoToDisplayDate, displayToIsoDate } from '../lib/dateFormat';
 import { getSeasonStartISO, daysUntilSeasonEnd } from '../lib/season';
 import { matchCanonicalLift } from './scan-workout';
@@ -14,7 +15,8 @@ import { BREAKPOINT_WIDE_LAYOUT } from '../constants/breakpoints';
 import { ACTIVITY_ICONS } from '../constants/activityIcons';
 import { formatDuration } from '../lib/format';
 import { computeActivityInsight, ActivityInsight, InsightActivity, InsightTone } from '../lib/activityInsights';
-import { RivalIcon, RivalFixedBackground, RivalTopNav, RivalProgressBar } from '../components/rival';
+import { RivalIcon, RivalFixedBackground, RivalTopNav, RivalProgressBar, RivalAvatar } from '../components/rival';
+import Svg, { Circle, Defs, LinearGradient, Stop } from 'react-native-svg';
 
 const INSIGHT_ICON: Record<InsightTone, 'trophy' | 'fire' | 'trendUp'> = {
   record: 'trophy',
@@ -154,6 +156,98 @@ const CHALLENGE_METRICS: Array<{ value: Challenge['metric']; label: string }> = 
   { value: 'duration', label: 'Time (hours)' },
   { value: 'activities', label: 'Activities Logged' },
 ];
+// Short unit suffix for the Team Challenge ring/stat labels — CHALLENGE_METRICS'
+// own labels are too long to sit next to a number ("Distance (km)" vs "km").
+const GOAL_METRIC_UNIT: Record<Challenge['metric'], string> = {
+  xp: 'effort', distance: 'km', elevation: 'm', duration: 'hrs', activities: 'activities',
+};
+
+// react-native's View.backgroundColor can't express a gradient — same
+// limitation as TeamChallengePhoto/RivalFixedBackground above. Web renders
+// the real CSS gradient via a raw style prop; native falls back to a flat
+// approximation passed as the base style (CARD_BG / paceCard's own
+// backgroundColor) so nothing breaks, it's just flatter there.
+const warmCardWeb =
+  Platform.OS === 'web'
+    ? ({
+        backgroundImage:
+          'radial-gradient(circle at -10% -15%, rgba(255,209,190,0.14) 0%, rgba(255,209,190,0) 70%), linear-gradient(135deg, #231e1b 0%, #2d241f 55%, #3b2821 100%)',
+      } as any)
+    : null;
+const paceCardWeb =
+  Platform.OS === 'web'
+    ? ({ backgroundImage: 'linear-gradient(135deg, rgba(217,119,87,0.16), rgba(217,119,87,0.05))' } as any)
+    : null;
+
+// Same SVG-ring technique as design-preview-team-hub-v3.tsx — a stroked
+// circle, transform applied only to the Svg element itself so it can't leak
+// onto sibling content.
+function TeamChallengeRing({ pct, value, unit, size = 176, thickness = 13 }: { pct: number; value: number; unit: string; size?: number; thickness?: number }) {
+  const clamped = Math.max(0, Math.min(1, pct));
+  const radius = (size - thickness) / 2;
+  const circumference = 2 * Math.PI * radius;
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <Svg width={size} height={size} style={{ position: 'absolute', transform: [{ rotate: '-90deg' }] }}>
+        <Defs>
+          <LinearGradient id="teamChallengeRingGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <Stop offset="0%" stopColor={RivalColors.accentFill} />
+            <Stop offset="100%" stopColor={RivalColors.accentText} />
+          </LinearGradient>
+        </Defs>
+        <Circle cx={size / 2} cy={size / 2} r={radius} stroke="rgba(255,255,255,0.08)" strokeWidth={thickness} fill="none" />
+        <Circle
+          cx={size / 2} cy={size / 2} r={radius}
+          stroke="url(#teamChallengeRingGrad)" strokeWidth={thickness} fill="none"
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={circumference * (1 - clamped)}
+        />
+      </Svg>
+      <RivalIcon name="flag" size={20} color={RivalColors.accentText} style={{ marginBottom: 4 }} />
+      <Text style={{ fontSize: 30, fontWeight: '800', color: '#fff', letterSpacing: -0.6 }}>{value.toLocaleString()}</Text>
+      <Text style={{ fontSize: 12, color: RivalColors.textSecondary, marginTop: 2 }}>{unit}</Text>
+    </View>
+  );
+}
+
+const TEAM_CHALLENGE_PHOTO = require('../../assets/images/backgrounds/optimized/coastal-highway-triathlete-dusk-3.png');
+
+// Same technique as RivalFixedBackground (see that file's comment for the
+// full explanation of why): react-native-web's ImageBackground hardcodes
+// backgroundPosition/no gradient support on the div that actually paints
+// the photo, so the focal point + fade-to-card gradient go on a plain View
+// via raw CSS on web instead. Scoped to just this card's hero strip (not
+// position:fixed — this sits inline, unlike the page's own ambient photo).
+function TeamChallengePhoto({ children }: { children: React.ReactNode }) {
+  if (Platform.OS === 'web') {
+    const uri = Asset.fromModule(TEAM_CHALLENGE_PHOTO).uri;
+    return (
+      <View
+        style={[
+          styles.teamChallengePhoto,
+          {
+            backgroundImage: [
+              'linear-gradient(180deg, rgba(20,14,10,0.1) 0%, rgba(19,19,19,0.55) 55%, rgba(19,19,19,0.96) 92%)',
+              'radial-gradient(120% 70% at 50% 0%, rgba(217,119,87,0.25) 0%, rgba(217,119,87,0) 60%)',
+              `url(${uri})`,
+            ].join(', '),
+            backgroundPosition: '0 0, 0 0, center 45%',
+            backgroundSize: 'auto, auto, cover',
+            backgroundRepeat: 'no-repeat, no-repeat, no-repeat',
+          } as any,
+        ]}
+      >
+        {children}
+      </View>
+    );
+  }
+  return (
+    <ImageBackground source={TEAM_CHALLENGE_PHOTO} style={styles.teamChallengePhoto} resizeMode="cover">
+      {children}
+    </ImageBackground>
+  );
+}
 // Two reactions, words not emoji: Respect is everyday acknowledgment
 // ("I saw the work"); Inspired is rare and means someone's effort actually
 // moved you to act. Only 'inspired' counts toward the recipient's Impact
@@ -169,7 +263,7 @@ function feedTargetKey(type: string, id: string) {
 }
 
 export default function LeagueScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, tab: initialTabParam } = useLocalSearchParams<{ id: string; tab?: string }>();
   const [league, setLeague] = useState<League | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [journeyRace, setJourneyRace] = useState<JourneyRace | null>(null);
@@ -177,8 +271,17 @@ export default function LeagueScreen() {
   // across every active member's activities since the team was created,
   // mutually exclusive with journeyRace (enforced by a DB check constraint).
   const [goalProgress, setGoalProgress] = useState(0);
+  const [goalContributors, setGoalContributors] = useState<{ userId: string; value: number }[]>([]);
   const [editingGoal, setEditingGoal] = useState(false);
   const [goalDraft, setGoalDraft] = useState('');
+  // Team Challenge composer (admin-only) — creates/edits the shared goal
+  // (leagues.goal_metric/goal_target/goal_target_date), distinct from the
+  // per-member race-day goal above (editingGoal/goalDraft).
+  const [showGoalComposer, setShowGoalComposer] = useState(false);
+  const [goalMetricDraft, setGoalMetricDraft] = useState<Challenge['metric']>('distance');
+  const [goalTargetDraft, setGoalTargetDraft] = useState('');
+  const [goalDateDraft, setGoalDateDraft] = useState('');
+  const [savingGoal, setSavingGoal] = useState(false);
   const [currentUserId, setCurrentUserId] = useState('');
   const [isAdmin, setIsAdmin] = useState(false);
   const [mvpUserId, setMvpUserId] = useState<string | null>(null);
@@ -191,7 +294,10 @@ export default function LeagueScreen() {
   const [feedAvatarMap, setFeedAvatarMap] = useState<Record<string, string | null>>({});
   const seasonDaysLeft = daysUntilSeasonEnd();
 
-  const [activeTab, setActiveTab] = useState<'feed' | 'chat' | 'sessions' | 'challenges'>('feed');
+  const VALID_TABS = ['feed', 'chat', 'sessions', 'challenges'] as const;
+  const [activeTab, setActiveTab] = useState<'feed' | 'chat' | 'sessions' | 'challenges'>(
+    VALID_TABS.includes(initialTabParam as any) ? (initialTabParam as any) : 'feed'
+  );
   const [sessionsView, setSessionsView] = useState<'upcoming' | 'history'>('upcoming');
   const [allSessions, setAllSessions] = useState<ChatMessage[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(true);
@@ -349,12 +455,19 @@ export default function LeagueScreen() {
     }
 
     if (leagueData?.goal_metric && membersData) {
-      const progress = await computeTeamGoalProgress(
+      const { total, byUser } = await computeTeamGoalProgress(
         membersData.map((m: any) => m.user_id),
         leagueData.goal_metric,
         leagueData.created_at,
       );
-      setGoalProgress(progress);
+      setGoalProgress(total);
+      setGoalContributors(
+        Object.entries(byUser)
+          .map(([userId, value]) => ({ userId, value: Math.round(value * 10) / 10 }))
+          .sort((a, b) => b.value - a.value)
+      );
+    } else {
+      setGoalContributors([]);
     }
 
     if (membersData) {
@@ -796,23 +909,43 @@ export default function LeagueScreen() {
   // Sums one metric across every active member since the team formed —
   // same per-metric scoring as computeChallengeProgress below, just summed
   // across the whole roster instead of two challengers.
-  async function computeTeamGoalProgress(memberIds: string[], metric: Challenge['metric'], sinceIso: string): Promise<number> {
-    if (memberIds.length === 0) return 0;
+  async function computeTeamGoalProgress(memberIds: string[], metric: Challenge['metric'], sinceIso: string): Promise<{ total: number; byUser: Record<string, number> }> {
+    if (memberIds.length === 0) return { total: 0, byUser: {} };
     const { data } = await supabase
       .from('activities')
-      .select('effort_score, distance_meters, elevation_meters, duration_seconds')
+      .select('user_id, effort_score, distance_meters, elevation_meters, duration_seconds')
       .in('user_id', memberIds)
       .gte('started_at', sinceIso);
 
     let total = 0;
+    const byUser: Record<string, number> = {};
     (data || []).forEach((a: any) => {
-      if (metric === 'xp') total += a.effort_score || 0;
-      else if (metric === 'distance') total += (a.distance_meters || 0) / 1000;
-      else if (metric === 'elevation') total += a.elevation_meters || 0;
-      else if (metric === 'duration') total += (a.duration_seconds || 0) / 3600;
-      else total += 1;
+      let value = 0;
+      if (metric === 'xp') value = a.effort_score || 0;
+      else if (metric === 'distance') value = (a.distance_meters || 0) / 1000;
+      else if (metric === 'elevation') value = a.elevation_meters || 0;
+      else if (metric === 'duration') value = (a.duration_seconds || 0) / 3600;
+      else value = 1;
+      total += value;
+      byUser[a.user_id] = (byUser[a.user_id] || 0) + value;
     });
-    return Math.round(total * 10) / 10;
+    return { total: Math.round(total * 10) / 10, byUser };
+  }
+
+  async function saveTeamGoal() {
+    const target = parseFloat(goalTargetDraft);
+    if (!target || target <= 0) { notify('Set a target', 'Enter a positive number.'); return; }
+    const iso = displayToIsoDate(goalDateDraft);
+    if (!iso) { notify('Set a target date', 'Use DD/MM/YYYY.'); return; }
+    setSavingGoal(true);
+    const { error } = await supabase
+      .from('leagues')
+      .update({ goal_metric: goalMetricDraft, goal_target: target, goal_target_date: iso })
+      .eq('id', id);
+    setSavingGoal(false);
+    if (error) { notify("Couldn't save the team challenge", error.message); return; }
+    setShowGoalComposer(false);
+    loadLeague();
   }
 
   async function computeChallengeProgress(challenge: Challenge): Promise<{ challenger: number; opponent: number }> {
@@ -1405,7 +1538,7 @@ export default function LeagueScreen() {
               <Text style={styles.leagueLogoEditText}>{uploadingLogo ? '⏳' : '📷'}</Text>
             </View>
           </TouchableOpacity>
-          <Text style={styles.leagueName}>{league.name}</Text>
+          <Text style={styles.leagueName}>{formatTeamName(league.name)}</Text>
         </View>
     </>
   );
@@ -1423,19 +1556,194 @@ export default function LeagueScreen() {
           </View>
         )}
 
-        {league.goal_metric && league.goal_target && league.goal_target_date && (
-          <View style={styles.journeyBanner}>
-            <RivalIcon name="target" size={22} color={RivalColors.accentText} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.journeyBannerTitle}>
-                {CHALLENGE_METRICS.find(m => m.value === league.goal_metric)?.label}: {goalProgress.toLocaleString()} / {league.goal_target.toLocaleString()}
-              </Text>
-              <Text style={styles.journeyBannerSub}>
-                {(() => { const d = daysUntilRace(league.goal_target_date!); return d === 0 ? 'Due today' : d > 0 ? `${d} days left — everyone's effort counts toward this together.` : 'Target date passed.'; })()}
-              </Text>
-              <View style={{ marginTop: 8 }}>
-                <RivalProgressBar pct={league.goal_target ? goalProgress / league.goal_target : 0} />
+        {league.goal_metric && league.goal_target && league.goal_target_date ? (
+          (() => {
+            const target = league.goal_target!;
+            const unit = GOAL_METRIC_UNIT[league.goal_metric!];
+            const pct = target ? goalProgress / target : 0;
+            const daysLeft = daysUntilRace(league.goal_target_date!);
+            // Real elapsed time, no floor-to-1 — a challenge created minutes ago
+            // has ~0 days elapsed, and forcing that to "1" produced a false
+            // "100% behind pace" reading on day one. hasPaceData gates the
+            // whole pace comparison off until there's actually enough signal.
+            const realDaysElapsed = (Date.now() - new Date(league.created_at).getTime()) / 86400000;
+            const hasPaceData = realDaysElapsed >= 1 && goalProgress > 0;
+            const avgPerDay = hasPaceData ? goalProgress / realDaysElapsed : 0;
+            const remaining = Math.max(0, target - goalProgress);
+            const neededPerDay = daysLeft > 0 ? remaining / daysLeft : remaining;
+            const paceDeltaPct = hasPaceData && neededPerDay > 0 ? Math.round(((avgPerDay - neededPerDay) / neededPerDay) * 100) : 0;
+            const topValue = goalContributors[0]?.value || 1;
+            const metricLabel = CHALLENGE_METRICS.find(m => m.value === league.goal_metric)?.label;
+            return (
+              <View style={styles.teamChallengeCard}>
+                <TeamChallengePhoto>
+                  <View style={styles.teamChallengeHead}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.teamChallengeEyebrow}>TEAM CHALLENGE</Text>
+                      <Text style={styles.teamChallengeTitle}>{metricLabel}</Text>
+                    </View>
+                    {isAdmin && (
+                      <TouchableOpacity
+                        style={styles.teamChallengeEditBtn}
+                        onPress={() => {
+                          setGoalMetricDraft(league.goal_metric!);
+                          setGoalTargetDraft(String(target));
+                          setGoalDateDraft(isoToDisplayDate(league.goal_target_date!));
+                          setShowGoalComposer(true);
+                        }}
+                      >
+                        <Text style={styles.teamChallengeEdit}>Edit</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+
+                  <View style={styles.teamChallengeRingWrap}>
+                    <TeamChallengeRing pct={pct} value={Math.round(goalProgress)} unit={`/ ${target.toLocaleString()} ${unit}`} />
+                  </View>
+
+                  <View style={styles.teamChallengeMetaRow}>
+                    <Text style={styles.teamChallengeMeta}><Text style={styles.teamChallengeMetaBold}>{Math.round(pct * 100)}%</Text> complete</Text>
+                    <Text style={styles.teamChallengeMeta}>
+                      <Text style={styles.teamChallengeMetaBold}>{daysLeft > 0 ? daysLeft : 0}</Text> {daysLeft === 1 ? 'day' : 'days'} left
+                    </Text>
+                  </View>
+                </TeamChallengePhoto>
+
+                <View style={styles.teamChallengeBody}>
+                  <View style={[styles.paceCard, paceCardWeb]}>
+                    <View style={styles.paceIcon}>
+                      <RivalIcon name="bolt" size={18} color={RivalColors.accentText} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      {!hasPaceData ? (
+                        <>
+                          <Text style={styles.paceTitle}>Just getting started</Text>
+                          <Text style={styles.paceSub}>Every activity logged from here counts toward the goal.</Text>
+                        </>
+                      ) : paceDeltaPct >= 0 ? (
+                        <>
+                          <Text style={styles.paceTitle}>Keep it up!</Text>
+                          <Text style={styles.paceSub}>
+                            <Text style={styles.paceSubBold}>{paceDeltaPct}% ahead</Text> of the pace needed to hit the goal.
+                          </Text>
+                        </>
+                      ) : (
+                        <>
+                          <Text style={styles.paceTitle}>Let's pick it up</Text>
+                          <Text style={styles.paceSub}>
+                            Needs <Text style={styles.paceSubBold}>{(Math.round(neededPerDay * 10) / 10).toLocaleString()} {unit}/day</Text> to hit the goal.
+                          </Text>
+                        </>
+                      )}
+                    </View>
+                    {hasPaceData && <RivalIcon name={paceDeltaPct >= 0 ? 'trendUp' : 'trendDown'} size={20} color={RivalColors.accentFill} />}
+                  </View>
+
+                  <View style={styles.statMiniRow}>
+                    <View style={[styles.statMiniCard, warmCardWeb]}>
+                      <Text style={styles.statMiniVal}>{hasPaceData ? (Math.round(avgPerDay * 10) / 10).toLocaleString() : '—'}</Text>
+                      <Text style={styles.statMiniLbl}>{unit}/DAY{'\n'}TEAM AVG</Text>
+                    </View>
+                    <View style={[styles.statMiniCard, warmCardWeb]}>
+                      <Text style={styles.statMiniVal}>{(Math.round(remaining * 10) / 10).toLocaleString()}</Text>
+                      <Text style={styles.statMiniLbl}>{unit} TO GO</Text>
+                    </View>
+                    <View style={[styles.statMiniCard, warmCardWeb]}>
+                      <Text style={styles.statMiniVal}>{daysLeft > 0 ? daysLeft : 0}</Text>
+                      <Text style={styles.statMiniLbl}>DAYS LEFT</Text>
+                    </View>
+                  </View>
+
+                  {goalContributors.length > 0 && (
+                    <View style={styles.teamChallengeContributors}>
+                      <Text style={styles.teamChallengeSectionTitle}>Top Contributors</Text>
+                      {goalContributors.slice(0, 5).map((c, i) => {
+                        const member = members.find(m => m.user_id === c.userId);
+                        if (!member) return null;
+                        const name = getDisplayName(member);
+                        return (
+                          <TouchableOpacity key={c.userId} style={styles.contribRow} onPress={() => goToProfile(c.userId)}>
+                            <Text style={styles.contribRank}>{i + 1}</Text>
+                            <View style={{ position: 'relative' }}>
+                              {i === 0 && (
+                                <View style={styles.contribCrown}>
+                                  <RivalIcon name="crown" size={14} color={RivalColors.accentGold} />
+                                </View>
+                              )}
+                              <RivalAvatar uri={member.users?.avatar_url} name={name} size={32} />
+                            </View>
+                            <View style={{ flex: 1, minWidth: 0 }}>
+                              <Text style={[styles.contribName, i === 0 && styles.contribGold]}>{name}{c.userId === currentUserId ? ' (you)' : ''}</Text>
+                              <View style={{ marginTop: 4 }}>
+                                <RivalProgressBar pct={c.value / topValue} height={4} />
+                              </View>
+                            </View>
+                            <Text style={[styles.contribValue, i === 0 && styles.contribGold]}>{c.value.toLocaleString()} {unit}</Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  )}
+                </View>
               </View>
+            );
+          })()
+        ) : isAdmin && !journeyRace ? (
+          <TouchableOpacity
+            style={[styles.teamChallengeEmpty, warmCardWeb]}
+            onPress={() => {
+              setGoalMetricDraft('distance');
+              setGoalTargetDraft('');
+              setGoalDateDraft('');
+              setShowGoalComposer(true);
+            }}
+          >
+            <View style={styles.paceIcon}>
+              <RivalIcon name="target" size={20} color={RivalColors.accentText} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.teamChallengeEmptyTitle}>Start a Team Challenge</Text>
+              <Text style={styles.teamChallengeEmptySub}>Set a shared distance, effort, or elevation target — everyone's activity counts toward it.</Text>
+            </View>
+          </TouchableOpacity>
+        ) : null}
+
+        {showGoalComposer && (
+          <View style={styles.sessionComposer}>
+            <Text style={styles.challengeModalTitle}>🎯 Team Challenge</Text>
+            <Text style={styles.composerLabel}>Metric</Text>
+            <View style={styles.typeChipRow}>
+              {CHALLENGE_METRICS.map(m => (
+                <TouchableOpacity key={m.value} style={[styles.typeChip, goalMetricDraft === m.value && styles.typeChipActive]} onPress={() => setGoalMetricDraft(m.value)}>
+                  <Text style={[styles.typeChipText, goalMetricDraft === m.value && styles.typeChipTextActive]}>{m.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={styles.composerLabel}>Target ({GOAL_METRIC_UNIT[goalMetricDraft]})</Text>
+            <TextInput
+              style={styles.composerInput}
+              value={goalTargetDraft}
+              onChangeText={setGoalTargetDraft}
+              placeholder="e.g. 1000"
+              placeholderTextColor="#555"
+              keyboardType="numeric"
+            />
+            <Text style={styles.composerLabel}>Target date</Text>
+            <TextInput
+              style={styles.composerInput}
+              value={goalDateDraft}
+              onChangeText={setGoalDateDraft}
+              placeholder="DD/MM/YYYY"
+              placeholderTextColor="#555"
+              keyboardType="numbers-and-punctuation"
+            />
+            <View style={styles.editModalButtons}>
+              <TouchableOpacity style={styles.editCancelButton} onPress={() => setShowGoalComposer(false)}>
+                <Text style={styles.editCancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.postSessionBtn} onPress={saveTeamGoal} disabled={savingGoal}>
+                <Text style={styles.postSessionBtnText}>{savingGoal ? 'Saving…' : 'Save Challenge'}</Text>
+              </TouchableOpacity>
             </View>
           </View>
         )}
@@ -1676,7 +1984,7 @@ export default function LeagueScreen() {
                 )}
               </TouchableOpacity>
               <View style={{ flex: 1 }}>
-                <Text style={styles.sidebarTeamName} numberOfLines={1}>{league.name}</Text>
+                <Text style={styles.sidebarTeamName} numberOfLines={1}>{formatTeamName(league.name)}</Text>
                 <Text style={styles.sidebarTeamLabel}>TEAM HUB</Text>
               </View>
             </View>
@@ -1720,7 +2028,7 @@ export default function LeagueScreen() {
             <Text style={styles.centerTitle}>
               {activeTab === 'feed' ? 'Team Feed' : activeTab === 'chat' ? 'Team Chat' : activeTab === 'sessions' ? 'Sessions' : 'Challenges'}
             </Text>
-            <Text style={styles.centerSub}>{league.name} · {members.length} {members.length === 1 ? 'member' : 'members'}</Text>
+            <Text style={styles.centerSub}>{formatTeamName(league.name)} · {members.length} {members.length === 1 ? 'member' : 'members'}</Text>
           </View>
         )}
         {!wide && (
@@ -2259,7 +2567,7 @@ export default function LeagueScreen() {
                       style={[styles.lvlLeaguePickerRow, lvlTargetLeague === l.id && styles.lvlLeaguePickerRowActive]}
                       onPress={() => setLvlTargetLeague(l.id)}
                     >
-                      <Text style={styles.lvlLeaguePickerText}>{l.name}</Text>
+                      <Text style={styles.lvlLeaguePickerText}>{formatTeamName(l.name)}</Text>
                       {lvlTargetLeague === l.id && <Text style={{ color: '#8DC63F' }}>✓</Text>}
                     </TouchableOpacity>
                   ))}
@@ -2300,7 +2608,7 @@ export default function LeagueScreen() {
             {lvlChallenges.filter(c => c.status === 'pending').map(c => {
               const isChallenger = c.challenger_league_id === id;
               const otherLeague = allLeaguesForPicker.find(l => l.id === (isChallenger ? c.opponent_league_id : c.challenger_league_id));
-              const otherName = otherLeague?.name ?? (isChallenger ? c.opponent_league_id : c.challenger_league_id);
+              const otherName = otherLeague ? formatTeamName(otherLeague.name) : (isChallenger ? c.opponent_league_id : c.challenger_league_id);
               return (
                 <View key={c.id} style={styles.challengeCard}>
                   <Text style={styles.challengeVsText}>
@@ -2328,9 +2636,9 @@ export default function LeagueScreen() {
             {lvlChallenges.filter(c => c.status === 'active').map(c => {
               const p = lvlProgress[c.id] || { challenger: 0, opponent: 0 };
               const max = Math.max(p.challenger, p.opponent, 1);
-              const challengerName = league?.name ?? 'Us';
+              const challengerName = league ? formatTeamName(league.name) : 'Us';
               const otherLeague = allLeaguesForPicker.find(l => l.id === (c.challenger_league_id === id ? c.opponent_league_id : c.challenger_league_id));
-              const opponentName = otherLeague?.name ?? 'Them';
+              const opponentName = otherLeague ? formatTeamName(otherLeague.name) : 'Them';
               const metricLabel = CHALLENGE_METRICS.find(m => m.value === c.metric)?.label ?? c.metric;
               const ourScore = c.challenger_league_id === id ? p.challenger : p.opponent;
               const theirScore = c.challenger_league_id === id ? p.opponent : p.challenger;
@@ -2361,7 +2669,7 @@ export default function LeagueScreen() {
               const otherLeague = allLeaguesForPicker.find(l => l.id === (c.challenger_league_id === id ? c.opponent_league_id : c.challenger_league_id));
               return (
                 <View key={c.id} style={styles.challengeCard}>
-                  <Text style={styles.challengeVsText}>🏟️ {league?.name} vs {otherLeague?.name ?? '?'}</Text>
+                  <Text style={styles.challengeVsText}>🏟️ {league ? formatTeamName(league.name) : ''} vs {otherLeague ? formatTeamName(otherLeague.name) : '?'}</Text>
                   <Text style={styles.challengeDetail}>{CHALLENGE_METRICS.find(m => m.value === c.metric)?.label} · {c.start_date} → {c.end_date}</Text>
                   <Text style={[styles.challengeWinner, { color: c.winner_league_id ? (isWinner ? '#FFC940' : '#f87171') : '#999999' }]}>
                     {c.winner_league_id === null ? '🤝 Draw' : isWinner ? '🏆 Your team won!' : '💪 Tough one — better luck next time'}
@@ -2418,8 +2726,8 @@ export default function LeagueScreen() {
             </Text>
             <Text style={styles.leaveConfirmBody}>
               {members.length <= 1
-                ? `You're the last member of ${league?.name ?? 'this team'}. Leaving will permanently delete it — chat, feed, and challenge history included. This can't be undone.`
-                : `Leave ${league?.name ?? 'this team'}? You'll need an invite (or to request to join again) to come back.`}
+                ? `You're the last member of ${league ? formatTeamName(league.name) : 'this team'}. Leaving will permanently delete it — chat, feed, and challenge history included. This can't be undone.`
+                : `Leave ${league ? formatTeamName(league.name) : 'this team'}? You'll need an invite (or to request to join again) to come back.`}
             </Text>
             <View style={styles.leaveConfirmActions}>
               <TouchableOpacity style={styles.editCancelButton} onPress={() => setShowLeaveConfirm(false)}>
@@ -2466,6 +2774,65 @@ const styles = StyleSheet.create({
   journeyBannerIcon: { fontSize: 22 },
   journeyBannerTitle: { fontSize: 14, fontWeight: '800', color: RivalColors.textPrimary },
   journeyBannerSub: { fontSize: 12, color: RivalColors.textSecondary, marginTop: 2 },
+
+  // Team Challenge (leagues.goal_metric/goal_target/goal_target_date)
+  teamChallengeCard: {
+    borderRadius: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: `${RivalColors.accentText}33`,
+    overflow: 'hidden',
+    backgroundColor: '#2a211d',
+  },
+  teamChallengePhoto: { padding: 16, paddingBottom: 20 },
+  teamChallengeHead: { flexDirection: 'row', alignItems: 'flex-start' },
+  teamChallengeEyebrow: {
+    fontSize: 10.5, fontWeight: '700', letterSpacing: 1, color: RivalColors.accentText, textTransform: 'uppercase',
+    textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
+  },
+  teamChallengeTitle: {
+    fontFamily: 'Georgia, "Times New Roman", serif', fontStyle: 'italic', fontWeight: '700', fontSize: 18, color: '#fff', marginTop: 2,
+    textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
+  },
+  teamChallengeEditBtn: { backgroundColor: 'rgba(20,20,20,0.55)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10 },
+  teamChallengeEdit: { fontSize: 12.5, fontWeight: '700', color: RivalColors.accentText },
+  teamChallengeRingWrap: { alignItems: 'center', marginTop: 12 },
+  teamChallengeMetaRow: { flexDirection: 'row', justifyContent: 'center', gap: 16, marginTop: 12 },
+  teamChallengeMeta: { fontSize: 13, color: 'rgba(255,255,255,0.8)', textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  teamChallengeMetaBold: { fontWeight: '800', color: '#fff' },
+  teamChallengeBody: { padding: 16, paddingTop: 14, gap: 14 },
+
+  paceCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: 'rgba(217,119,87,0.1)', borderWidth: 1, borderColor: 'rgba(217,119,87,0.25)',
+    borderRadius: 14, padding: 12,
+  },
+  paceIcon: { width: 34, height: 34, borderRadius: 10, backgroundColor: 'rgba(217,119,87,0.22)', alignItems: 'center', justifyContent: 'center' },
+  paceTitle: { fontFamily: 'Georgia, "Times New Roman", serif', fontStyle: 'italic', fontWeight: '700', fontSize: 14, color: '#fff' },
+  paceSub: { fontSize: 12, color: RivalColors.onSurfaceVariant, marginTop: 2 },
+  paceSubBold: { fontWeight: '800', color: '#fff' },
+
+  statMiniRow: { flexDirection: 'row', gap: 8 },
+  statMiniCard: { flex: 1, backgroundColor: '#2a211d', borderWidth: 1, borderColor: `${RivalColors.accentText}24`, borderRadius: 14, paddingVertical: 12, alignItems: 'center' },
+  statMiniVal: { fontSize: 17, fontWeight: '800', color: '#fff', letterSpacing: -0.3 },
+  statMiniLbl: { fontFamily: 'Georgia, "Times New Roman", serif', fontStyle: 'italic', fontWeight: '700', fontSize: 9, letterSpacing: 0.4, color: 'rgba(255,255,255,0.55)', textTransform: 'uppercase', textAlign: 'center', marginTop: 4 },
+
+  teamChallengeContributors: { borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)', paddingTop: 12, gap: 2 },
+  teamChallengeSectionTitle: { fontFamily: 'Georgia, "Times New Roman", serif', fontStyle: 'italic', fontWeight: '700', fontSize: 14, color: '#fff', marginBottom: 6 },
+  contribRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 7 },
+  contribRank: { width: 14, textAlign: 'center', color: RivalColors.textSecondary, fontSize: 12, fontWeight: '700' },
+  contribCrown: { position: 'absolute', top: -10, left: '50%', transform: [{ translateX: -7 }], zIndex: 2 },
+  contribName: { fontSize: 13.5, fontWeight: '700', color: '#fff' },
+  contribValue: { fontSize: 12.5, fontWeight: '700', color: RivalColors.textSecondary },
+  contribGold: { color: RivalColors.accentGold },
+  teamChallengeEmpty: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: '#2a211d',
+    borderRadius: 14, padding: 14, marginBottom: 16,
+    borderWidth: 1, borderColor: `${RivalColors.accentText}33`,
+  },
+  teamChallengeEmptyTitle: { fontSize: 14, fontWeight: '800', color: RivalColors.textPrimary },
+  teamChallengeEmptySub: { fontSize: 12, color: RivalColors.textSecondary, marginTop: 2 },
   goalText: { fontSize: 12, color: RivalColors.success, marginTop: 4, fontWeight: '600' },
   goalEditRow: { marginTop: 4 },
   goalInput: { backgroundColor: RivalColors.surfaceLow, borderRadius: 8, paddingVertical: 6, paddingHorizontal: 10, fontSize: 12, color: RivalColors.textPrimary, borderWidth: 1, borderColor: RivalColors.success },

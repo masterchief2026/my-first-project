@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { StyleSheet, TouchableOpacity, View, Text, ScrollView, TextInput, Image, useWindowDimensions, Platform } from 'react-native';
+import { StyleSheet, TouchableOpacity, View, Text, ScrollView, TextInput, Image, useWindowDimensions, Platform, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { supabase } from '../lib/supabase';
 import { RivalTopNav, RivalIcon, RivalFixedBackground } from '../components/rival';
+import { formatTeamName } from '../lib/identity';
 import type { RivalIconName } from '../components/rival/RivalIcon';
 import { RivalColors, RivalRadius, RivalType } from '../constants/rivalTheme';
 import { BREAKPOINT_TWO_UP_GRID } from '../constants/breakpoints';
@@ -65,8 +66,15 @@ export default function DiscoverLeaguesScreen() {
   const [search, setSearch] = useState('');
   const [joining, setJoining] = useState<string | null>(null);
   const [joinError, setJoinError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => { load(); }, []);
+
+  async function handlePullToRefresh() {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  }
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser();
@@ -219,7 +227,7 @@ export default function DiscoverLeaguesScreen() {
     const sortedMyTeams = myTeamRows
       .map((m: any) => ({
         id: m.leagues.id,
-        name: m.leagues.name,
+        name: formatTeamName(m.leagues.name),
         logo_url: m.leagues.logo_url,
         member_count: countMap[m.leagues.id] || 0,
         membership: 'active' as MembershipState,
@@ -244,7 +252,7 @@ export default function DiscoverLeaguesScreen() {
         .filter((l: any) => membershipMap.get(l.id) !== 'active')
         .map((l: any) => ({
           id: l.id,
-          name: l.name,
+          name: formatTeamName(l.name),
           logo_url: l.logo_url,
           member_count: countMap[l.id] || 0,
           membership: membershipMap.get(l.id) || 'none',
@@ -323,7 +331,10 @@ export default function DiscoverLeaguesScreen() {
       <View style={styles.scrim} />
       <SafeAreaView style={styles.container}>
       <RivalTopNav active="teams" />
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handlePullToRefresh} tintColor={RivalColors.accentText} colors={[RivalColors.accentFill]} />}
+      >
 
         {/* Search + entry points */}
         <View style={[styles.toolRow, wide && styles.toolRowWide]}>

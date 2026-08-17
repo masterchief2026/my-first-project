@@ -3,7 +3,7 @@ import { StyleSheet, TouchableOpacity, View, Text, TextInput, ScrollView, Alert,
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { supabase } from '../lib/supabase';
-import { formatDisplayName } from '../lib/identity';
+import { formatDisplayName, formatTeamName } from '../lib/identity';
 
 // A crest (and the name baked into it) can change once every 6 months —
 // often enough to fix a bad first attempt or reflect a real team change,
@@ -18,6 +18,11 @@ function crestOnCooldown(generatedAt: string | null): boolean {
   if (!generatedAt) return false;
   return Date.now() < nextCrestEligibleAt(generatedAt).getTime();
 }
+
+// Mirrors generate-team-crest/index.ts's UNLIMITED_REGEN_USER_ID — keeps the
+// button/name-lock UI in sync with the server-side bypass for Ricky's own
+// account instead of showing a disabled button the server would actually accept.
+const UNLIMITED_REGEN_USER_ID = '09b2e197-8257-4d7c-a0e6-12dc0429eeff';
 
 type Member = {
   user_id: string;
@@ -44,6 +49,10 @@ export default function LeagueSettingsScreen() {
   const [crestGeneratedAt, setCrestGeneratedAt] = useState<string | null>(null);
   const [generatingCrest, setGeneratingCrest] = useState(false);
   const [crestError, setCrestError] = useState('');
+  // 3 candidates come back from one generation call; the admin picks one
+  // before it's written to the league (see chooseCrest below).
+  const [crestCandidates, setCrestCandidates] = useState<string[] | null>(null);
+  const [confirmingCrest, setConfirmingCrest] = useState(false);
   const [isPrivate, setIsPrivate] = useState(true);
   const [pendingRequests, setPendingRequests] = useState<Member[]>([]);
   const [respondingTo, setRespondingTo] = useState<string | null>(null);
@@ -136,13 +145,31 @@ export default function LeagueSettingsScreen() {
       setGeneratingCrest(false);
       return;
     }
-    setLogoUrl(data.url);
-    setCrestGeneratedAt(new Date().toISOString());
     setGeneratingCrest(false);
+    setCrestCandidates(data.urls);
   }
 
+  async function chooseCrest(url: string) {
+    setConfirmingCrest(true);
+    setCrestError('');
+    const { error } = await supabase
+      .from('leagues')
+      .update({ logo_url: url, crest_generated_at: new Date().toISOString() })
+      .eq('id', id);
+    setConfirmingCrest(false);
+    if (error) {
+      setCrestError('Failed to save your crest. Please try again.');
+      return;
+    }
+    setLogoUrl(url);
+    setCrestGeneratedAt(new Date().toISOString());
+    setCrestCandidates(null);
+  }
+
+  const cooldownActive = currentUserId !== UNLIMITED_REGEN_USER_ID && crestOnCooldown(crestGeneratedAt);
+
   async function saveName() {
-    if (crestOnCooldown(crestGeneratedAt)) {
+    if (cooldownActive) {
       setEditingName(false);
       return;
     }
@@ -219,7 +246,7 @@ export default function LeagueSettingsScreen() {
       <ScrollView contentContainerStyle={styles.content}>
 
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.replace({ pathname: '/league', params: { id } })}>
+          <TouchableOpacity onPress={() => router.replace({ pathname: '/team-hub', params: { id } })}>
             <Text style={styles.back}>← Back</Text>
           </TouchableOpacity>
         </View>
@@ -231,30 +258,51 @@ export default function LeagueSettingsScreen() {
             hand. logoCard here is just a preview; the only action is
             generateCrest below. */}
         <Text style={styles.sectionLabel}>Team Crest</Text>
-        <View style={styles.logoCard}>
-          {logoUrl ? (
-            <Image source={{ uri: logoUrl }} style={styles.logoImage} />
-          ) : (
-            <View style={styles.logoPlaceholder}>
-              <Text style={styles.logoPlaceholderIcon}>🏟️</Text>
-              <Text style={styles.logoPlaceholderHint}>No crest yet</Text>
+        {crestCandidates ? (
+          <>
+            <Text style={styles.crestPickHint}>Pick your crest:</Text>
+            <View style={styles.crestPickRow}>
+              {crestCandidates.map((url, i) => (
+                <TouchableOpacity
+                  key={i}
+                  style={styles.crestPickFrame}
+                  onPress={() => chooseCrest(url)}
+                  disabled={confirmingCrest}
+                >
+                  <Image source={{ uri: url }} style={styles.crestPickImg} />
+                </TouchableOpacity>
+              ))}
             </View>
-          )}
-        </View>
+            {confirmingCrest ? <Text style={styles.crestPickHint}>Saving your pick…</Text> : null}
+          </>
+        ) : (
+          <>
+            <View style={styles.logoCard}>
+              {logoUrl ? (
+                <Image source={{ uri: logoUrl }} style={styles.logoImage} />
+              ) : (
+                <View style={styles.logoPlaceholder}>
+                  <Text style={styles.logoPlaceholderIcon}>🏟️</Text>
+                  <Text style={styles.logoPlaceholderHint}>No crest yet</Text>
+                </View>
+              )}
+            </View>
 
-        <TouchableOpacity
-          style={[styles.crestBtn, (generatingCrest || crestOnCooldown(crestGeneratedAt)) && styles.crestBtnDisabled]}
-          onPress={generateCrest}
-          disabled={generatingCrest || crestOnCooldown(crestGeneratedAt)}
-        >
-          <Text style={styles.crestBtnText}>
-            {generatingCrest
-              ? 'Generating…'
-              : crestOnCooldown(crestGeneratedAt)
-                ? `Next crest available ${nextCrestEligibleAt(crestGeneratedAt!).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}`
-                : crestGeneratedAt ? '✨ Regenerate AI Crest' : '✨ Generate AI Crest'}
-          </Text>
-        </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.crestBtn, (generatingCrest || cooldownActive) && styles.crestBtnDisabled]}
+              onPress={generateCrest}
+              disabled={generatingCrest || cooldownActive}
+            >
+              <Text style={styles.crestBtnText}>
+                {generatingCrest
+                  ? 'Generating…'
+                  : cooldownActive
+                    ? `Next crest available ${nextCrestEligibleAt(crestGeneratedAt!).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}`
+                    : crestGeneratedAt ? '✨ Regenerate AI Crest' : '✨ Generate AI Crest'}
+              </Text>
+            </TouchableOpacity>
+          </>
+        )}
         {crestError ? <Text style={styles.crestErrorText}>{crestError}</Text> : null}
 
         {/* Rename */}
@@ -268,6 +316,7 @@ export default function LeagueSettingsScreen() {
                 onChangeText={setNewName}
                 autoFocus
                 autoCapitalize="words"
+                maxLength={40}
               />
               <TouchableOpacity style={styles.saveBtn} onPress={saveName} disabled={saving}>
                 <Text style={styles.saveBtnText}>{saving ? '…' : 'Save'}</Text>
@@ -276,19 +325,19 @@ export default function LeagueSettingsScreen() {
                 <Text style={styles.cancelText}>Cancel</Text>
               </TouchableOpacity>
             </View>
-          ) : crestOnCooldown(crestGeneratedAt) ? (
+          ) : cooldownActive ? (
             <View style={styles.nameRow}>
-              <Text style={styles.nameText}>{leagueName}</Text>
+              <Text style={styles.nameText}>{formatTeamName(leagueName)}</Text>
               <Text style={styles.editHintLocked}>🔒 Locked</Text>
             </View>
           ) : (
             <TouchableOpacity style={styles.nameRow} onPress={() => setEditingName(true)}>
-              <Text style={styles.nameText}>{leagueName}</Text>
+              <Text style={styles.nameText}>{formatTeamName(leagueName)}</Text>
               <Text style={styles.editHint}>✏️ Edit</Text>
             </TouchableOpacity>
           )}
         </View>
-        {crestOnCooldown(crestGeneratedAt) ? (
+        {cooldownActive ? (
           <Text style={styles.nameLockedHint}>Your AI crest has this name built into the artwork, so the name is locked until your next crest is available.</Text>
         ) : null}
 
@@ -510,6 +559,10 @@ const styles = StyleSheet.create({
   crestBtnDisabled: { backgroundColor: '#2A2A2A' },
   crestBtnText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
   crestErrorText: { color: '#FF6B6B', fontSize: 13, marginTop: 6 },
+  crestPickHint: { color: '#999999', fontSize: 13, marginBottom: 10 },
+  crestPickRow: { flexDirection: 'row', gap: 10, marginBottom: 28 },
+  crestPickFrame: { flex: 1, aspectRatio: 1, backgroundColor: '#1A1A1A', borderRadius: 12, borderWidth: 1, borderColor: '#8DC63F', overflow: 'hidden' },
+  crestPickImg: { width: '100%', height: '100%' },
   membersCard: {
     backgroundColor: '#111111',
     borderRadius: 12,

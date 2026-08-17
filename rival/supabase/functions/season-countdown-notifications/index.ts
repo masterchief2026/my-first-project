@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { sendPushMessages } from '../_shared/push.ts';
+import { formatTeamName } from '../_shared/formatName.ts';
 
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL')!,
@@ -42,7 +43,7 @@ Deno.serve(async (req) => {
   const leagueNameByUser: Record<string, string> = {};
   (leagueMemberships || []).forEach((m: any) => {
     if (m.leagues?.name && !leagueNameByUser[m.user_id]) {
-      leagueNameByUser[m.user_id] = m.leagues.name;
+      leagueNameByUser[m.user_id] = formatTeamName(m.leagues.name);
     }
   });
 

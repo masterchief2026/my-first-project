@@ -6,6 +6,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../lib/supabase';
 import { calculateEffortScore, loadScoringMultipliers } from '../lib/effort';
 import { isoToDisplayDate, displayToIsoDate } from '../lib/dateFormat';
+import { findMatchingRaceId } from '../lib/raceMatch';
 import { RivalColors, RivalRadius } from '../constants/rivalTheme';
 
 type ExtractedWorkout = {
@@ -681,6 +682,8 @@ export default function ScanWorkoutScreen() {
         ? extractedWorkout.exercises.map((ex, i) => liftTags[i] ? { ...ex, prLift: liftTags[i] } : ex)
         : null;
 
+      const raceId = await findMatchingRaceId(user.id, startedAt.toISOString());
+
       const activityPayload = {
         user_id: user.id,
         name: workoutName,
@@ -693,6 +696,7 @@ export default function ScanWorkoutScreen() {
         raw_effort_score: effortScore,
         notes: userNotes.trim() || null,
         exercises: exercisesPayload,
+        race_id: raceId,
       };
 
       let activityId: string;

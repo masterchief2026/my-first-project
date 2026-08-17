@@ -3,7 +3,7 @@ import { StyleSheet, TouchableOpacity, View, Text, ScrollView, TextInput, Modal 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { supabase } from '../lib/supabase';
-import { formatDisplayName } from '../lib/identity';
+import { formatDisplayName, formatTeamName } from '../lib/identity';
 import { ACTIVITY_ICONS } from '../constants/activityIcons';
 import { RivalTopNav } from '../components/rival';
 
@@ -112,7 +112,7 @@ export default function PlanScreen() {
 
         return {
           league_id: league.id,
-          league_name: league.name,
+          league_name: formatTeamName(league.name),
           currentRank,
           projectedRank: currentRank,
           myCurrentScore: myScore,

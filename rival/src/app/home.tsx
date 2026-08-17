@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { StyleSheet, TouchableOpacity, View, Text, Platform, ScrollView, Image, ImageBackground, useWindowDimensions } from 'react-native';
+import { StyleSheet, TouchableOpacity, View, Text, Platform, ScrollView, Image, ImageBackground, useWindowDimensions, RefreshControl } from 'react-native';
 import Svg, { Defs, LinearGradient, Polygon, Stop } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
@@ -10,6 +10,7 @@ import { getMondayOfWeek, calculateStreak } from '../lib/streak';
 import { getCurrentSeasonYear, daysUntilSeasonEnd, getSeasonStartISO } from '../lib/season';
 import { getLevel } from '../lib/xp';
 import { computeGoalProgress, goalUnit, GoalRow } from '../lib/goalProgress';
+import { formatTeamName } from '../lib/identity';
 import { RivalButton, RivalCard, RivalProgressBar, RivalIcon, RivalTopNav } from '../components/rival';
 import { RivalColors, RivalRadius, RivalType, RivalFontFamily } from '../constants/rivalTheme';
 import { BREAKPOINT_WIDE_LAYOUT } from '../constants/breakpoints';
@@ -241,354 +242,13 @@ function heroValueFontSize(text: string, availableWidth: number): number {
 
 
 
-export default function HomeScreen() {
-  const [stravaConnected, setStravaConnected] = useState(true);
-  const [leagues, setLeagues] = useState<League[]>([]);
-  // Populated by loadAll() below from real account data. When the real
-  // standings are exactly 2 people, loadAll() fabricates a 3rd teammate
-  // ("Jordan") so the 3-column podium layout can still be previewed without
-  // a real 3rd teammate — see the previewStandings injection there.
-  const [weeklyLeader, setWeeklyLeader] = useState<WeeklyLeader | null>(null);
-  const [momentumTrainers, setMomentumTrainers] = useState<MomentumTrainers | null>(null);
-  const [nextRace, setNextRace] = useState<NextRace>({ name: 'Auckland Marathon', race_date: '2026-10-25' });
-  const [totalDistanceKm, setTotalDistanceKm] = useState(1037);
-  const [totalElevationM, setTotalElevationM] = useState(20937);
-  const [totalTimeMinutes, setTotalTimeMinutes] = useState(188 * 60 + 33);
-  // Lifetime effort/activity counts — kept separate from totalXp (season-
-  // scoped, drives getLevel()) so the LEGACY card's four numbers are all the
-  // same timeframe without changing what powers the user's rank.
-  const [lifetimeXp, setLifetimeXp] = useState(13038);
-  const [lifetimeActivityCount, setLifetimeActivityCount] = useState(223);
-  const [weeklyStreak, setWeeklyStreak] = useState(16);
-  // Today-only Effort — new, mobile Legacy section's "Effort today" stat.
-  // Derived from the same `activities` array loadAll() already fetches, not
-  // a new query.
-  const [todayEffort, setTodayEffort] = useState(42);
-  const [rankName, setRankName] = useState<string | null>('Legend');
-  const [featuredGoal, setFeaturedGoal] = useState<FeaturedGoal | null>({
-    id: 'debug', title: 'Run • 100 km', activityLabel: 'Run', progress: 24.6, target: 100, unit: 'km', pct: 0.246, daysLeft: 3,
-  });
-  const [goalsCardHovered, setGoalsCardHovered] = useState(false);
-  const [leaderCardHovered, setLeaderCardHovered] = useState(false);
-  const [momentumCardHovered, setMomentumCardHovered] = useState(false);
-  const [statsCardHovered, setStatsCardHovered] = useState(false);
-  const [addActivityHovered, setAddActivityHovered] = useState(false);
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-
-  useFocusEffect(useCallback(() => {
-    loadAll();
-  }, []));
-
-  async function loadAll() {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    const uId = user.id;
-
-    const today = todayLocalStr();
-
-    // Phase 1: own data + strava status
-    const [stravaRes, activitiesRes, leaguesRes, raceRes, userProfileRes, goalsRes] = await Promise.all([
-      supabase.from('fitness_connections').select('user_id').eq('user_id', uId).eq('provider', 'strava').maybeSingle(),
-      fetchAllActivities(uId, 'id, started_at, effort_score, distance_meters, elevation_meters, activity_type, duration_seconds'),
-      supabase.from('league_members').select('league_id, leagues(id, name, invite_code, logo_url)').eq('user_id', uId).eq('status', 'active'),
-      supabase.from('races').select('name, race_date').eq('user_id', uId).gte('race_date', today).order('race_date', { ascending: true }).limit(1).maybeSingle(),
-      supabase.from('users').select('avatar_url').eq('id', uId).single(),
-      supabase.from('goals').select('*').eq('user_id', uId),
-    ]);
-
-    setStravaConnected(!!stravaRes.data);
-    setNextRace(raceRes.data ?? null);
-    const myAvatarUrl: string | null = userProfileRes.data?.avatar_url || null;
-    setAvatarUrl(myAvatarUrl);
-
-    const leagueList = leaguesRes.data?.map((m: any) => m.leagues).filter(Boolean) ?? [];
-    setLeagues(leagueList);
-    const leagueIds = leaguesRes.data?.map((m: any) => m.league_id) ?? [];
-
-    const activities = activitiesRes;
-    setTotalDistanceKm(Math.round(activities.reduce((s, a) => s + (a.distance_meters || 0), 0) / 1000));
-    setTotalElevationM(Math.round(activities.reduce((s, a) => s + (a.elevation_meters || 0), 0)));
-    setTotalTimeMinutes(Math.round(activities.reduce((s, a) => s + (a.duration_seconds || 0), 0) / 60));
-    setLifetimeXp(activities.reduce((s, a) => s + (a.effort_score || 0), 0));
-    setLifetimeActivityCount(activities.length);
-    setWeeklyStreak(calculateStreak(activities).current);
-    // Same local-day-boundary approach as the league "recentCount" teaser
-    // below — additive filter over the array already fetched above, no new query.
-    setTodayEffort(activities.filter(a => dateLocalStr(new Date(a.started_at)) === today).reduce((s, a) => s + (a.effort_score || 0), 0));
-
-    // Rank = level from this season's Effort — same definition the nav bar uses.
-    const seasonStart = new Date(getSeasonStartISO());
-    const seasonEffort = activities.filter(a => new Date(a.started_at) >= seasonStart).reduce((s, a) => s + (a.effort_score || 0), 0);
-    setRankName(getLevel(seasonEffort).name);
-
-    // Featured goal: the ACTIVE goal nearest its deadline (tie-break: most
-    // complete). One goal on the dashboard, deliberately — Ricky's call:
-    // showing several dilutes focus; the card links to /goals for the rest.
-    const now = new Date();
-    type GoalRowFull = GoalRow & { id: string; target_value: number; period_type: 'week' | 'month' | 'custom'; pinned?: boolean };
-    const allGoals = (goalsRes.data ?? []) as GoalRowFull[];
-    const activeGoals = allGoals
-      .filter(g => { const end = new Date(g.end_date); end.setHours(23, 59, 59, 999); return end >= now; })
-      .map(g => {
-        const progress = computeGoalProgress(g, activities);
-        const end = new Date(g.end_date); end.setHours(23, 59, 59, 999);
-        return {
-          endMs: end.getTime(),
-          goal: g,
-          progress,
-          pct: g.target_value > 0 ? Math.min(1, progress / g.target_value) : 0,
-        };
-      })
-      // Pinned goal wins outright, ahead of the nearest-deadline sort —
-      // that sort is only the fallback for when nothing's been pinned.
-      .sort((a, b) => (b.goal.pinned ? 1 : 0) - (a.goal.pinned ? 1 : 0) || a.endMs - b.endMs || b.pct - a.pct);
-    if (activeGoals.length > 0) {
-      const top = activeGoals[0];
-      setFeaturedGoal({
-        id: top.goal.id,
-        title: featuredGoalTitle(top.goal),
-        activityLabel: top.goal.goal_type === 'gym_sessions' ? 'Gym Sessions' : (top.goal.activity_filter ?? 'All Activities'),
-        progress: top.progress,
-        target: top.goal.target_value,
-        unit: goalUnit(top.goal.goal_type),
-        pct: top.pct,
-        daysLeft: Math.max(0, Math.ceil((top.endMs - now.getTime()) / (1000 * 60 * 60 * 24))),
-      });
-    } else {
-      // No active goal — the "ended, not hit" encouragement + Try Again
-      // action lives only on the Goals page (goals.tsx's isGoalEnded/
-      // endedMessage), not here. Today's card just invites setting a new
-      // one either way.
-      setFeaturedGoal(null);
-    }
-
-    // Per-league "new activity" teaser count — powers the Team Pulse card.
-    // Local calendar-day boundary (midnight in the viewer's own device
-    // timezone), not a rolling 24h window — a rolling window still calls
-    // yesterday-afternoon's workout "today" if it's under 24h old, which is
-    // exactly the mismatch a rolling window can't avoid. This runs
-    // client-side so it's automatically each viewer's own "today", no
-    // matter what country they're in.
-    if (leagueIds.length > 0) {
-      const startOfToday = new Date();
-      startOfToday.setHours(0, 0, 0, 0);
-
-      const { data: leagueMembersData } = await supabase
-        .from('league_members')
-        .select('league_id, user_id')
-        .in('league_id', leagueIds)
-        .eq('status', 'active');
-
-      const memberIdsByLeague: Record<string, string[]> = {};
-      (leagueMembersData || []).forEach((m: any) => {
-        if (!memberIdsByLeague[m.league_id]) memberIdsByLeague[m.league_id] = [];
-        memberIdsByLeague[m.league_id].push(m.user_id);
-      });
-
-      const allMemberIds = [...new Set((leagueMembersData || []).map((m: any) => m.user_id as string))];
-      const { data: recentActivities } = await supabase
-        .from('activities')
-        .select('user_id, started_at')
-        .in('user_id', allMemberIds)
-        .gte('started_at', startOfToday.toISOString())
-        .order('started_at', { ascending: false });
-
-      const leagueListWithCounts = leagueList.map((l: League) => {
-        const memberIds = new Set(memberIdsByLeague[l.id] || []);
-        const count = (recentActivities || []).filter((a: any) => a.user_id !== uId && memberIds.has(a.user_id)).length;
-        return { ...l, recentCount: count };
-      });
-      // Most-active teams first — Momentum is "who's training right now", and
-      // only the top few show by default (mockup keeps this card compact).
-      leagueListWithCounts.sort((a: League, b: League) => (b.recentCount ?? 0) - (a.recentCount ?? 0));
-      setLeagues(leagueListWithCounts);
-
-      // Who's actually moved, not just how many — "Sandy, Emma and 3 others"
-      // reads as a nudge from people, not a stat. Most-recent-first, dedup'd,
-      // for the same top team the rest of Momentum/Weekly Leader focus on.
-      const hotLeague = leagueListWithCounts[0];
-      const hotMemberIds = new Set(memberIdsByLeague[hotLeague.id] || []);
-      const trainerIds: string[] = [];
-      let selfTrained = false;
-      (recentActivities || []).forEach((a: any) => {
-        if (a.user_id === uId) { selfTrained = true; return; }
-        if (hotMemberIds.has(a.user_id) && !trainerIds.includes(a.user_id)) {
-          trainerIds.push(a.user_id);
-        }
-      });
-      if (trainerIds.length > 0) {
-        const { data: trainerProfiles } = await supabase
-          .from('users')
-          .select('id, display_name, email')
-          .in('id', trainerIds);
-        const trainerProfileById: Record<string, any> = {};
-        (trainerProfiles || []).forEach((p: any) => { trainerProfileById[p.id] = p; });
-        const names = trainerIds.map((id) => firstNameOnly(trainerProfileById[id]));
-        setMomentumTrainers({ leagueId: hotLeague.id, names, totalCount: trainerIds.length, selfTrained });
-      } else {
-        setMomentumTrainers(null);
-      }
-
-      // Weekly Leader: standings for your most-active team, this calendar
-      // week (Monday-start, same boundary streak.ts uses). A single big
-      // session can't win the whole day-to-day this way — it has to hold up
-      // over the week, and laggards can see exactly how much Effort they
-      // need to catch the leader instead of just "some number."
-      const pulseLeague = leagueListWithCounts[0];
-      const pulseMemberIds = memberIdsByLeague[pulseLeague.id] || [];
-      if (pulseMemberIds.length > 0) {
-        const weekStart = getMondayOfWeek(new Date());
-        const weekEnd = new Date(weekStart);
-        weekEnd.setDate(weekEnd.getDate() + 6);
-        weekEnd.setHours(23, 59, 59, 999);
-        const daysRemaining = Math.max(0, Math.ceil((weekEnd.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
-
-        const { data: weekActivities } = await supabase
-          .from('activities')
-          .select('user_id, effort_score')
-          .in('user_id', pulseMemberIds)
-          .gte('started_at', weekStart.toISOString());
-
-        const pointsByUser: Record<string, number> = {};
-        (weekActivities || []).forEach((a: any) => {
-          pointsByUser[a.user_id] = (pointsByUser[a.user_id] || 0) + (a.effort_score || 0);
-        });
-
-        // Full ranked list (not just the podium) — the viewer's own rank
-        // might be 4th+, and the card still needs to tell that story.
-        const rankedIds = Object.keys(pointsByUser)
-          .filter((id) => pointsByUser[id] > 0)
-          .sort((a, b) => pointsByUser[b] - pointsByUser[a]);
-
-        if (rankedIds.length > 0) {
-          const { data: profiles } = await supabase
-            .from('users')
-            .select('id, display_name, avatar_url, email')
-            .in('id', rankedIds);
-          const profileById: Record<string, any> = {};
-          (profiles || []).forEach((p: any) => { profileById[p.id] = p; });
-
-          // First name + last initial always, regardless of the user's
-          // chosen display style (e.g. username_only) — a leaderboard reads
-          // better with names than handles, unlike league.tsx's member list
-          // which respects that preference.
-          const standings: WeeklyLeaderEntry[] = rankedIds.map((id) => ({
-            userId: id,
-            name: weeklyLeaderName(profileById[id]),
-            avatarUrl: profileById[id]?.avatar_url || null,
-            points: Math.round(pointsByUser[id]),
-            isSelf: id === uId,
-          }));
-
-          // TEMP DEBUG — injects a fake 3rd teammate into the REAL standings
-          // (Ricky's real account only has 2) purely so the 3-column podium
-          // can be previewed on his own logged-in device. Revert this block.
-          const previewStandings = standings.length === 2
-            ? [...standings, { userId: 'debug-3rd', name: 'Jordan', avatarUrl: null, points: Math.max(1, Math.round(standings[1].points * 0.8)), isSelf: false }]
-            : standings;
-          setWeeklyLeader({ leagueId: pulseLeague.id, teamName: pulseLeague.name, daysRemaining, standings: previewStandings });
-        } else {
-          setWeeklyLeader(null);
-        }
-      } else {
-        setWeeklyLeader(null);
-      }
-    } else {
-      setWeeklyLeader(null);
-    }
-  }
-
-  async function connectStrava() {
-    const clientId = process.env.EXPO_PUBLIC_STRAVA_CLIENT_ID;
-    const redirectUri = typeof window !== 'undefined'
-      ? `${window.location.origin}/strava-callback`
-      : process.env.EXPO_PUBLIC_STRAVA_REDIRECT_URI;
-    const { data: { session } } = await supabase.auth.getSession();
-    const stravaUrl = `https://www.strava.com/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=read,activity:read_all&state=${session?.access_token ?? ''}`;
-    if (Platform.OS === 'web') {
-      const popup = window.open(stravaUrl, 'strava-auth', 'width=600,height=700');
-      const interval = setInterval(() => {
-        try {
-          if (popup?.closed) { clearInterval(interval); loadAll(); }
-        } catch { clearInterval(interval); }
-      }, 500);
-    }
-  }
-
-  // The mockup's 4-card row must stay 4-across on desktop — explicit quarter
-  // widths above the breakpoint, natural wrapping (2-up/stacked) below it.
-  const { width: windowWidth } = useWindowDimensions();
-  const fourUp = windowWidth >= BREAKPOINT_WIDE_LAYOUT;
-  // Mobile-only redesign branch — see rival/design/today-redesign. Desktop
-  // (below) is untouched: same width check the 4-up grid already uses, just
-  // inverted, so the two never overlap.
-  const mobile = windowWidth < BREAKPOINT_WIDE_LAYOUT;
-  const gridCardStyle = fourUp ? [styles.gridCard, styles.gridCardQuarter] : styles.gridCard;
-  const days = nextRace ? daysUntil(nextRace.race_date) : null;
-  const seasonYear = getCurrentSeasonYear();
-  const seasonDaysLeft = daysUntilSeasonEnd();
-  const heroHours = Math.floor(totalTimeMinutes / 60);
-  const heroMins = totalTimeMinutes % 60;
-  const heroTimeText = `${heroHours > 0 ? `${heroHours}h ` : ''}${heroMins}m`;
-  // `content`'s horizontal padding (24 each side) minus heroCard's own maxWidth
-  // (92%) and internal padding (16 each side) — see styles below.
-  const heroCardAvailableWidth = Math.min(windowWidth - 48, 1200) * 0.92 - 32;
-
+function WeeklyLeaderCardBody({ leader }: { leader: WeeklyLeader | null }) {
   return (
-    <View style={{ flex: 1 }}>
-      {/* Fixed viewport-covering background, decoupled from content height —
-          a long team/stats list scrolling taller than one screen must never
-          outgrow the photo (same fix as league.tsx). Desktop only — the
-          mockup's mobile redesign has no hero photo, just a flat dark
-          background (#131313 + a subtle warm radial glow), so mobile skips
-          both the photo and its scrim entirely. */}
-      {!mobile && (
-        <>
-          <ImageBackground
-            source={require('../../assets/images/backgrounds/optimized/a-single-solo-athlete-standing-on.jpg')}
-            style={styles.bgFixed}
-            resizeMode="cover"
-          />
-          <View style={styles.scrim} />
-        </>
-      )}
-      {mobile && <View style={styles.mBgFixed} />}
-      <SafeAreaView style={styles.container}>
-        <RivalTopNav
-          active="today"
-          centerSlot={mobile ? (
-            <View style={{ alignItems: 'center' }}>
-              <Text style={styles.mTimeEarnedLabel}>TOTAL TIME EARNED</Text>
-              <Text style={styles.mTimeEarnedValue} numberOfLines={1}>{heroTimeText}</Text>
-            </View>
-          ) : undefined}
-        />
-
-        <ScrollView
-          contentContainerStyle={[styles.content, mobile && styles.contentMobile]}
-          // iOS standalone (home-screen) web apps have a known WebKit quirk:
-          // position:fixed siblings of a nested SCROLLING div (this one —
-          // the actual page <body> deliberately doesn't scroll, see
-          // +html.tsx) can fail to stay pinned to the viewport during/after
-          // that div's scroll. This is the standard compositing fix for
-          // that exact case.
-          style={Platform.OS === 'web' ? ({ WebkitOverflowScrolling: 'touch' } as any) : undefined}
-        >
-
-          {mobile ? (
-            <>
-              {/* Weekly Leader podium */}
-              <RivalCard style={styles.mLeaderCard}>
-                <Image
-                  source={require('../../assets/images/backgrounds/optimized/podium-smoke.png')}
-                  style={styles.mPodiumSmoke}
-                  resizeMode="cover"
-                />
+    <>
                 <Text style={styles.mLeaderKicker}>WEEKLY LEADER</Text>
-                {weeklyLeader && <Text style={styles.mLeaderTeamName}>{weeklyLeader.teamName}</Text>}
+                {leader && <Text style={styles.mLeaderTeamName}>{leader.teamName}</Text>}
 
-                {weeklyLeader === null ? (
+                {leader === null ? (
                   <View style={{ alignItems: 'center', gap: 6, marginTop: 20 }}>
                     <View style={styles.medalRing}><RivalIcon name="medal" size={28} color="#ECC654" /></View>
                     <Text style={styles.mLeaderEmptyTitle}>TAKE THE LEAD</Text>
@@ -596,7 +256,7 @@ export default function HomeScreen() {
                     <View style={styles.mLeaderEmptyDivider} />
                   </View>
                 ) : (() => {
-                  const { standings, daysRemaining } = weeklyLeader;
+                  const { standings, daysRemaining } = leader;
                   const selfIndex = standings.findIndex((e) => e.isSelf);
                   const endsLabel = daysRemaining === 0 ? 'Last day' : daysRemaining === 1 ? 'Ends tomorrow' : `${daysRemaining} days remaining`;
                   const slots = podiumSlots(standings);
@@ -763,13 +423,33 @@ export default function HomeScreen() {
                         // the capsule instead of left-aligning them against its
                         // number-driven width.
                         const centered = !!story && story.gap === null;
+                        // "N Behind X" — the gap number leads the line, with text
+                        // trailing after it (unlike "Leading by N", where the number
+                        // trails). Real flex row+column instead of a hand-tuned fixed
+                        // marginLeft — the old fixed 46px offset only happened to line
+                        // "days remaining" up under "Behind" for whatever digit-width
+                        // gap number it was originally eyeballed against, and visibly
+                        // drifted for any other width (e.g. a single-digit gap).
+                        const numberLeads = !!story && story.gap !== null && story.before === '';
+                        if (numberLeads && story) {
+                          return (
+                            <View style={styles.mPodiumMetaCapsule}>
+                              <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                                <Text style={{ color: RivalColors.accentText, fontWeight: '700', fontSize: 31, lineHeight: 31 }}>{story.gap}</Text>
+                                <View style={{ marginLeft: 6, paddingTop: 3 }}>
+                                  <Text style={styles.mPodiumOutsideRow}>{story.after.trim()}</Text>
+                                  <Text style={[styles.mLeaderFooterMeta, { marginLeft: 0, marginTop: -2 }]}>{endsLabel}</Text>
+                                </View>
+                              </View>
+                            </View>
+                          );
+                        }
                         return (
                           <View style={[styles.mPodiumMetaCapsule, centered && { alignItems: 'center' }]}>
                             {story && (
                               <Text style={[styles.mPodiumOutsideRow, centered && { textAlign: 'center' }]}>
                                 {story.before}
                                 {story.gap !== null && <Text style={{ color: RivalColors.accentText, fontWeight: '700', fontSize: 31 }}>{story.gap}</Text>}
-                                <Text style={{ position: 'relative', top: -12, marginLeft: 6 }}>{story.after}</Text>
                               </Text>
                             )}
                             {/* The -18 pull-up is tuned against rows that have trailing "Behind
@@ -785,6 +465,405 @@ export default function HomeScreen() {
                     </>
                   );
                 })()}
+    </>
+  );
+}
+
+export default function HomeScreen() {
+  const [stravaConnected, setStravaConnected] = useState(true);
+  const [leagues, setLeagues] = useState<League[]>([]);
+  // Populated by loadAll() below from real account data. When the real
+  // standings are exactly 2 people, loadAll() fabricates a 3rd teammate
+  // ("Jordan") so the 3-column podium layout can still be previewed without
+  // a real 3rd teammate — see the previewStandings injection there.
+  // One entry per team the user belongs to (mobile Weekly Leader card swipes
+  // across all of them); `weeklyLeader` below stays the most-active team's
+  // data, same as before this became a list, so every other reader of it
+  // (desktop Focus card, Momentum status line) is unaffected.
+  const [weeklyLeaders, setWeeklyLeaders] = useState<WeeklyLeader[]>([]);
+  const [leaderCardIndex, setLeaderCardIndex] = useState(0);
+  const weeklyLeader = weeklyLeaders[0] ?? null;
+  const [momentumTrainers, setMomentumTrainers] = useState<MomentumTrainers | null>(null);
+  const [nextRace, setNextRace] = useState<NextRace>({ name: 'Auckland Marathon', race_date: '2026-10-25' });
+  const [totalDistanceKm, setTotalDistanceKm] = useState(1037);
+  const [totalElevationM, setTotalElevationM] = useState(20937);
+  const [totalTimeMinutes, setTotalTimeMinutes] = useState(188 * 60 + 33);
+  // Lifetime effort/activity counts — kept separate from totalXp (season-
+  // scoped, drives getLevel()) so the LEGACY card's four numbers are all the
+  // same timeframe without changing what powers the user's rank.
+  const [lifetimeXp, setLifetimeXp] = useState(13038);
+  const [lifetimeActivityCount, setLifetimeActivityCount] = useState(223);
+  const [weeklyStreak, setWeeklyStreak] = useState(16);
+  // Today-only Effort — new, mobile Legacy section's "Effort today" stat.
+  // Derived from the same `activities` array loadAll() already fetches, not
+  // a new query.
+  const [todayEffort, setTodayEffort] = useState(42);
+  const [rankName, setRankName] = useState<string | null>('Legend');
+  const [featuredGoal, setFeaturedGoal] = useState<FeaturedGoal | null>({
+    id: 'debug', title: 'Run • 100 km', activityLabel: 'Run', progress: 24.6, target: 100, unit: 'km', pct: 0.246, daysLeft: 3,
+  });
+  const [goalsCardHovered, setGoalsCardHovered] = useState(false);
+  const [leaderCardHovered, setLeaderCardHovered] = useState(false);
+  const [momentumCardHovered, setMomentumCardHovered] = useState(false);
+  const [statsCardHovered, setStatsCardHovered] = useState(false);
+  const [addActivityHovered, setAddActivityHovered] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  useFocusEffect(useCallback(() => {
+    loadAll();
+  }, []));
+
+  async function handlePullToRefresh() {
+    setRefreshing(true);
+    await loadAll();
+    setRefreshing(false);
+  }
+
+  async function loadAll() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const uId = user.id;
+
+    const today = todayLocalStr();
+
+    // Phase 1: own data + strava status
+    const [stravaRes, activitiesRes, leaguesRes, raceRes, userProfileRes, goalsRes] = await Promise.all([
+      supabase.from('fitness_connections').select('user_id').eq('user_id', uId).eq('provider', 'strava').maybeSingle(),
+      fetchAllActivities(uId, 'id, started_at, effort_score, distance_meters, elevation_meters, activity_type, duration_seconds'),
+      supabase.from('league_members').select('league_id, leagues(id, name, invite_code, logo_url)').eq('user_id', uId).eq('status', 'active'),
+      supabase.from('races').select('name, race_date').eq('user_id', uId).gte('race_date', today).order('race_date', { ascending: true }).limit(1).maybeSingle(),
+      supabase.from('users').select('avatar_url').eq('id', uId).single(),
+      supabase.from('goals').select('*').eq('user_id', uId),
+    ]);
+
+    setStravaConnected(!!stravaRes.data);
+    setNextRace(raceRes.data ?? null);
+    const myAvatarUrl: string | null = userProfileRes.data?.avatar_url || null;
+    setAvatarUrl(myAvatarUrl);
+
+    const leagueList = leaguesRes.data?.map((m: any) => m.leagues).filter(Boolean) ?? [];
+    setLeagues(leagueList);
+    const leagueIds = leaguesRes.data?.map((m: any) => m.league_id) ?? [];
+
+    const activities = activitiesRes;
+    setTotalDistanceKm(Math.round(activities.reduce((s, a) => s + (a.distance_meters || 0), 0) / 1000));
+    setTotalElevationM(Math.round(activities.reduce((s, a) => s + (a.elevation_meters || 0), 0)));
+    setTotalTimeMinutes(Math.round(activities.reduce((s, a) => s + (a.duration_seconds || 0), 0) / 60));
+    setLifetimeXp(activities.reduce((s, a) => s + (a.effort_score || 0), 0));
+    setLifetimeActivityCount(activities.length);
+    setWeeklyStreak(calculateStreak(activities).current);
+    // Same local-day-boundary approach as the league "recentCount" teaser
+    // below — additive filter over the array already fetched above, no new query.
+    setTodayEffort(activities.filter(a => dateLocalStr(new Date(a.started_at)) === today).reduce((s, a) => s + (a.effort_score || 0), 0));
+
+    // Rank = level from this season's Effort — same definition the nav bar uses.
+    const seasonStart = new Date(getSeasonStartISO());
+    const seasonEffort = activities.filter(a => new Date(a.started_at) >= seasonStart).reduce((s, a) => s + (a.effort_score || 0), 0);
+    setRankName(getLevel(seasonEffort).name);
+
+    // Featured goal: the ACTIVE goal nearest its deadline (tie-break: most
+    // complete). One goal on the dashboard, deliberately — Ricky's call:
+    // showing several dilutes focus; the card links to /goals for the rest.
+    const now = new Date();
+    type GoalRowFull = GoalRow & { id: string; target_value: number; period_type: 'week' | 'month' | 'custom'; pinned?: boolean };
+    const allGoals = (goalsRes.data ?? []) as GoalRowFull[];
+    const activeGoals = allGoals
+      .filter(g => { const end = new Date(g.end_date); end.setHours(23, 59, 59, 999); return end >= now; })
+      .map(g => {
+        const progress = computeGoalProgress(g, activities);
+        const end = new Date(g.end_date); end.setHours(23, 59, 59, 999);
+        return {
+          endMs: end.getTime(),
+          goal: g,
+          progress,
+          pct: g.target_value > 0 ? Math.min(1, progress / g.target_value) : 0,
+        };
+      })
+      // Pinned goal wins outright, ahead of the nearest-deadline sort —
+      // that sort is only the fallback for when nothing's been pinned.
+      .sort((a, b) => (b.goal.pinned ? 1 : 0) - (a.goal.pinned ? 1 : 0) || a.endMs - b.endMs || b.pct - a.pct);
+    if (activeGoals.length > 0) {
+      const top = activeGoals[0];
+      setFeaturedGoal({
+        id: top.goal.id,
+        title: featuredGoalTitle(top.goal),
+        activityLabel: top.goal.goal_type === 'gym_sessions' ? 'Gym Sessions' : (top.goal.activity_filter ?? 'All Activities'),
+        progress: top.progress,
+        target: top.goal.target_value,
+        unit: goalUnit(top.goal.goal_type),
+        pct: top.pct,
+        daysLeft: Math.max(0, Math.ceil((top.endMs - now.getTime()) / (1000 * 60 * 60 * 24))),
+      });
+    } else {
+      // No active goal — the "ended, not hit" encouragement + Try Again
+      // action lives only on the Goals page (goals.tsx's isGoalEnded/
+      // endedMessage), not here. Today's card just invites setting a new
+      // one either way.
+      setFeaturedGoal(null);
+    }
+
+    // Per-league "new activity" teaser count — powers the Team Pulse card.
+    // Local calendar-day boundary (midnight in the viewer's own device
+    // timezone), not a rolling 24h window — a rolling window still calls
+    // yesterday-afternoon's workout "today" if it's under 24h old, which is
+    // exactly the mismatch a rolling window can't avoid. This runs
+    // client-side so it's automatically each viewer's own "today", no
+    // matter what country they're in.
+    if (leagueIds.length > 0) {
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
+
+      const { data: leagueMembersData } = await supabase
+        .from('league_members')
+        .select('league_id, user_id')
+        .in('league_id', leagueIds)
+        .eq('status', 'active');
+
+      const memberIdsByLeague: Record<string, string[]> = {};
+      (leagueMembersData || []).forEach((m: any) => {
+        if (!memberIdsByLeague[m.league_id]) memberIdsByLeague[m.league_id] = [];
+        memberIdsByLeague[m.league_id].push(m.user_id);
+      });
+
+      const allMemberIds = [...new Set((leagueMembersData || []).map((m: any) => m.user_id as string))];
+      const { data: recentActivities } = await supabase
+        .from('activities')
+        .select('user_id, started_at')
+        .in('user_id', allMemberIds)
+        .gte('started_at', startOfToday.toISOString())
+        .order('started_at', { ascending: false });
+
+      const leagueListWithCounts = leagueList.map((l: League) => {
+        const memberIds = new Set(memberIdsByLeague[l.id] || []);
+        const count = (recentActivities || []).filter((a: any) => a.user_id !== uId && memberIds.has(a.user_id)).length;
+        return { ...l, recentCount: count };
+      });
+      // Most-active teams first — Momentum is "who's training right now", and
+      // only the top few show by default (mockup keeps this card compact).
+      leagueListWithCounts.sort((a: League, b: League) => (b.recentCount ?? 0) - (a.recentCount ?? 0));
+      setLeagues(leagueListWithCounts);
+
+      // Who's actually moved, not just how many — "Sandy, Emma and 3 others"
+      // reads as a nudge from people, not a stat. Most-recent-first, dedup'd,
+      // for the same top team the rest of Momentum/Weekly Leader focus on.
+      const hotLeague = leagueListWithCounts[0];
+      const hotMemberIds = new Set(memberIdsByLeague[hotLeague.id] || []);
+      const trainerIds: string[] = [];
+      let selfTrained = false;
+      (recentActivities || []).forEach((a: any) => {
+        if (a.user_id === uId) { selfTrained = true; return; }
+        if (hotMemberIds.has(a.user_id) && !trainerIds.includes(a.user_id)) {
+          trainerIds.push(a.user_id);
+        }
+      });
+      if (trainerIds.length > 0) {
+        const { data: trainerProfiles } = await supabase
+          .from('users')
+          .select('id, display_name, email')
+          .in('id', trainerIds);
+        const trainerProfileById: Record<string, any> = {};
+        (trainerProfiles || []).forEach((p: any) => { trainerProfileById[p.id] = p; });
+        const names = trainerIds.map((id) => firstNameOnly(trainerProfileById[id]));
+        setMomentumTrainers({ leagueId: hotLeague.id, names, totalCount: trainerIds.length, selfTrained });
+      } else {
+        setMomentumTrainers(null);
+      }
+
+      // Weekly Leader: standings for EVERY team you're in, this calendar week
+      // (Monday-start, same boundary streak.ts uses) — one entry per team,
+      // most-active first (leagueListWithCounts is already sorted that way),
+      // so the mobile card can swipe across all of them. A single big session
+      // can't win the whole day-to-day this way — it has to hold up over the
+      // week, and laggards can see exactly how much Effort they need to catch
+      // the leader instead of just "some number."
+      const weekStart = getMondayOfWeek(new Date());
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekEnd.getDate() + 6);
+      weekEnd.setHours(23, 59, 59, 999);
+      const daysRemaining = Math.max(0, Math.ceil((weekEnd.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+
+      const leaders: WeeklyLeader[] = [];
+      for (const league of leagueListWithCounts) {
+        const leagueMemberIds = memberIdsByLeague[league.id] || [];
+        if (leagueMemberIds.length === 0) continue;
+
+        const { data: weekActivities } = await supabase
+          .from('activities')
+          .select('user_id, effort_score')
+          .in('user_id', leagueMemberIds)
+          .gte('started_at', weekStart.toISOString());
+
+        const pointsByUser: Record<string, number> = {};
+        (weekActivities || []).forEach((a: any) => {
+          pointsByUser[a.user_id] = (pointsByUser[a.user_id] || 0) + (a.effort_score || 0);
+        });
+
+        // Full ranked list (not just the podium) — the viewer's own rank
+        // might be 4th+, and the card still needs to tell that story.
+        const rankedIds = Object.keys(pointsByUser)
+          .filter((id) => pointsByUser[id] > 0)
+          .sort((a, b) => pointsByUser[b] - pointsByUser[a]);
+        if (rankedIds.length === 0) continue;
+
+        const { data: profiles } = await supabase
+          .from('users')
+          .select('id, display_name, avatar_url, email')
+          .in('id', rankedIds);
+        const profileById: Record<string, any> = {};
+        (profiles || []).forEach((p: any) => { profileById[p.id] = p; });
+
+        // First name + last initial always, regardless of the user's
+        // chosen display style (e.g. username_only) — a leaderboard reads
+        // better with names than handles, unlike league.tsx's member list
+        // which respects that preference.
+        const standings: WeeklyLeaderEntry[] = rankedIds.map((id) => ({
+          userId: id,
+          name: weeklyLeaderName(profileById[id]),
+          avatarUrl: profileById[id]?.avatar_url || null,
+          points: Math.round(pointsByUser[id]),
+          isSelf: id === uId,
+        }));
+
+        // TEMP DEBUG — injects a fake 3rd teammate into the REAL standings
+        // (Ricky's real account only has 2) purely so the 3-column podium
+        // can be previewed on his own logged-in device. Revert this block.
+        const previewStandings = standings.length === 2
+          ? [...standings, { userId: 'debug-3rd', name: 'Jordan', avatarUrl: null, points: Math.max(1, Math.round(standings[1].points * 0.8)), isSelf: false }]
+          : standings;
+        leaders.push({ leagueId: league.id, teamName: formatTeamName(league.name), daysRemaining, standings: previewStandings });
+      }
+      setWeeklyLeaders(leaders);
+    } else {
+      setWeeklyLeaders([]);
+    }
+  }
+
+  async function connectStrava() {
+    const clientId = process.env.EXPO_PUBLIC_STRAVA_CLIENT_ID;
+    const redirectUri = typeof window !== 'undefined'
+      ? `${window.location.origin}/strava-callback`
+      : process.env.EXPO_PUBLIC_STRAVA_REDIRECT_URI;
+    const { data: { session } } = await supabase.auth.getSession();
+    const stravaUrl = `https://www.strava.com/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=read,activity:read_all&state=${session?.access_token ?? ''}`;
+    if (Platform.OS === 'web') {
+      const popup = window.open(stravaUrl, 'strava-auth', 'width=600,height=700');
+      const interval = setInterval(() => {
+        try {
+          if (popup?.closed) { clearInterval(interval); loadAll(); }
+        } catch { clearInterval(interval); }
+      }, 500);
+    }
+  }
+
+  // The mockup's 4-card row must stay 4-across on desktop — explicit quarter
+  // widths above the breakpoint, natural wrapping (2-up/stacked) below it.
+  const { width: windowWidth } = useWindowDimensions();
+  const fourUp = windowWidth >= BREAKPOINT_WIDE_LAYOUT;
+  // Mobile-only redesign branch — see rival/design/today-redesign. Desktop
+  // (below) is untouched: same width check the 4-up grid already uses, just
+  // inverted, so the two never overlap.
+  const mobile = windowWidth < BREAKPOINT_WIDE_LAYOUT;
+  const gridCardStyle = fourUp ? [styles.gridCard, styles.gridCardQuarter] : styles.gridCard;
+  const days = nextRace ? daysUntil(nextRace.race_date) : null;
+  const seasonYear = getCurrentSeasonYear();
+  const seasonDaysLeft = daysUntilSeasonEnd();
+  const heroHours = Math.floor(totalTimeMinutes / 60);
+  const heroMins = totalTimeMinutes % 60;
+  const heroTimeText = `${heroHours > 0 ? `${heroHours}h ` : ''}${heroMins}m`;
+  // `content`'s horizontal padding (24 each side) minus heroCard's own maxWidth
+  // (92%) and internal padding (16 each side) — see styles below.
+  const heroCardAvailableWidth = Math.min(windowWidth - 48, 1200) * 0.92 - 32;
+
+  return (
+    <View style={{ flex: 1 }}>
+      {/* Fixed viewport-covering background, decoupled from content height —
+          a long team/stats list scrolling taller than one screen must never
+          outgrow the photo (same fix as league.tsx). Desktop only — the
+          mockup's mobile redesign has no hero photo, just a flat dark
+          background (#131313 + a subtle warm radial glow), so mobile skips
+          both the photo and its scrim entirely. */}
+      {!mobile && (
+        <>
+          <ImageBackground
+            source={require('../../assets/images/backgrounds/optimized/a-single-solo-athlete-standing-on.jpg')}
+            style={styles.bgFixed}
+            resizeMode="cover"
+          />
+          <View style={styles.scrim} />
+        </>
+      )}
+      {mobile && <View style={styles.mBgFixed} />}
+      <SafeAreaView style={styles.container}>
+        <RivalTopNav
+          active="today"
+          centerSlot={mobile ? (
+            <View style={{ alignItems: 'center' }}>
+              <Text style={styles.mTimeEarnedLabel}>TOTAL TIME EARNED</Text>
+              <Text style={styles.mTimeEarnedValue} numberOfLines={1}>{heroTimeText}</Text>
+            </View>
+          ) : undefined}
+        />
+
+        <ScrollView
+          contentContainerStyle={[styles.content, mobile && styles.contentMobile]}
+          // iOS standalone (home-screen) web apps have a known WebKit quirk:
+          // position:fixed siblings of a nested SCROLLING div (this one —
+          // the actual page <body> deliberately doesn't scroll, see
+          // +html.tsx) can fail to stay pinned to the viewport during/after
+          // that div's scroll. This is the standard compositing fix for
+          // that exact case.
+          style={Platform.OS === 'web' ? ({ WebkitOverflowScrolling: 'touch' } as any) : undefined}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handlePullToRefresh} tintColor={RivalColors.accentText} colors={[RivalColors.accentFill]} />}
+        >
+
+          {mobile ? (
+            <>
+              {/* Weekly Leader podium — swipeable across every team you're in
+                  (Instagram-style: drag either direction, snaps to the next
+                  card). The card's own background (gradient + smoke glow) is
+                  painted ONCE by this single outer RivalCard — only the
+                  podium/text content pages across on top of it, so there's
+                  no second independently-painted background to ever show a
+                  seam against. No dot indicators.
+                  Page width is computed directly from windowWidth and the
+                  card's own known fixed horizontal padding (16 a side) —
+                  NOT measured via onLayout. Measuring would recreate the
+                  exact circular-collapse bug hit earlier: this card's
+                  alignItems:'center' shrinks any child with no explicit
+                  size to its own content width, and a page whose width
+                  comes FROM that same measurement starts at 0, so it never
+                  has any content to measure a nonzero size from. */}
+              <RivalCard style={styles.mLeaderCard}>
+                {/* Painted once here, outside/behind the swiping ScrollView,
+                    so it never travels with the content — only the podium/
+                    text pages across on top of this fixed backdrop. */}
+                <Image
+                  source={require('../../assets/images/backgrounds/optimized/podium-smoke.png')}
+                  style={styles.mPodiumSmoke}
+                  resizeMode="cover"
+                />
+                {weeklyLeaders.length > 1 ? (
+                  <ScrollView
+                    horizontal
+                    pagingEnabled
+                    showsHorizontalScrollIndicator={false}
+                    style={{ width: windowWidth - 32 }}
+                    onMomentumScrollEnd={(e) => {
+                      const idx = Math.round(e.nativeEvent.contentOffset.x / (windowWidth - 32));
+                      setLeaderCardIndex(idx);
+                    }}
+                  >
+                    {weeklyLeaders.map((leader) => (
+                      <View key={leader.leagueId} style={{ width: windowWidth - 32, alignItems: 'center' }}>
+                        <WeeklyLeaderCardBody leader={leader} />
+                      </View>
+                    ))}
+                  </ScrollView>
+                ) : (
+                  <WeeklyLeaderCardBody leader={weeklyLeaders[0] ?? null} />
+                )}
               </RivalCard>
 
               {/* Add Activity */}
@@ -1377,7 +1456,7 @@ export default function HomeScreen() {
                           <Text style={styles.momentumAvatarText}>{hotTeam.name.slice(0, 2).toUpperCase()}</Text>
                         </View>
                       )}
-                      <Text style={[styles.leaderEmptyTitle, { marginTop: 10, textTransform: 'uppercase' }]} numberOfLines={1}>{hotTeam.name}</Text>
+                      <Text style={[styles.leaderEmptyTitle, { marginTop: 10, textTransform: 'uppercase' }]} numberOfLines={1}>{formatTeamName(hotTeam.name)}</Text>
                     </View>
                     <Text style={styles.leaderEmptySub} numberOfLines={2}>{story.message}</Text>
 
@@ -1564,7 +1643,11 @@ const styles = StyleSheet.create({
   // not part of the layout flow, so the scroll content needs its own
   // clearance or the last card ends up hidden behind it — the 48 above is
   // sized for desktop, which has no floating nav to clear.
-  contentMobile: { paddingBottom: 120 },
+  // paddingTop:0 (not `content`'s shared 16) — the Weekly Leader card is the
+  // first thing in the mobile feed and is meant to sit flush against the nav
+  // bar, no gap. That gap was exposing the plain mBgFixed color as a visible
+  // seam above the card's own textured background.
+  contentMobile: { paddingTop: 0, paddingBottom: 120 },
 
   navBar: { width: '100%', backgroundColor: 'rgba(14,14,14,0.65)', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' },
   navRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', maxWidth: 1200, marginHorizontal: 'auto', paddingHorizontal: 24, paddingVertical: 12 },
@@ -1909,12 +1992,12 @@ const styles = StyleSheet.create({
     alignSelf: 'center', marginTop: 19, paddingTop: 5, paddingBottom: 8, paddingHorizontal: 20, borderRadius: RivalRadius.lg,
     alignItems: 'flex-start', backgroundColor: 'rgba(19,19,19,0.55)', borderWidth: 1, borderColor: RivalColors.surfaceBright,
   },
-  mPodiumOutsideRow: { fontFamily: RivalFontFamily, fontSize: 15, fontWeight: '600', color: '#FFFFFF', textAlign: 'left', letterSpacing: 0.5 },
+  mPodiumOutsideRow: { fontFamily: RivalFontFamily, fontSize: 15, fontWeight: '700', color: '#FFFFFF', textAlign: 'left', letterSpacing: 0.5 },
   // marginLeft lines "Ends tomorrow" up under "Behind" on the line above —
   // tuned by measuring where "Behind" actually starts, not a guess.
   mLeaderFooterMeta: { fontFamily: RivalFontFamily, fontSize: 11, color: RivalColors.textSecondary, marginTop: -18, marginLeft: 46 },
   mLeaderEmptyTitle: { fontFamily: RivalFontFamily, fontSize: 14, fontWeight: '500', letterSpacing: 3, color: RivalColors.textPrimary, textAlign: 'center' },
-  mLeaderEmptySub: { fontFamily: RivalFontFamily, fontSize: 11, fontWeight: '500', color: '#ffcabb', letterSpacing: 1, marginTop: 3, textAlign: 'center' },
+  mLeaderEmptySub: { fontFamily: RivalFontFamily, fontSize: 11, fontWeight: '500', color: '#ffcabb', letterSpacing: 1, marginTop: 0, textAlign: 'center' },
 
   // Next Event card
   mNextEventCard: {

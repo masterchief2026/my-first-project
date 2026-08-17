@@ -1,12 +1,13 @@
-import { useState, useCallback } from 'react';
-import { StyleSheet, TouchableOpacity, View, Text, TextInput, ScrollView, Image, Platform, ImageBackground, useWindowDimensions } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { StyleSheet, TouchableOpacity, View, Text, TextInput, ScrollView, Image, Platform, ImageBackground, useWindowDimensions, RefreshControl } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { supabase } from '../lib/supabase';
 import { formatDuration, formatDurationClock } from '../lib/format';
 import { calculateStreak } from '../lib/streak';
+import { displayToIsoDate, isoToDisplayDate } from '../lib/dateFormat';
 import { computeActivityInsight, InsightTone } from '../lib/activityInsights';
-import { RivalTopNav, RivalIcon, activityIconName, RivalFixedBackground } from '../components/rival';
+import { RivalTopNav, RivalIcon, activityIconName, RivalFixedBackground, ActivityDiaryViewer, DiaryActivity, PhotoPositioner, CoverImage } from '../components/rival';
 import { RivalColors, RivalRadius, RivalType } from '../constants/rivalTheme';
 import { BREAKPOINT_TWO_UP_GRID, BREAKPOINT_SPACIOUS_GALLERY, BREAKPOINT_MOBILE_NAV } from '../constants/breakpoints';
 
@@ -29,7 +30,14 @@ type Activity = {
   elevation_meters: number | null;
   effort_score: number;
   photo_url: string | null;
+  photo_focal_x: number | null;
+  photo_focal_y: number | null;
   exercises: ExerciseEntry[] | null;
+  race_id: string | null;
+  notes: string | null;
+  location: string | null;
+  companions: string | null;
+  pinned: boolean;
 };
 
 type MediaRow = { id: string; activity_id: string; media_url: string; media_type: 'photo' | 'video' };
@@ -39,6 +47,19 @@ type WeekGroup = {
   weekStart: number;
   activities: Activity[];
   total: number;
+};
+
+type MonthGroup = {
+  year: number;
+  month: number; // 0-indexed (Date.getMonth())
+  label: string; // "August 2026"
+  startWeekday: number; // 0=Sun..6=Sat, leading blank cells in the grid
+  daysInMonth: number;
+  byDay: Map<number, Activity[]>; // day-of-month -> activities that day
+  total: number;
+  count: number;
+  seconds: number;
+  km: number;
 };
 
 const DISTANCE_SPORTS = new Set([
@@ -82,6 +103,97 @@ const INSIGHT_COLOR: Record<InsightTone, string> = {
   comeback: RivalColors.tertiary,
 };
 
+// Local (not UTC) YYYY-MM-DD for a timestamp — a plain string .slice(0, 10)
+// on started_at would read the UTC date, which is wrong for NZ (UTC+12/13).
+// Full weekday name ("Friday", not "Fri") for the subtle day badge on
+// journal photo cards — an abbreviation would read as a stat/code at that
+// size, a full word reads as a caption.
+function dayOfWeekLabel(timestamp: string) {
+  return new Date(timestamp).toLocaleDateString('en-US', { weekday: 'long' });
+}
+
+function localIsoDate(timestamp: string) {
+  const d = new Date(timestamp);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// ISO-8601 week number — matches the mockup's "Week 31" style week block
+// title (mobile Activity Journal only; the desktop pill keeps its own
+// "This week"/"Last week"/date-range label untouched).
+function getWeekNumber(date: Date) {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+}
+
+// Compact "Jul 21 – 27" (single month name) matching the mockup's
+// .activity-range — the shared weekLabel() below instead spells out both
+// month names ("Jul 20 – Jul 26") for the desktop pill, which stays as-is.
+function formatWeekRangeCompact(weekStart: number) {
+  const start = new Date(weekStart);
+  const end = new Date(weekStart + 6 * 24 * 60 * 60 * 1000);
+  const startMonth = start.toLocaleDateString('en-US', { month: 'short' });
+  const endMonth = end.toLocaleDateString('en-US', { month: 'short' });
+  return startMonth === endMonth
+    ? `${startMonth} ${start.getDate()} – ${end.getDate()}`
+    : `${startMonth} ${start.getDate()} – ${endMonth} ${end.getDate()}`;
+}
+
+// Month layout's calendar pages — one entry per calendar month present in
+// `activities`, always including the current month even when it has no
+// activities yet, ascending (oldest first) so "previous month" sits to the
+// left of the current one in the swipeable pager.
+function computeMonthGroups(activities: Activity[]): MonthGroup[] {
+  const keys = new Set<string>();
+  const now = new Date();
+  keys.add(`${now.getFullYear()}-${now.getMonth()}`);
+  for (const a of activities) {
+    const d = new Date(a.started_at);
+    keys.add(`${d.getFullYear()}-${d.getMonth()}`);
+  }
+
+  const groups: MonthGroup[] = Array.from(keys).map((key) => {
+    const [yearStr, monthStr] = key.split('-');
+    const year = Number(yearStr);
+    const month = Number(monthStr);
+    const label = new Date(year, month, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    const startWeekday = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    const byDay = new Map<number, Activity[]>();
+    let total = 0, count = 0, seconds = 0, km = 0;
+    for (const a of activities) {
+      const d = new Date(a.started_at);
+      if (d.getFullYear() !== year || d.getMonth() !== month) continue;
+      const day = d.getDate();
+      if (!byDay.has(day)) byDay.set(day, []);
+      byDay.get(day)!.push(a);
+      total += a.effort_score || 0;
+      count += 1;
+      seconds += a.duration_seconds || 0;
+      km += (a.distance_meters || 0) / 1000;
+    }
+
+    return { year, month, label, startWeekday, daysInMonth, byDay, total: Math.round(total * 10) / 10, count, seconds, km };
+  });
+
+  groups.sort((x, y) => x.year - y.year || x.month - y.month);
+  return groups;
+}
+
+// Strava auto-names imported activities "Morning Run", "Afternoon Ride" etc.
+// — the mobile Activity Journal card is small enough that the type alone
+// ("Run", "Ride") reads better than a truncated "Morni…"/"Afternoo…". Only
+// strips a LEADING time-of-day word, so a user's own custom title (e.g.
+// "Morning coffee run with Jane") is left alone.
+const TIME_OF_DAY_PREFIX = /^(morning|afternoon|evening|night)\s+/i;
+function cardDisplayName(name: string | null | undefined, activityType: string) {
+  const raw = name || activityType;
+  return raw.replace(TIME_OF_DAY_PREFIX, '') || activityType;
+}
+
 function getMondayStart(date: Date) {
   const d = new Date(date);
   const day = d.getDay();
@@ -91,11 +203,67 @@ function getMondayStart(date: Date) {
   return d.getTime();
 }
 
+// Same collapsed-pill/expand-to-stat-grid pattern as the "This Week"/"This
+// Month" hero cards, for every OTHER (non-current) week — used in both the
+// Weekly pager and Rows layout. A top-level component (not inlined in the
+// .map()) so each rendered week gets its own independent expand state,
+// unlike the hero cards' one shared flag (only one hero is ever on screen
+// at a time; Rows can show a dozen of these pills at once).
+function WeekStatPill({ title, dateRange, activities }: { title: string; dateRange: string; activities: Activity[] }) {
+  const [expanded, setExpanded] = useState(false);
+  const total = Math.round(activities.reduce((s, a) => s + (a.effort_score || 0), 0) * 10) / 10;
+  const count = activities.length;
+  const seconds = activities.reduce((s, a) => s + (a.duration_seconds || 0), 0);
+  const km = activities.reduce((s, a) => s + (a.distance_meters || 0), 0) / 1000;
+  return (
+    <View style={[styles.recapCard, !expanded && styles.recapCardCollapsed]}>
+      <TouchableOpacity style={styles.recapTitleRow} activeOpacity={0.7} onPress={() => setExpanded((v) => !v)}>
+        <View>
+          <Text style={styles.recapTitle}>{title}</Text>
+          <Text style={styles.jWeekDateRange}>{dateRange}</Text>
+        </View>
+        <View style={styles.recapEffortInline}>
+          <View style={styles.recapEffortNumCol}>
+            <Text style={styles.recapEffortNum}>{total}</Text>
+            <Text style={styles.recapEffortLabel}>Effort</Text>
+          </View>
+          <RivalIcon name="chevronDown" size={16} color={RivalColors.textSecondary} style={expanded ? styles.recapChevronOpen : undefined} />
+        </View>
+      </TouchableOpacity>
+      {expanded && (
+        <View style={styles.recapStatgrid}>
+          <View style={styles.recapStatcell}>
+            <RivalIcon name="pulse" size={27} color={RivalColors.accentFill} />
+            <Text style={[styles.recapStatValue, { marginTop: -6 }]}>{count}</Text>
+            <Text style={styles.recapStatTitle}>{count === 1 ? 'Activity' : 'Activities'}</Text>
+          </View>
+          <View style={[styles.recapStatcell, styles.recapStatcellDivider]}>
+            <RivalIcon name="timerOutline" size={20} color={RivalColors.accentFill} />
+            <Text style={styles.recapStatValue}>{formatDuration(seconds) || '0m'}</Text>
+            <Text style={styles.recapStatTitle}>Time</Text>
+          </View>
+          <View style={[styles.recapStatcell, styles.recapStatcellDivider]}>
+            <RivalIcon name="distance" size={20} color={RivalColors.accentFill} />
+            <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+              <Text style={styles.recapStatValue}>{km >= 0.1 ? km.toFixed(1) : '0'}</Text>
+              <Text style={styles.recapStatUnit}>km</Text>
+            </View>
+            <Text style={styles.recapStatTitle}>Distance</Text>
+          </View>
+        </View>
+      )}
+    </View>
+  );
+}
+
 export default function MyActivitiesScreen() {
   const { width: windowWidth } = useWindowDimensions();
-  const insets = useSafeAreaInsets();
   // Below this, RivalTopNav shows its floating bottom tab bar instead of the
   // desktop link row — the FAB needs to clear it, not sit underneath it.
+  // This is also the mobile/desktop layout gate for this whole screen: the
+  // Activity Journal redesign (hero card, horizontal weekly rows, full-
+  // screen diary viewer) only replaces the MOBILE presentation. Desktop
+  // keeps its existing layout completely unchanged (mobile-only scope).
   const mobileNav = windowWidth < BREAKPOINT_MOBILE_NAV;
   // Two-up card grid only kicks in with room for it; below this everything stacks.
   const wide = windowWidth >= BREAKPOINT_TWO_UP_GRID;
@@ -108,6 +276,7 @@ export default function MyActivitiesScreen() {
   const [thisWeekTotal, setThisWeekTotal] = useState(0);
   const [pbs, setPbs] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [userId, setUserId] = useState('');
   const [uploading, setUploading] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -129,6 +298,67 @@ export default function MyActivitiesScreen() {
   const [sortOrder, setSortOrder] = useState<'latest' | 'oldest'>('latest');
   const [prOnly, setPrOnly] = useState(false);
   const [showTypeFilter, setShowTypeFilter] = useState(false);
+  // Mobile Activity Journal's "search by date" — ISO YYYY-MM-DD, matched
+  // against started_at's date portion. Entered via a plain prompt (DD/MM/YYYY,
+  // this app's display format) rather than a full calendar picker.
+  const [dateFilter, setDateFilter] = useState<string | null>(null);
+
+  // Mobile Activity Journal's full-screen diary viewer — a flat, continuously
+  // ordered list of activities (most-recent-first, matching the horizontal
+  // rows' own order) plus which index within it is currently open.
+  const [diaryList, setDiaryList] = useState<DiaryActivity[] | null>(null);
+  // A just-uploaded cover photo — shown behind the crop-positioner overlay
+  // until the user confirms a focal point or skips (keeping the center
+  // default). Separate from the upload flow itself so it works whether the
+  // upload happened from the card grid or from inside the open diary viewer.
+  const [positioningPhoto, setPositioningPhoto] = useState<{
+    activityId: string; url: string;
+    previousUrl: string | null; previousFocalX: number | null; previousFocalY: number | null;
+  } | null>(null);
+  const [diaryIndex, setDiaryIndex] = useState(0);
+  // Mobile Activity Journal's full-screen weekly pager — each week is sized to
+  // exactly this height (measured off the pager's own onLayout) so one week
+  // fills the screen and vertical swipe/scroll snaps to the next, retro-app
+  // style. Falls back to a generous flex fill before the first layout pass.
+  const [pagerHeight, setPagerHeight] = useState(0);
+  // Mobile Activity Journal's 3-way layout switch — Rows (horizontal
+  // per-week scroll), Weekly (full-screen one-week-per-page swipe, the
+  // previous default), Month (calendar grid, swipe between months). Kept
+  // in-memory only for now; not persisted across reloads.
+  const [journalLayout, setJournalLayout] = useState<'weekly' | 'month' | 'year'>('weekly');
+  // Hero stat card (This Week/This Month/etc.) — resting state shows just
+  // the title + Effort total; tapping expands the stat grid/quote/momentum/
+  // filter buttons. One shared flag rather than per-card state: only one of
+  // Rows/Week/Month is on screen at a time, and for Month's multiple mounted
+  // pages, keeping them in sync when you swipe reads as more consistent than
+  // each page remembering its own expand state independently.
+  const [heroExpanded, setHeroExpanded] = useState(false);
+  const monthPagerRef = useRef<ScrollView>(null);
+  const [monthPagerWidth, setMonthPagerWidth] = useState(0);
+  const hasScrolledMonthPager = useRef(false);
+  // Which month's CALENDAR is currently centered in the horizontal peek
+  // carousel — only the calendar card swipes; the stat card above it is a
+  // single fixed instance that re-renders off this index instead of being
+  // duplicated per month (that duplication was also the source of a real
+  // bug: each month page had its own independent vertical ScrollView, so
+  // mid-swipe you could see two pages at different, desynced scroll
+  // positions — one real vertical scroll instead of N of them fixes that
+  // structurally, not just visually).
+  const [visibleMonthIndex, setVisibleMonthIndex] = useState(0);
+  // Re-snap to the current month every time you switch INTO Month view, not
+  // just once ever — otherwise switching to Rows/Week and back leaves you
+  // wherever you'd previously scrolled, which reads as random rather than
+  // "here's now" the way the Week hero always resets to this week.
+  useEffect(() => {
+    if (journalLayout === 'month') hasScrolledMonthPager.current = false;
+  }, [journalLayout]);
+  // Measured width of the calendar's 7-column grid (post-padding), used to
+  // size each day cell exactly. `width: '13%'` per cell (91%) plus the row's
+  // 6px gaps (36px across 7 columns) used to overflow the container by a few
+  // px, silently wrapping the grid to 6 columns and leaving a large empty
+  // gap before day 1 — this sidesteps percentage/gap math entirely.
+  const [calGridWidth, setCalGridWidth] = useState(0);
+  const calCellSize = calGridWidth > 0 ? (calGridWidth - 24 - 6 * 6) / 7 : 0;
 
   useFocusEffect(useCallback(() => {
     loadActivities();
@@ -140,12 +370,12 @@ export default function MyActivitiesScreen() {
       const { data: refreshed } = await supabase.auth.refreshSession();
       user = refreshed.user;
     }
-    if (!user) return;
+    if (!user) { setLoading(false); return; }
     setUserId(user.id);
 
     const { data } = await supabase
       .from('activities')
-      .select('id, name, activity_type, started_at, duration_seconds, distance_meters, elevation_meters, effort_score, photo_url, exercises')
+      .select('id, name, activity_type, started_at, duration_seconds, distance_meters, elevation_meters, effort_score, photo_url, photo_focal_x, photo_focal_y, exercises, race_id, notes, location, companions, pinned')
       .eq('user_id', user.id)
       .order('started_at', { ascending: false })
       .limit(100);
@@ -198,6 +428,12 @@ export default function MyActivitiesScreen() {
     setLoading(false);
   }
 
+  async function handlePullToRefresh() {
+    setRefreshing(true);
+    await loadActivities();
+    setRefreshing(false);
+  }
+
   const MAX_PHOTOS = 2;
   const MAX_VIDEOS = 1;
   const MAX_PHOTO_MB = 15;
@@ -222,10 +458,16 @@ export default function MyActivitiesScreen() {
       setUploading(activityId);
       try {
         const existing = mediaMap[activityId] || [];
-        const existingCount = existing.length;
         let photoCount = existing.filter(m => m.media_type === 'photo').length;
         let videoCount = existing.filter(m => m.media_type === 'video').length;
         let firstNewPhotoUrl: string | null = null;
+        // Captured before any mutation below, so "Cancel" in the crop step
+        // can put the cover photo back exactly how it was rather than just
+        // accepting a default center crop of the new one.
+        const prevActivity = allActivities.find(a => a.id === activityId);
+        const previousUrl = prevActivity?.photo_url ?? null;
+        const previousFocalX = prevActivity?.photo_focal_x ?? null;
+        const previousFocalY = prevActivity?.photo_focal_y ?? null;
 
         for (let i = 0; i < files.length; i++) {
           const file = files[i];
@@ -288,11 +530,28 @@ export default function MyActivitiesScreen() {
           }
         }
 
-        if (firstNewPhotoUrl && existingCount === 0) {
-          await supabase.from('activities').update({ photo_url: firstNewPhotoUrl }).eq('id', activityId);
+        // A newly uploaded photo always becomes the new cover, even if one
+        // already existed — this UI has nowhere else to show extra photos
+        // (the card grid and diary viewer both only ever render photo_url),
+        // so from the user's side "upload a photo" IS "set/replace the
+        // photo." The old `existingCount === 0` gate meant a SECOND upload
+        // silently landed in activity_media but never replaced what was
+        // shown — the crop/photo appeared not to "swap." Focal point resets
+        // to center since it was measured against the old image.
+        if (firstNewPhotoUrl) {
+          await supabase.from('activities').update({ photo_url: firstNewPhotoUrl, photo_focal_x: null, photo_focal_y: null }).eq('id', activityId);
           setAllActivities(prev => prev.map(a =>
-            a.id === activityId ? { ...a, photo_url: firstNewPhotoUrl! } : a
+            a.id === activityId ? { ...a, photo_url: firstNewPhotoUrl!, photo_focal_x: null, photo_focal_y: null } : a
           ));
+          // diaryList is a separate snapshot the open viewer actually renders
+          // from (not derived live from allActivities) — without patching it
+          // too, an upload made while the viewer is open doesn't show until
+          // you close and reopen it, since the viewer keeps reading the
+          // stale snapshot captured when it was first opened.
+          setDiaryList(prev => prev ? prev.map(a =>
+            a.id === activityId ? { ...a, photo_url: firstNewPhotoUrl!, photo_focal_x: null, photo_focal_y: null } : a
+          ) : prev);
+          setPositioningPhoto({ activityId, url: firstNewPhotoUrl, previousUrl, previousFocalX, previousFocalY });
         }
       } finally {
         setUploading(null);
@@ -323,6 +582,44 @@ export default function MyActivitiesScreen() {
     setEditingId(null);
   }
 
+  // Patches a single activity in local state — used by the diary viewer so
+  // edits (name/location/companions/notes/pinned) reflect on the card grid
+  // immediately, without waiting on a reload. The viewer does its own
+  // (debounced) Supabase writes; this is purely local-state sync.
+  function updateActivityLocal(id: string, patch: Partial<Activity>) {
+    setAllActivities(prev => prev.map(a => a.id === id ? { ...a, ...patch } : a));
+  }
+
+  function toDiaryActivity(a: Activity): DiaryActivity {
+    return {
+      id: a.id,
+      name: a.name,
+      activity_type: a.activity_type,
+      started_at: a.started_at,
+      duration_seconds: a.duration_seconds,
+      distance_meters: a.distance_meters,
+      elevation_meters: a.elevation_meters,
+      effort_score: a.effort_score,
+      photo_url: a.photo_url,
+      photo_focal_x: a.photo_focal_x,
+      photo_focal_y: a.photo_focal_y,
+      notes: a.notes,
+      location: a.location,
+      companions: a.companions,
+      pinned: a.pinned,
+      race_id: a.race_id,
+      isPb: !!pbs[a.id],
+    };
+  }
+
+  function openDiary(flatActivities: Activity[], activityId: string) {
+    const list = flatActivities.map(toDiaryActivity);
+    const idx = list.findIndex((a) => a.id === activityId);
+    if (idx < 0) return;
+    setDiaryList(list);
+    setDiaryIndex(idx);
+  }
+
   function weekLabel(weekStart: number, currentWeekStart: number) {
     const oneWeek = 7 * 24 * 60 * 60 * 1000;
     if (weekStart === currentWeekStart) return 'This week';
@@ -336,6 +633,10 @@ export default function MyActivitiesScreen() {
   function computeGroups(activities: Activity[], order: 'latest' | 'oldest'): WeekGroup[] {
     const currentWeekStart = getMondayStart(new Date());
     const map = new Map<number, Activity[]>();
+    // Always keep a slot for the current week, even if a filter (PBs only,
+    // activity type) leaves it empty — otherwise the Weekly pager's hero page
+    // vanishes entirely when the filter excludes every activity this week.
+    map.set(currentWeekStart, []);
     for (const activity of activities) {
       const ws = getMondayStart(new Date(activity.started_at));
       if (!map.has(ws)) map.set(ws, []);
@@ -358,9 +659,80 @@ export default function MyActivitiesScreen() {
 
   const activityTypes = Array.from(new Set(allActivities.map(a => a.activity_type))).sort();
   const filteredActivities = allActivities.filter(a =>
-    (filterType === 'All' || a.activity_type === filterType) && (!prOnly || !!pbs[a.id])
+    (filterType === 'All' || a.activity_type === filterType) &&
+    (!prOnly || !!pbs[a.id]) &&
+    (!dateFilter || localIsoDate(a.started_at) === dateFilter)
   );
   const groups = computeGroups(filteredActivities, sortOrder);
+  // Flat, continuously-ordered list matching the rows' own display order —
+  // what the diary viewer tap-through navigates across.
+  const flatOrdered = groups.flatMap((g) => g.activities);
+
+  // Month layout's calendar pages — one per calendar month present in
+  // allActivities (capped at 100 rows, so realistically the last few
+  // months), always including the current month even if it's empty yet.
+  // Ascending order (oldest first) so "previous month" sits to the left and
+  // the pager can be scrolled to the last (current) page on mount.
+  // Unfiltered, like Week's thisWk/thisWeekTotal — the "This Month" header
+  // numbers stay put when a filter is toggled; only the calendar cells below
+  // react (via filteredMonthByKey).
+  const monthGroups = computeMonthGroups(allActivities);
+  // Type/PBs-only/date-filtered version, keyed by "year-month", so the
+  // calendar day cells can react to the same corner-button filters as
+  // Week's and Rows' card grids without touching the header stats above.
+  const filteredMonthByKey = new Map(
+    computeMonthGroups(filteredActivities).map((g) => [`${g.year}-${g.month}`, g])
+  );
+
+  // Full-width paging (chevron buttons are the swipe affordance instead of
+  // a peek carousel) — each month card is exactly the pager's width.
+  const monthPageWidth = monthPagerWidth;
+  const monthStride = monthPageWidth;
+  // Single fixed stat card's data — driven by `visibleMonthIndex` (which
+  // month is currently centered in the calendar carousel), not duplicated
+  // per month like the calendar cards themselves.
+  const activeMg = monthGroups[Math.min(visibleMonthIndex, monthGroups.length - 1)] ?? monthGroups[monthGroups.length - 1];
+  const activeMonthPrevDate = new Date(activeMg.year, activeMg.month - 1, 1);
+  const activeMonthPrevTotal = monthGroups.find(
+    (g) => g.year === activeMonthPrevDate.getFullYear() && g.month === activeMonthPrevDate.getMonth()
+  )?.total ?? 0;
+  const activeMonthEffortDelta = activeMonthPrevTotal > 0 ? Math.round((activeMg.total - activeMonthPrevTotal) / activeMonthPrevTotal * 100) : null;
+  const activeMonthContextLine = ((): { highlight: string; rest: string } | null => {
+    if (activeMg.count === 0) return null;
+    const earned = formatDuration(activeMg.seconds);
+    const candidates: Array<{ highlight: string; rest: string }> = [];
+    if (activeMonthPrevTotal > 0) {
+      const gap = Math.round((activeMonthPrevTotal - activeMg.total) * 10) / 10;
+      if (gap > 0) candidates.push({ highlight: `${gap} Effort`, rest: ' until you match last month.' });
+      else candidates.push({ highlight: `You've already beaten last month's Effort`, rest: ' — keep it up.' });
+    }
+    const bestMonthEver = Math.max(0, ...monthGroups.filter((g) => !(g.year === activeMg.year && g.month === activeMg.month)).map((g) => g.total));
+    if (bestMonthEver > 0 && activeMg.total < bestMonthEver) {
+      const gap = Math.round((bestMonthEver - activeMg.total) * 10) / 10;
+      candidates.push({ highlight: `${gap} Effort`, rest: ' until your strongest month.' });
+    }
+    if (candidates.length === 0) {
+      return { highlight: `You've earned ${earned}`, rest: ' this month. Every session counts.' };
+    }
+    const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / (24 * 60 * 60 * 1000));
+    return candidates[dayOfYear % candidates.length];
+  })();
+  const activeMonthToday = new Date();
+  const activeLastMonthDate = new Date(activeMonthToday.getFullYear(), activeMonthToday.getMonth() - 1, 1);
+  const activeRecapTitleText =
+    activeMg.year === activeMonthToday.getFullYear() && activeMg.month === activeMonthToday.getMonth() ? 'This Month'
+    : activeMg.year === activeLastMonthDate.getFullYear() && activeMg.month === activeLastMonthDate.getMonth() ? 'Last Month'
+    : 'Month Total';
+  // Performs the actual re-snap-to-current-month scroll once the carousel's
+  // width is known (the reset effect near the top just clears the guard so
+  // this fires again on every re-entry into Month view).
+  useEffect(() => {
+    if (journalLayout !== 'month' || hasScrolledMonthPager.current || !monthPagerWidth) return;
+    hasScrolledMonthPager.current = true;
+    const targetIndex = monthGroups.length - 1;
+    setVisibleMonthIndex(targetIndex);
+    monthPagerRef.current?.scrollTo({ x: targetIndex * monthStride, animated: false });
+  }, [journalLayout, monthPagerWidth, monthGroups.length, monthStride]);
 
   const currentWeekStartForHero = getMondayStart(new Date());
   const oneWeekMs = 7 * 24 * 60 * 60 * 1000;
@@ -444,6 +816,13 @@ export default function MyActivitiesScreen() {
     return candidates[dayOfYear % candidates.length];
   }
   const contextLine = weekContextLine();
+
+  // Empty-week comparison — shown in place of the (otherwise nonexistent)
+  // grid when this week has no activities yet, so Monday reads as a fresh
+  // scoreboard rather than a broken/blank page.
+  const emptyWeekLine = lastWk.count > 0
+    ? `Last week: ${Math.round(lastWk.effort)} Effort across ${lastWk.count} ${lastWk.count === 1 ? 'activity' : 'activities'}.`
+    : 'Every week is a fresh start.';
 
   // Monthly PB snapshot — a calendar-month roundup of every record set (both
   // cardio distance/duration PBs from `pbs` and lift PRs tagged on exercises),
@@ -546,15 +925,733 @@ export default function MyActivitiesScreen() {
     return `${(meters / 1000).toFixed(1)} km`;
   }
 
+  // Title — rendered as leading content INSIDE each layout's own scrollable
+  // region (rather than fixed above it) so the whole page, title included,
+  // scrolls as one continuous unit under the true top nav.
+  const journalTitle = (
+    <View style={styles.jTitleBlock}>
+      <Text style={styles.jTitle}>Activity Journal</Text>
+      <Text style={styles.jSubtitle}>Every Effort Tells A Story</Text>
+    </View>
+  );
+
+  // 3-way layout switch (Rows/Week/Month) — sits directly below the stat
+  // card (tight, via negative margin, matching the filterBarTight pattern
+  // just below it — `wide` picks the right negative-margin variant for
+  // whichever container gap it's sitting in, jWeekPage vs jContent). One
+  // shared function to avoid the triplication (and drift) that came from
+  // copy-pasting this into all three layout blocks previously.
+  function renderJournalToggle(wide: boolean) {
+    return (
+      <View style={[styles.jLayoutToggleRow, wide ? styles.jLayoutToggleRowTightWide : styles.jLayoutToggleRowTight]}>
+        <View style={styles.jLayoutToggle}>
+          {([
+            { key: 'weekly' as const, icon: 'calendar' as const, label: 'Week' },
+            { key: 'month' as const, icon: 'calendarMonth' as const, label: 'Month' },
+            { key: 'year' as const, icon: 'stats' as const, label: 'Year' },
+          ]).map((opt) => (
+            <TouchableOpacity
+              key={opt.key}
+              style={[styles.jLayoutToggleItem, journalLayout === opt.key && styles.jLayoutToggleItemActive]}
+              onPress={() => setJournalLayout(opt.key)}
+            >
+              <RivalIcon name={opt.icon} size={13} color={journalLayout === opt.key ? RivalColors.accentText : RivalColors.textSecondary} />
+              <Text style={[styles.jLayoutToggleLabel, journalLayout === opt.key && styles.jLayoutToggleLabelActive]}>{opt.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.root}>
       <RivalFixedBackground
-        source={require('../../assets/images/backgrounds/optimized/handstand-airy-warehouse-gym.jpg')}
-        focalPoint="50% 38%"
+        source={require('../../assets/images/backgrounds/optimized/a-single-solo-athlete-standing-on.jpg')}
+        focalPoint="50% 42%"
       />
       <View style={styles.scrim} />
       <SafeAreaView style={styles.container}>
+        {/* Today's mobile screen has no photo at all behind its top nav (flat
+            #131313), so its translucent bar reads as solid dark. This screen's
+            photo (bright sky/cloud, brightest right at the top) shows through
+            the same translucent bar instead — the uniform page `scrim` above
+            isn't dark enough there on its own. Matches Today's look with a
+            solid dark backing sized to just the nav strip, rather than
+            touching the shared RivalTopNav or losing the photo further down.
+            Rendered as a sibling INSIDE `container` (not outside it) so it
+            shares the nav's own stacking context — `container` itself
+            (position:relative + zIndex:0) otherwise traps the nav's zIndex:100
+            and hides anything outside it that has a higher zIndex than
+            container's own. Its zIndex here (50) only needs to beat the
+            photo/scrim behind it and stay under the nav's 100. */}
+        {mobileNav && <View style={styles.navBacking} />}
         <RivalTopNav active="activity" />
+
+        {mobileNav ? (
+          <>
+          {journalLayout === 'weekly' && (
+          // Full-screen weekly pager — one week fills the screen, swipe/scroll
+          // up snaps to the next (retro-app style). RNW's ScrollView applies
+          // CSS scroll-snap for free via `pagingEnabled` (wraps each direct
+          // child in a scrollSnapAlign:'start' View) — no manual CSS needed.
+          // Each week page's height is pinned to the pager's own measured
+          // height (onLayout) so "one week = one screen" holds regardless of
+          // how much content that week has; a week with more cards than fit
+          // scrolls internally via its own nested grid ScrollView instead of
+          // fighting the outer snap.
+          <ScrollView
+            pagingEnabled
+            style={styles.jPager}
+            onLayout={(e) => setPagerHeight(e.nativeEvent.layout.height)}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handlePullToRefresh}
+                tintColor={RivalColors.accentText}
+                colors={[RivalColors.accentFill]}
+              />
+            }
+          >
+            {loading && (
+              <View style={[styles.jWeekPage, pagerHeight ? { height: pagerHeight } : null]}>
+                <Text style={styles.emptyText}>Loading…</Text>
+              </View>
+            )}
+
+            {!loading && groups.length === 0 && (
+              <View style={[styles.jWeekPage, pagerHeight ? { height: pagerHeight } : null]}>
+                <Text style={styles.emptyText}>
+                  {allActivities.length === 0 ? 'No activities yet. Log a workout on Strava to get started.' : 'No activities match this filter.'}
+                </Text>
+              </View>
+            )}
+
+            {!loading && groups.map((group) => {
+              const isCurrentWeek = group.weekStart === currentWeekStartForHero;
+              return (
+                <ScrollView
+                  key={group.weekStart}
+                  style={pagerHeight ? { height: pagerHeight } : undefined}
+                  contentContainerStyle={styles.jWeekPage}
+                  showsVerticalScrollIndicator={false}
+                >
+                  {isCurrentWeek ? (
+                    <>
+                      {journalTitle}
+                      {/* Hero recap card — "This Week", 3-stat grid, quote. Matches the
+                          mockup's .recap-card exactly. */}
+                      <View style={[styles.recapCard, !heroExpanded && styles.recapCardCollapsed]}>
+                        <TouchableOpacity style={styles.recapTitleRow} activeOpacity={0.7} onPress={() => setHeroExpanded((v) => !v)}>
+                          <View>
+                            <Text style={styles.recapTitle}>This Week</Text>
+                            <Text style={styles.jWeekDateRange}>{formatWeekRangeCompact(currentWeekStartForHero)}</Text>
+                          </View>
+                          <View style={styles.recapEffortInline}>
+                            <View style={styles.recapEffortNumCol}>
+                              <Text style={styles.recapEffortNum}>{thisWeekTotal}</Text>
+                              <Text style={styles.recapEffortLabel}>Effort</Text>
+                            </View>
+                            <RivalIcon name="chevronDown" size={16} color={RivalColors.textSecondary} style={heroExpanded ? styles.recapChevronOpen : undefined} />
+                          </View>
+                        </TouchableOpacity>
+                        {heroExpanded && (
+                        <>
+                        <View style={styles.recapStatgrid}>
+                          <View style={styles.recapStatcell}>
+                            <RivalIcon name="pulse" size={27} color={RivalColors.accentFill} />
+                            {/* The pulse icon (27) is taller than its neighbors' icons (20) —
+                                pull the number back up so all three numbers still share
+                                one baseline despite the extra icon height above it. */}
+                            <Text style={[styles.recapStatValue, { marginTop: -6 }]}>{thisWeekCount}</Text>
+                            <Text style={styles.recapStatTitle}>{thisWeekCount === 1 ? 'Activity' : 'Activities'}</Text>
+                          </View>
+                          <View style={[styles.recapStatcell, styles.recapStatcellDivider]}>
+                            <RivalIcon name="timerOutline" size={20} color={RivalColors.accentFill} />
+                            <Text style={styles.recapStatValue}>{formatDuration(thisWk.seconds) || '0m'}</Text>
+                            <Text style={styles.recapStatTitle}>Time</Text>
+                          </View>
+                          <View style={[styles.recapStatcell, styles.recapStatcellDivider]}>
+                            <RivalIcon name="distance" size={20} color={RivalColors.accentFill} />
+                            <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+                              <Text style={styles.recapStatValue}>{thisWk.km >= 0.1 ? thisWk.km.toFixed(1) : '0'}</Text>
+                              <Text style={styles.recapStatUnit}>km</Text>
+                            </View>
+                            <Text style={styles.recapStatTitle}>Distance</Text>
+                          </View>
+                        </View>
+                        {contextLine && (
+                          <Text style={styles.recapQuote}>
+                            {contextLine.highlight}{contextLine.rest}
+                          </Text>
+                        )}
+
+                        {/* Momentum chip — vs-last-week delta. Not in the mockup
+                            (which never modeled this data), kept so real signal isn't
+                            lost, now living inside the hero card under the quote. */}
+                        {effortDelta !== null && (
+                          <View style={styles.momentumRow}>
+                            <View style={styles.momentumChip}>
+                              <RivalIcon name={effortDelta >= 0 ? 'trendUp' : 'trendDown'} size={13} color={effortDelta >= 0 ? RivalColors.success : '#ff5c5c'} />
+                              <Text style={styles.momentumChipText}>{Math.abs(effortDelta)}% vs last week</Text>
+                            </View>
+                          </View>
+                        )}
+
+                        {/* Filter + PBs-only toggles — moved here (bottom-right of the
+                            hero card) from the standalone toolbar row above. */}
+                        <View style={styles.recapCornerBtnRow}>
+                          <TouchableOpacity
+                            style={[styles.recapFilterBtn, prOnly && styles.toolbarBtnActive]}
+                            onPress={() => setPrOnly(!prOnly)}
+                          >
+                            <RivalIcon name="trophy" size={14} color={prOnly ? RivalColors.accentText : RivalColors.textSecondary} />
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[styles.recapFilterBtn, showTypeFilter && styles.toolbarBtnActive]}
+                            onPress={() => setShowTypeFilter(!showTypeFilter)}
+                          >
+                            <RivalIcon name="search" size={14} color={showTypeFilter ? RivalColors.accentText : RivalColors.textSecondary} />
+                          </TouchableOpacity>
+                        </View>
+                        </>
+                        )}
+                      </View>
+                      {renderJournalToggle(false)}
+
+                      {(filterType !== 'All' || prOnly || dateFilter || showTypeFilter) && (
+                      <View style={[styles.filterBar, styles.filterBarTight]}>
+                        {(filterType !== 'All' || prOnly || dateFilter) && !showTypeFilter && (
+                          <View style={styles.activeFiltersRow}>
+                            {filterType !== 'All' && (
+                              <TouchableOpacity style={styles.activeFilterChip} onPress={() => setFilterType('All')}>
+                                <RivalIcon name={activityIconName(filterType)} size={12} color={RivalColors.accentText} />
+                                <Text style={styles.activeFilterChipText}>{filterType}</Text>
+                                <RivalIcon name="close" size={12} color={RivalColors.textSecondary} />
+                              </TouchableOpacity>
+                            )}
+                            {prOnly && (
+                              <TouchableOpacity style={styles.activeFilterChip} onPress={() => setPrOnly(false)}>
+                                <RivalIcon name="fire" size={12} color={RivalColors.accentText} />
+                                <Text style={styles.activeFilterChipText}>PBs only</Text>
+                                <RivalIcon name="close" size={12} color={RivalColors.textSecondary} />
+                              </TouchableOpacity>
+                            )}
+                            {dateFilter && (
+                              <TouchableOpacity style={styles.activeFilterChip} onPress={() => setDateFilter(null)}>
+                                <RivalIcon name="calendar" size={12} color={RivalColors.accentText} />
+                                <Text style={styles.activeFilterChipText}>{isoToDisplayDate(dateFilter)}</Text>
+                                <RivalIcon name="close" size={12} color={RivalColors.textSecondary} />
+                              </TouchableOpacity>
+                            )}
+                          </View>
+                        )}
+                        {showTypeFilter && (
+                          <View style={{ gap: 10 }}>
+                            <View>
+                              <Text style={styles.typeFilterLabel}>Type</Text>
+                              <View style={styles.typeFilterRow}>
+                                <TouchableOpacity style={[styles.typeFilterChip, filterType === 'All' && styles.typeFilterChipActive]} onPress={() => { setFilterType('All'); setShowTypeFilter(false); }}>
+                                  <Text style={[styles.typeFilterChipText, filterType === 'All' && styles.typeFilterChipTextActive]}>All</Text>
+                                </TouchableOpacity>
+                                {activityTypes.map((t) => (
+                                  <TouchableOpacity key={t} style={[styles.typeFilterChip, filterType === t && styles.typeFilterChipActive]} onPress={() => { setFilterType(t); setShowTypeFilter(false); }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                                      <RivalIcon name={activityIconName(t)} size={13} color={filterType === t ? RivalColors.accentText : RivalColors.textSecondary} />
+                                      <Text style={[styles.typeFilterChipText, filterType === t && styles.typeFilterChipTextActive]}>{t}</Text>
+                                    </View>
+                                  </TouchableOpacity>
+                                ))}
+                              </View>
+                            </View>
+                            <View>
+                              <Text style={styles.typeFilterLabel}>Date</Text>
+                              <View style={styles.typeFilterRow}>
+                                <TouchableOpacity
+                                  style={[styles.typeFilterChip, !!dateFilter && styles.typeFilterChipActive]}
+                                  onPress={() => {
+                                    if (Platform.OS !== 'web') return;
+                                    const input = window.prompt('Search by date (DD/MM/YYYY)', dateFilter ? isoToDisplayDate(dateFilter) : '');
+                                    if (input === null) return;
+                                    if (input.trim() === '') { setDateFilter(null); setShowTypeFilter(false); return; }
+                                    const iso = displayToIsoDate(input);
+                                    if (!iso) { window.alert('Enter a valid date as DD/MM/YYYY.'); return; }
+                                    setDateFilter(iso);
+                                    setShowTypeFilter(false);
+                                  }}
+                                >
+                                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                                    <RivalIcon name="calendar" size={13} color={dateFilter ? RivalColors.accentText : RivalColors.textSecondary} />
+                                    <Text style={[styles.typeFilterChipText, !!dateFilter && styles.typeFilterChipTextActive]}>{dateFilter ? isoToDisplayDate(dateFilter) : 'Search by date'}</Text>
+                                  </View>
+                                </TouchableOpacity>
+                              </View>
+                            </View>
+                          </View>
+                        )}
+                      </View>
+                      )}
+
+                      {monthlyPbs.length > 0 && (
+                        <View style={styles.monthlyPbCard}>
+                          <View style={styles.monthlyPbHeader}>
+                            <Text style={styles.monthlyPbTitle}>{monthName} PBs</Text>
+                            <View style={styles.monthlyPbCount}>
+                              <Text style={styles.monthlyPbCountText}>{monthlyPbs.length}</Text>
+                            </View>
+                          </View>
+                          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.monthlyPbRow}>
+                            {monthlyPbs.map((pb) => (
+                              <View key={pb.id} style={styles.monthlyPbEntry}>
+                                <Text style={styles.monthlyPbName} numberOfLines={1}>{pb.title}</Text>
+                                <View style={styles.monthlyPbValueRow}>
+                                  <Text style={styles.monthlyPbValue}>{pb.value}</Text>
+                                  {!!pb.unit && <Text style={styles.monthlyPbUnit}>{pb.unit}</Text>}
+                                </View>
+                              </View>
+                            ))}
+                          </ScrollView>
+                        </View>
+                      )}
+                    </>
+                  ) : (
+                    <WeekStatPill
+                      title={group.weekStart === currentWeekStartForHero - oneWeekMs ? 'Last Week' : `Week ${getWeekNumber(new Date(group.weekStart))}`}
+                      dateRange={formatWeekRangeCompact(group.weekStart)}
+                      activities={group.activities}
+                    />
+                  )}
+
+                  {/* Card grid — scrolls together with the hero/header above as
+                      one continuous page (not a separately-clipped region). */}
+                  <View style={styles.jGridContent}>
+                    {isCurrentWeek && group.activities.length === 0 ? (
+                      // Monday (or any day before the first activity lands) —
+                      // a lone "Add Activity" card on an otherwise-empty grid
+                      // read as broken. Show a real comparison to last week
+                      // instead so the page still feels alive.
+                      <View style={styles.jWeekEmptyWrap}>
+                        <View style={styles.jWeekEmptyCard}>
+                          <RivalIcon name="pulse" size={20} color={RivalColors.accentFill} />
+                          <Text style={styles.jWeekEmptyTitle}>Your week is wide open.</Text>
+                          <Text style={styles.jWeekEmptySub}>{emptyWeekLine}</Text>
+                        </View>
+                        <TouchableOpacity
+                          style={styles.jAddCard}
+                          activeOpacity={0.7}
+                          onPress={() => router.push('/add-workout')}
+                        >
+                          <RivalIcon name="add" size={22} color="rgba(255,255,255,0.6)" style={{ marginTop: -15 }} />
+                          <Text style={styles.jAddCardText}>Activity</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : (
+                    <View style={styles.jGrid}>
+                      {group.activities.map((activity) => {
+                        const pbLabel = pbs[activity.id];
+                        const badgeKind: 'pb' | 'race' | null = pbLabel ? 'pb' : activity.race_id ? 'race' : null;
+                        const ringColor = badgeKind === 'pb' ? RivalColors.rankAnchors.unrivaled : badgeKind === 'race' ? '#ff5c5c' : 'transparent';
+                        const cardDistance = formatDistance(activity.distance_meters, activity.activity_type);
+                        const cardStat = cardDistance || (activity.duration_seconds > 0 ? formatDurationClock(activity.duration_seconds) : '');
+                        return (
+                          <TouchableOpacity
+                            key={activity.id}
+                            style={styles.jGridCard}
+                            activeOpacity={0.85}
+                            onPress={() => openDiary(flatOrdered, activity.id)}
+                          >
+                            {activity.photo_url ? (
+                              <CoverImage
+                                uri={activity.photo_url}
+                                focalX={activity.photo_focal_x}
+                                focalY={activity.photo_focal_y}
+                                style={styles.jCardPhoto}
+                              />
+                            ) : (
+                              <View style={styles.jCardArt}>
+                                <RivalIcon name={activityIconName(activity.activity_type)} size={48} color={RivalColors.accentText} />
+                              </View>
+                            )}
+                            <View style={styles.jCardScrim} pointerEvents="none" />
+                            <View style={styles.jCardDayBadge} pointerEvents="none">
+                              <Text style={styles.jCardDayText}>{dayOfWeekLabel(activity.started_at)}</Text>
+                            </View>
+                            {activity.pinned && (
+                              <View style={styles.jCardPin}>
+                                <RivalIcon name="star" size={16} color={RivalColors.accentText} />
+                              </View>
+                            )}
+                            <View style={styles.jCardBody}>
+                              <View style={{ flex: 1 }}>
+                                <Text style={styles.jCardName} numberOfLines={1}>{cardDisplayName(activity.name, activity.activity_type)}</Text>
+                                {!!cardStat && <Text style={styles.jCardStat}>{cardStat}</Text>}
+                              </View>
+                              <View style={styles.jCardEffort}>
+                                <Text style={styles.jCardEffortNum}>{activity.effort_score}</Text>
+                                <Text style={styles.jCardEffortLabel}>Effort</Text>
+                              </View>
+                            </View>
+                            {badgeKind && <View pointerEvents="none" style={[styles.jCardRing, { borderColor: ringColor }]} />}
+                          </TouchableOpacity>
+                        );
+                      })}
+                      {isCurrentWeek && (
+                        // Wrapped in a full grid-column slot (matches jGridCard's
+                        // flexBasis) so it lands in whichever column the wrap
+                        // naturally puts it — e.g. under the 2nd card when a lone
+                        // 3rd photo card takes the 1st column on the last row.
+                        <View style={styles.jAddCardSlot}>
+                          <TouchableOpacity
+                            style={styles.jAddCard}
+                            activeOpacity={0.7}
+                            onPress={() => router.push('/add-workout')}
+                          >
+                            <RivalIcon name="add" size={22} color="rgba(255,255,255,0.6)" style={{ marginTop: -15 }} />
+                            <Text style={styles.jAddCardText}>Add Activity</Text>
+                          </TouchableOpacity>
+                        </View>
+                      )}
+                    </View>
+                    )}
+                    {/* Swipe hint — new affordance teaching the swipe-up-for-next-week
+                        gesture, which didn't exist before this layout. */}
+                    <View style={styles.jSwipeHint}>
+                      <RivalIcon name="chevronDown" size={18} color={RivalColors.textSecondary} />
+                    </View>
+                  </View>
+                </ScrollView>
+              );
+            })}
+          </ScrollView>
+          )}
+
+          {journalLayout === 'month' && (
+          // Only the calendar CARD swipes horizontally, as a peek carousel
+          // (next/previous month's edge stays visible — the swipe
+          // affordance). The stat card above it is a single fixed instance
+          // driven by `activeMg` (= monthGroups[visibleMonthIndex]), updated
+          // via onMomentumScrollEnd — not duplicated per month like before.
+          // That duplication was also the source of a real bug: each month
+          // page had its own independent vertical ScrollView, so mid-swipe
+          // you could see two pages at different, desynced scroll positions.
+          // One real vertical scroll for the whole layout fixes that
+          // structurally.
+          <ScrollView
+            contentContainerStyle={styles.jContent}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handlePullToRefresh}
+                tintColor={RivalColors.accentText}
+                colors={[RivalColors.accentFill]}
+              />
+            }
+          >
+            {journalTitle}
+            <View style={[styles.recapCard, !heroExpanded && styles.recapCardCollapsed]}>
+              <TouchableOpacity style={styles.recapTitleRow} activeOpacity={0.7} onPress={() => setHeroExpanded((v) => !v)}>
+                <View>
+                  <Text style={styles.recapTitle}>{activeRecapTitleText}</Text>
+                </View>
+                <View style={styles.recapEffortInline}>
+                  <View style={styles.recapEffortNumCol}>
+                    <Text style={styles.recapEffortNum}>{activeMg.total}</Text>
+                    <Text style={styles.recapEffortLabel}>Effort</Text>
+                  </View>
+                  <RivalIcon name="chevronDown" size={16} color={RivalColors.textSecondary} style={heroExpanded ? styles.recapChevronOpen : undefined} />
+                </View>
+              </TouchableOpacity>
+              {heroExpanded && (
+              <>
+              <View style={styles.recapStatgrid}>
+                <View style={styles.recapStatcell}>
+                  <RivalIcon name="pulse" size={27} color={RivalColors.accentFill} />
+                  <Text style={[styles.recapStatValue, { marginTop: -6 }]}>{activeMg.count}</Text>
+                  <Text style={styles.recapStatTitle}>{activeMg.count === 1 ? 'Activity' : 'Activities'}</Text>
+                </View>
+                <View style={[styles.recapStatcell, styles.recapStatcellDivider]}>
+                  <RivalIcon name="timerOutline" size={20} color={RivalColors.accentFill} />
+                  <Text style={styles.recapStatValue}>{formatDuration(activeMg.seconds) || '0m'}</Text>
+                  <Text style={styles.recapStatTitle}>Time</Text>
+                </View>
+                <View style={[styles.recapStatcell, styles.recapStatcellDivider]}>
+                  <RivalIcon name="distance" size={20} color={RivalColors.accentFill} />
+                  <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+                    <Text style={styles.recapStatValue}>{activeMg.km >= 0.1 ? activeMg.km.toFixed(1) : '0'}</Text>
+                    <Text style={styles.recapStatUnit}>km</Text>
+                  </View>
+                  <Text style={styles.recapStatTitle}>Distance</Text>
+                </View>
+              </View>
+
+              {activeMonthContextLine && (
+                <Text style={styles.recapQuote}>
+                  {activeMonthContextLine.highlight}{activeMonthContextLine.rest}
+                </Text>
+              )}
+
+              {activeMonthEffortDelta !== null && (
+                <View style={styles.momentumRow}>
+                  <View style={styles.momentumChip}>
+                    <RivalIcon name={activeMonthEffortDelta >= 0 ? 'trendUp' : 'trendDown'} size={13} color={activeMonthEffortDelta >= 0 ? RivalColors.success : '#ff5c5c'} />
+                    <Text style={styles.momentumChipText}>{Math.abs(activeMonthEffortDelta)}% vs last month</Text>
+                  </View>
+                </View>
+              )}
+
+              <View style={styles.recapCornerBtnRow}>
+                <TouchableOpacity
+                  style={[styles.recapFilterBtn, prOnly && styles.toolbarBtnActive]}
+                  onPress={() => setPrOnly(!prOnly)}
+                >
+                  <RivalIcon name="trophy" size={14} color={prOnly ? RivalColors.accentText : RivalColors.textSecondary} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.recapFilterBtn, showTypeFilter && styles.toolbarBtnActive]}
+                  onPress={() => setShowTypeFilter(!showTypeFilter)}
+                >
+                  <RivalIcon name="search" size={14} color={showTypeFilter ? RivalColors.accentText : RivalColors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+              </>
+              )}
+            </View>
+            {renderJournalToggle(true)}
+
+            {(filterType !== 'All' || prOnly || dateFilter || showTypeFilter) && (
+            <View style={[styles.filterBar, styles.filterBarTightWide]}>
+              {(filterType !== 'All' || prOnly || dateFilter) && !showTypeFilter && (
+                <View style={styles.activeFiltersRow}>
+                  {filterType !== 'All' && (
+                    <TouchableOpacity style={styles.activeFilterChip} onPress={() => setFilterType('All')}>
+                      <RivalIcon name={activityIconName(filterType)} size={12} color={RivalColors.accentText} />
+                      <Text style={styles.activeFilterChipText}>{filterType}</Text>
+                      <RivalIcon name="close" size={12} color={RivalColors.textSecondary} />
+                    </TouchableOpacity>
+                  )}
+                  {prOnly && (
+                    <TouchableOpacity style={styles.activeFilterChip} onPress={() => setPrOnly(false)}>
+                      <RivalIcon name="fire" size={12} color={RivalColors.accentText} />
+                      <Text style={styles.activeFilterChipText}>PBs only</Text>
+                      <RivalIcon name="close" size={12} color={RivalColors.textSecondary} />
+                    </TouchableOpacity>
+                  )}
+                  {dateFilter && (
+                    <TouchableOpacity style={styles.activeFilterChip} onPress={() => setDateFilter(null)}>
+                      <RivalIcon name="calendar" size={12} color={RivalColors.accentText} />
+                      <Text style={styles.activeFilterChipText}>{isoToDisplayDate(dateFilter)}</Text>
+                      <RivalIcon name="close" size={12} color={RivalColors.textSecondary} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
+              {showTypeFilter && (
+                <View style={{ gap: 10 }}>
+                  <View>
+                    <Text style={styles.typeFilterLabel}>Type</Text>
+                    <View style={styles.typeFilterRow}>
+                      <TouchableOpacity style={[styles.typeFilterChip, filterType === 'All' && styles.typeFilterChipActive]} onPress={() => { setFilterType('All'); setShowTypeFilter(false); }}>
+                        <Text style={[styles.typeFilterChipText, filterType === 'All' && styles.typeFilterChipTextActive]}>All</Text>
+                      </TouchableOpacity>
+                      {activityTypes.map((t) => (
+                        <TouchableOpacity key={t} style={[styles.typeFilterChip, filterType === t && styles.typeFilterChipActive]} onPress={() => { setFilterType(t); setShowTypeFilter(false); }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                            <RivalIcon name={activityIconName(t)} size={13} color={filterType === t ? RivalColors.accentText : RivalColors.textSecondary} />
+                            <Text style={[styles.typeFilterChipText, filterType === t && styles.typeFilterChipTextActive]}>{t}</Text>
+                          </View>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                  <View>
+                    <Text style={styles.typeFilterLabel}>Date</Text>
+                    <View style={styles.typeFilterRow}>
+                      <TouchableOpacity
+                        style={[styles.typeFilterChip, !!dateFilter && styles.typeFilterChipActive]}
+                        onPress={() => {
+                          if (Platform.OS !== 'web') return;
+                          const input = window.prompt('Search by date (DD/MM/YYYY)', dateFilter ? isoToDisplayDate(dateFilter) : '');
+                          if (input === null) return;
+                          if (input.trim() === '') { setDateFilter(null); setShowTypeFilter(false); return; }
+                          const iso = displayToIsoDate(input);
+                          if (!iso) { window.alert('Enter a valid date as DD/MM/YYYY.'); return; }
+                          setDateFilter(iso);
+                          setShowTypeFilter(false);
+                        }}
+                      >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                          <RivalIcon name="calendar" size={13} color={dateFilter ? RivalColors.accentText : RivalColors.textSecondary} />
+                          <Text style={[styles.typeFilterChipText, !!dateFilter && styles.typeFilterChipTextActive]}>{dateFilter ? isoToDisplayDate(dateFilter) : 'Search by date'}</Text>
+                        </View>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </View>
+              )}
+            </View>
+            )}
+
+            <View>
+            <ScrollView
+              ref={monthPagerRef}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              onLayout={(e) => setMonthPagerWidth(Math.round(e.nativeEvent.layout.width))}
+              onMomentumScrollEnd={(e) => {
+                if (monthStride <= 0) return;
+                const idx = Math.round(e.nativeEvent.contentOffset.x / monthStride);
+                setVisibleMonthIndex(Math.max(0, Math.min(monthGroups.length - 1, idx)));
+              }}
+            >
+              {monthGroups.map((mg) => {
+                const leadingBlanks = mg.startWeekday;
+                const dayCells: Array<{ day: number } | null> = [
+                  ...Array.from({ length: leadingBlanks }, () => null),
+                  ...Array.from({ length: mg.daysInMonth }, (_, i) => ({ day: i + 1 })),
+                ];
+                const filteredByDay = filteredMonthByKey.get(`${mg.year}-${mg.month}`)?.byDay;
+                return (
+                  <View key={`${mg.year}-${mg.month}`} style={monthPageWidth ? { width: monthPageWidth } : styles.jMonthPageFallback}>
+                    <View style={styles.jMonthCard}>
+                      <View style={styles.jMonthHeader}>
+                        <Text style={styles.jMonthTitle}>{mg.label}</Text>
+                        {/* Fades to transparent at both tips instead of a hard-cut
+                            border, so the line reads as tapering to a point
+                            rather than just stopping. */}
+                        <View style={styles.jMonthTitleUnderline} />
+                      </View>
+                      <View style={styles.jDowRow}>
+                        {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
+                          <Text key={i} style={styles.jDow}>{d}</Text>
+                        ))}
+                      </View>
+                      <View style={styles.jCalGrid} onLayout={(e) => setCalGridWidth(e.nativeEvent.layout.width)}>
+                        {dayCells.map((cell, idx) => {
+                          const sizeOverride = calCellSize > 0 ? { width: calCellSize } : null;
+                          if (!cell) return <View key={`blank-${idx}`} style={[styles.jCalCellEmpty, sizeOverride]} />;
+                          const dayActs = filteredByDay?.get(cell.day) || [];
+                          const isFuture = new Date(mg.year, mg.month, cell.day) > new Date();
+                          if (dayActs.length === 0) {
+                            // Today-or-earlier empty days are a quick "log this day"
+                            // shortcut into manual entry, prefilled with the tapped
+                            // date. Future days stay inert — can't log ahead of time.
+                            if (!isFuture) {
+                              const isoDate = `${mg.year}-${String(mg.month + 1).padStart(2, '0')}-${String(cell.day).padStart(2, '0')}`;
+                              return (
+                                <TouchableOpacity
+                                  key={cell.day}
+                                  style={[styles.jCalCellRest, sizeOverride]}
+                                  activeOpacity={0.7}
+                                  onPress={() => router.push(`/manual-entry?date=${isoDate}`)}
+                                >
+                                  <View style={styles.jCalIconSlot} />
+                                  <Text style={styles.jCalDaynum}>{cell.day}</Text>
+                                </TouchableOpacity>
+                              );
+                            }
+                            return (
+                              <View key={cell.day} style={[styles.jCalCellFuture, sizeOverride]}>
+                                <View style={styles.jCalIconSlot} />
+                                <Text style={styles.jCalDaynumFuture}>{cell.day}</Text>
+                              </View>
+                            );
+                          }
+                          const withPb = dayActs.find((a) => pbs[a.id]);
+                          const withRace = dayActs.find((a) => a.race_id);
+                          const withPhoto = dayActs.find((a) => a.photo_url);
+                          const badgeStyle = withPb ? styles.jCalCellPb : withRace ? styles.jCalCellRace : null;
+                          return (
+                            <TouchableOpacity
+                              key={cell.day}
+                              style={[styles.jCalCellActive, badgeStyle, sizeOverride]}
+                              activeOpacity={0.85}
+                              onPress={() => openDiary(flatOrdered, dayActs[0].id)}
+                            >
+                              {withPhoto?.photo_url && (
+                                <CoverImage
+                                  uri={withPhoto.photo_url}
+                                  focalX={withPhoto.photo_focal_x}
+                                  focalY={withPhoto.photo_focal_y}
+                                  style={styles.jCalCellPhoto}
+                                />
+                              )}
+                              {/* Fixed-height slot (icon or empty) ABOVE the day number,
+                                  always reserved so the number lands in the same spot
+                                  whether the cell shows a photo, a fallback icon, or
+                                  neither — previously the number visibly jumped around
+                                  depending on what else was in the cell. */}
+                              <View style={styles.jCalIconSlot}>
+                                {!withPhoto?.photo_url && (
+                                  <RivalIcon name={activityIconName(dayActs[0].activity_type)} size={22} color={RivalColors.accentText} style={{ opacity: 0.55 }} />
+                                )}
+                              </View>
+                              <Text style={withPhoto ? styles.jCalDaynumPhoto : styles.jCalDaynumActive}>{cell.day}</Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                      <View style={styles.jCalLegend}>
+                        <View style={styles.jCalLegendItem}>
+                          <View style={[styles.jCalLegendSwatch, styles.jCalLegendSwatchPb]} />
+                          <Text style={styles.jCalLegendText}>Personal Best</Text>
+                        </View>
+                        <View style={styles.jCalLegendItem}>
+                          <View style={[styles.jCalLegendSwatch, styles.jCalLegendSwatchRace]} />
+                          <Text style={styles.jCalLegendText}>Event</Text>
+                        </View>
+                      </View>
+                    </View>
+                  </View>
+                );
+              })}
+            </ScrollView>
+            <TouchableOpacity
+              style={[styles.jMonthChevron, styles.jMonthChevronLeft]}
+              activeOpacity={0.7}
+              disabled={visibleMonthIndex <= 0}
+              onPress={() => {
+                const idx = Math.max(0, visibleMonthIndex - 1);
+                setVisibleMonthIndex(idx);
+                monthPagerRef.current?.scrollTo({ x: idx * monthStride, animated: true });
+              }}
+            >
+              <RivalIcon name="monthBack" size={18} color={visibleMonthIndex <= 0 ? RivalColors.textSecondary : RivalColors.accentText} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.jMonthChevron, styles.jMonthChevronRight]}
+              activeOpacity={0.7}
+              disabled={visibleMonthIndex >= monthGroups.length - 1}
+              onPress={() => {
+                const idx = Math.min(monthGroups.length - 1, visibleMonthIndex + 1);
+                setVisibleMonthIndex(idx);
+                monthPagerRef.current?.scrollTo({ x: idx * monthStride, animated: true });
+              }}
+            >
+              <RivalIcon name="monthForward" size={18} color={visibleMonthIndex >= monthGroups.length - 1 ? RivalColors.textSecondary : RivalColors.accentText} />
+            </TouchableOpacity>
+            </View>
+          </ScrollView>
+          )}
+
+          {journalLayout === 'year' && (
+          // Placeholder — the full year-in-review view (totals, monthly
+          // trend, PB timeline) is a future build; this just makes the tab
+          // real and navigable now instead of hiding it until that's done.
+          <ScrollView contentContainerStyle={styles.jWeekPage}>
+            {journalTitle}
+            {renderJournalToggle(false)}
+            <View style={styles.jYearComingSoon}>
+              <RivalIcon name="stats" size={32} color={RivalColors.accentText} />
+              <Text style={styles.jYearComingSoonTitle}>Your Year, coming soon</Text>
+              <Text style={styles.jYearComingSoonBody}>A full look back at everything you've put in this year — total Effort, your biggest months, and every PB along the way.</Text>
+            </View>
+          </ScrollView>
+          )}
+          </>
+        ) : (
         <ScrollView contentContainerStyle={styles.content}>
 
         {/* Hero — this week's momentum, not just a number. Two columns on wide
@@ -822,6 +1919,13 @@ export default function MyActivitiesScreen() {
                       </View>
                     )}
 
+                    {activity.race_id && (
+                      <View style={styles.raceBadge}>
+                        <RivalIcon name="flag" size={12} color="#ff5c5c" />
+                        <Text style={styles.raceBadgeText}>Event</Text>
+                      </View>
+                    )}
+
                     {/* Stat mini-cards + exercises stacked on the left, Effort badge +
                         action icons on the right. The right column is measured to match
                         the LEFT column's full height (stats + exercises together, not
@@ -1006,15 +2110,15 @@ export default function MyActivitiesScreen() {
           </View>
         ))}
 
-      </ScrollView>
+        </ScrollView>
+        )}
 
-        <TouchableOpacity
-          style={[styles.fab, mobileNav && { bottom: insets.bottom + 88 }]}
-          onPress={() => router.push('/add-workout')}
-        >
-          <RivalIcon name="add" size={18} color={RivalColors.onAccentFill} />
-          <Text style={styles.fabText}>Add Activity</Text>
-        </TouchableOpacity>
+        {!mobileNav && (
+          <TouchableOpacity style={styles.fab} onPress={() => router.push('/add-workout')}>
+            <RivalIcon name="add" size={18} color={RivalColors.onAccentFill} />
+            <Text style={styles.fabText}>Add Activity</Text>
+          </TouchableOpacity>
+        )}
 
         {/* Photo lightbox — click any card photo to view it full size; click
             anywhere (or ✕) to dismiss. */}
@@ -1026,6 +2130,49 @@ export default function MyActivitiesScreen() {
             </TouchableOpacity>
           </TouchableOpacity>
         )}
+
+        {/* Mobile Activity Journal's full-screen diary viewer. */}
+        {diaryList && (
+          <ActivityDiaryViewer
+            activities={diaryList}
+            startIndex={diaryIndex}
+            onClose={() => setDiaryList(null)}
+            onUpdate={(id, patch) => {
+              updateActivityLocal(id, patch as Partial<Activity>);
+              setDiaryList((prev) => prev ? prev.map((a) => a.id === id ? { ...a, ...patch } : a) : prev);
+            }}
+            onUploadPhoto={uploadPhoto}
+          />
+        )}
+
+        {/* Crop positioner — shown right after a cover photo upload finishes. */}
+        {positioningPhoto && (
+          <PhotoPositioner
+            photoUrl={positioningPhoto.url}
+            onCancel={async () => {
+              const { activityId, previousUrl, previousFocalX, previousFocalY } = positioningPhoto;
+              setPositioningPhoto(null);
+              setAllActivities(prev => prev.map(a =>
+                a.id === activityId ? { ...a, photo_url: previousUrl, photo_focal_x: previousFocalX, photo_focal_y: previousFocalY } : a
+              ));
+              setDiaryList(prev => prev ? prev.map(a =>
+                a.id === activityId ? { ...a, photo_url: previousUrl, photo_focal_x: previousFocalX, photo_focal_y: previousFocalY } : a
+              ) : prev);
+              await supabase.from('activities').update({ photo_url: previousUrl, photo_focal_x: previousFocalX, photo_focal_y: previousFocalY }).eq('id', activityId);
+            }}
+            onConfirm={async (x, y) => {
+              const { activityId } = positioningPhoto;
+              setPositioningPhoto(null);
+              setAllActivities(prev => prev.map(a =>
+                a.id === activityId ? { ...a, photo_focal_x: x, photo_focal_y: y } : a
+              ));
+              setDiaryList(prev => prev ? prev.map(a =>
+                a.id === activityId ? { ...a, photo_focal_x: x, photo_focal_y: y } : a
+              ) : prev);
+              await supabase.from('activities').update({ photo_focal_x: x, photo_focal_y: y }).eq('id', activityId);
+            }}
+          />
+        )}
       </SafeAreaView>
     </View>
   );
@@ -1034,6 +2181,12 @@ export default function MyActivitiesScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: RivalColors.surfaceLow },
   scrim: { position: 'fixed' as any, top: 0, left: 0, right: 0, height: '100vh' as any, backgroundColor: 'rgba(14,14,14,0.55)' },
+  // Solid backing behind just the top nav strip on mobile — see the comment
+  // where this is rendered. Matches home.tsx's mobile flat-background color
+  // (#131313) so the nav reads the same on both screens.
+  // 62 = the nav bar's own rendered height (rowNarrow padding 14*2 + ~34 of
+  // content) — sized to just the bar, not the content below it.
+  navBacking: { position: 'fixed' as any, top: 0, left: 0, right: 0, height: 62, backgroundColor: '#131313', zIndex: 50 },
   container: { flex: 1 },
   content: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 100, maxWidth: 900, width: '100%', alignSelf: 'center' },
 
@@ -1073,7 +2226,8 @@ const styles = StyleSheet.create({
   monthlyPbEmpty: { fontSize: 12, color: RivalColors.textSecondary, lineHeight: 17 },
   monthlyPbScroll: { maxHeight: 168 },
   monthlyPbList: { gap: 12 },
-  monthlyPbEntry: { borderLeftWidth: 2, borderLeftColor: `${RivalColors.rankAnchors.unrivaled}55`, paddingLeft: 10, gap: 1 },
+  monthlyPbRow: { flexDirection: 'row', gap: 12 },
+  monthlyPbEntry: { borderLeftWidth: 2, borderLeftColor: `${RivalColors.rankAnchors.unrivaled}55`, paddingLeft: 10, gap: 1, minWidth: 100 },
   monthlyPbName: { fontSize: 11, fontWeight: '600', letterSpacing: 0.8, color: RivalColors.textSecondary, textTransform: 'uppercase' },
   monthlyPbValueRow: { flexDirection: 'row', alignItems: 'baseline', gap: 5 },
   monthlyPbValue: { fontSize: 28, fontWeight: '800', color: RivalColors.textPrimary, lineHeight: 32 },
@@ -1086,15 +2240,37 @@ const styles = StyleSheet.create({
   toolbarBtnWrap: { position: 'relative' },
   toolbarBtn: { width: 34, height: 34, borderRadius: RivalRadius.DEFAULT, backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: RivalColors.surfaceContainerHigh, alignItems: 'center', justifyContent: 'center' },
   toolbarBtnActive: { backgroundColor: `${RivalColors.accentFill}1a`, borderColor: RivalColors.accentFill },
+  // Mobile Activity Journal's own toolbar button — same as toolbarBtn but no
+  // border, kept separate so desktop's toolbar (which shares toolbarBtn) is
+  // untouched.
+  jToolbarBtn: { width: 34, height: 34, borderRadius: RivalRadius.DEFAULT, backgroundColor: 'rgba(255,255,255,0.04)', alignItems: 'center', justifyContent: 'center' },
+  recapCornerBtnRow: { position: 'absolute', right: 10, bottom: 10, flexDirection: 'row', gap: 6 },
+  recapFilterBtn: {
+    width: 26, height: 26, borderRadius: RivalRadius.sm,
+    backgroundColor: 'rgba(255,255,255,0.04)', alignItems: 'center', justifyContent: 'center',
+  },
   toolbarTooltip: { position: 'absolute', bottom: '100%', right: 0, marginBottom: 6, backgroundColor: RivalColors.surfaceContainerHighest, borderRadius: RivalRadius.sm, paddingHorizontal: 8, paddingVertical: 5, zIndex: 10 },
   toolbarTooltipText: { fontSize: 11, fontWeight: '600', color: RivalColors.textPrimary },
 
   filterBar: { marginBottom: 8 },
+  // Pulls the filter bar flush against the stat card's bottom edge instead of
+  // sitting a full container `gap` below it (Mobile Activity Journal only).
+  // Two variants because the two container gaps differ: jWeekPage's `gap: 14`
+  // (Weekly pager) vs jContent's `gap: 18` (Rows/Month).
+  filterBarTight: { marginTop: -14 },
+  filterBarTightWide: { marginTop: -14 },
   activeFiltersRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
   activeFilterChip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: `${RivalColors.accentFill}1a`, borderWidth: 1, borderColor: RivalColors.accentFill, borderRadius: RivalRadius.full, paddingVertical: 6, paddingHorizontal: 10 },
   activeFilterChipText: { fontSize: 12, fontWeight: '700', color: RivalColors.accentText },
+  typeFilterLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase', color: RivalColors.textSecondary, marginBottom: 6 },
   typeFilterRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
-  typeFilterChip: { backgroundColor: RivalColors.surfaceLowest, borderRadius: RivalRadius.sm, paddingVertical: 6, paddingHorizontal: 10, borderWidth: 1, borderColor: RivalColors.surfaceContainerHigh },
+  // Matches the hero/card family's warm dark tone (#211c19, same as jCard)
+  // rather than the harsher neutral surfaceLowest grey.
+  // Matches the hero card's own warm brown fill (recapCard's #2d241f), not
+  // the darker near-black #211c19 other small chips (jCard) use — the first
+  // pass here was still reading too close to black against this screen's
+  // brighter background.
+  typeFilterChip: { backgroundColor: '#2d241f', borderRadius: RivalRadius.sm, paddingVertical: 6, paddingHorizontal: 10, borderWidth: 1, borderColor: 'rgba(255,181,158,0.14)' },
   typeFilterChipActive: { backgroundColor: `${RivalColors.accentFill}1a`, borderColor: RivalColors.accentFill },
   typeFilterChipText: { fontSize: 11, fontWeight: '600', color: RivalColors.textSecondary },
   typeFilterChipTextActive: { color: RivalColors.accentText },
@@ -1135,6 +2311,11 @@ const styles = StyleSheet.create({
 
   bestBadge: { flexDirection: 'row', alignSelf: 'flex-start', alignItems: 'center', gap: 4, backgroundColor: `${RivalColors.rankAnchors.unrivaled}22`, paddingHorizontal: 8, paddingVertical: 3, borderRadius: RivalRadius.sm },
   bestBadgeText: { fontSize: 11, fontWeight: '700', color: RivalColors.rankAnchors.unrivaled },
+  // Race badge — a checkered-flag red kept deliberately distinct from the PB
+  // gold above (not added to rivalTheme.ts; that file is only for confirmed
+  // DESIGN.md tokens, see its header comment).
+  raceBadge: { flexDirection: 'row', alignSelf: 'flex-start', alignItems: 'center', gap: 4, backgroundColor: '#ff5c5c22', paddingHorizontal: 8, paddingVertical: 3, borderRadius: RivalRadius.sm },
+  raceBadgeText: { fontSize: 11, fontWeight: '700', color: '#ff5c5c' },
 
   // Compact pills that hug their content — no more stretched tiles with dead space.
   // Stat mini-cards stacked on the left, Effort badge prominent on the right.
@@ -1188,5 +2369,205 @@ const styles = StyleSheet.create({
   // instead of staying put. Same fix as RivalTopNav's bottom tab bar.
   fab: { position: 'fixed' as any, bottom: 28, right: 24, flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 14, paddingHorizontal: 20, borderRadius: RivalRadius.full, backgroundColor: RivalColors.accentFill, shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 6, zIndex: 150 },
   fabText: { fontSize: 15, fontWeight: '700', color: RivalColors.onAccentFill },
-});
 
+  // ===== Mobile Activity Journal (ported from the Claude mockup) =====
+  // Full-screen weekly pager — see the render-site comment for how RNW's
+  // `pagingEnabled` gives CSS scroll-snap for free. `flex: 1` gives this
+  // ScrollView a definite bounded height (rest of the screen below the top
+  // nav), which is what makes `pagerHeight` from its onLayout meaningful and
+  // lets each week page's explicit pixel height actually take effect.
+  jPager: { flex: 1 },
+  jWeekPage: { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 14, gap: 14 },
+  jGridContent: { marginTop: 4, paddingBottom: 32, gap: 10 },
+  // justifyContent centers items on a wrap-line that doesn't fill the row —
+  // the flexGrow:1 photo cards still stretch to consume any leftover space
+  // on their own lines, so this only visibly centers the narrower, non-growing
+  // jAddCard when it lands alone on the last line.
+  jGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'center' },
+  jSwipeHint: { alignItems: 'center', paddingTop: 4, opacity: 0.6 },
+  jYearComingSoon: { alignItems: 'center', gap: 10, paddingTop: 80, paddingHorizontal: 24 },
+  jYearComingSoonTitle: { fontFamily: 'Georgia, "Times New Roman", serif', fontStyle: 'italic', fontWeight: '700', fontSize: 19, color: RivalColors.textPrimary, marginTop: 4 },
+  jYearComingSoonBody: { fontSize: 13, color: RivalColors.textSecondary, textAlign: 'center', lineHeight: 19 },
+  jTitleBlock: { alignSelf: 'center', marginTop: 16, marginBottom: 16, paddingVertical: 8, paddingHorizontal: 20, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.12)', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.12)' },
+  jTitle: { fontFamily: 'Georgia, "Times New Roman", serif', fontStyle: 'italic', fontWeight: '500', fontSize: 17, color: 'rgba(255,255,255,0.75)', textAlign: 'center' },
+  jSubtitle: { fontSize: 11, color: 'rgba(255,255,255,0.32)', textAlign: 'center', marginTop: 2 },
+  jToolbarRow: { flexDirection: 'row', gap: 6, alignSelf: 'center' },
+
+  // 3-way layout switch (Rows / Weekly / Month).
+  // marginTop pulls it up against the stat card (or its filter bar, when
+  // shown) instead of sitting a full container `gap` below — same trick as
+  // filterBarTight.
+  jLayoutToggleRow: { flexDirection: 'row', justifyContent: 'center', paddingTop: 12, paddingBottom: 4, marginTop: -10 },
+  // Sits directly below the stat card — cancels the container's own `gap`
+  // (jWeekPage:14 vs jContent:18) so it hugs the card instead of floating a
+  // full gap below it, same technique as filterBarTight/filterBarTightWide.
+  jLayoutToggleRowTight: { marginTop: -18 },
+  jLayoutToggleRowTightWide: { marginTop: -18 },
+  jLayoutToggle: { flexDirection: 'row', backgroundColor: 'rgba(45,36,31,0.75)', borderWidth: 1, borderColor: 'rgba(255,181,158,0.14)', borderRadius: 12, padding: 3, gap: 2 },
+  jLayoutToggleItem: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 6, paddingHorizontal: 10, borderRadius: 9 },
+  jLayoutToggleItemActive: { backgroundColor: 'rgba(255,181,158,0.12)' },
+  jLayoutToggleLabel: { fontSize: 10, fontWeight: '700', color: RivalColors.textSecondary },
+  jLayoutToggleLabelActive: { color: RivalColors.accentText },
+
+  // Rows layout — continuous vertical scroll, hero once at top, each week's
+  // cards in their own horizontally-scrolling row.
+  // Same paddingTop/gap as jWeekPage (Weekly layout's container) — Rows and
+  // Month used to use a slightly larger gap (18 vs 14), which visibly shifted
+  // the stat card's position when toggling between layouts.
+  jContent: { paddingTop: 14, paddingBottom: 100, gap: 14, paddingHorizontal: 16 },
+  jWeeksContainer: { gap: 22 },
+  jWeekBlock: { gap: 10 },
+  jActivityRow: { gap: 12, paddingRight: 4 },
+  jCard: { width: 150, aspectRatio: 3 / 4, borderRadius: 20, overflow: 'hidden', backgroundColor: '#211c19', position: 'relative' },
+
+  // Month layout — swipeable calendar grid.
+  jMonthPageFallback: { width: '100%' },
+  // Swipe affordance for the month pager — a tap target is also just more
+  // discoverable than a bare swipe gesture on its own. Aligned with the
+  // month title row (jMonthCard's border + jMonthHeader's paddingTop + half
+  // the title's line height), not vertically centered on the whole card —
+  // reads as calendar nav (‹ July 2026 ›) instead of floating mid-grid.
+  jMonthChevron: {
+    position: 'absolute', top: 13, width: 30, height: 30, borderRadius: 15,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(19,19,19,0.55)', borderWidth: 1, borderColor: '#323232',
+  },
+  jMonthChevronLeft: { left: 6 },
+  jMonthChevronRight: { right: 6 },
+  jMonthCard: {
+    borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255,181,158,0.14)',
+    borderBottomWidth: 2, borderBottomColor: RivalColors.accentFill,
+    backgroundColor: '#2d241f', paddingBottom: 10, overflow: 'hidden',
+    ...(Platform.OS === 'web' ? {
+      backgroundImage: 'linear-gradient(135deg, rgba(45,36,31,0.88) 0%, rgba(59,40,33,0.88) 100%)',
+    } as any : {}),
+  },
+  jMonthHeader: { alignItems: 'center', paddingTop: 16, paddingBottom: 10, paddingHorizontal: 16 },
+  jMonthTitle: { fontFamily: 'Georgia, "Times New Roman", serif', fontStyle: 'italic', fontWeight: '600', fontSize: 20, color: 'rgba(255,255,255,0.92)' },
+  // A plain border can't fade, so this is a separate bar with a transparent-
+  // to-color-to-transparent gradient (web) — tapers to a point at each tip
+  // instead of the hard-cut edge a borderBottomWidth would give.
+  jMonthTitleUnderline: {
+    width: 190, height: 1.5, marginTop: 7, marginBottom: 4,
+    ...(Platform.OS === 'web' ? {
+      backgroundImage: 'linear-gradient(90deg, rgba(217,119,87,0) 0%, rgba(217,119,87,0.8) 50%, rgba(217,119,87,0) 100%)',
+    } as any : { backgroundColor: 'rgba(217,119,87,0.8)' }),
+  },
+  jDowRow: { flexDirection: 'row', paddingHorizontal: 12, marginBottom: 6 },
+  jDow: { flex: 1, textAlign: 'center', fontSize: 9, fontWeight: '800', letterSpacing: 0.4, color: 'rgba(255,255,255,0.3)' },
+  jCalGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 12, gap: 6 },
+  jCalCellEmpty: { width: '13%', aspectRatio: 3 / 4 },
+  jCalCellRest: { width: '13%', aspectRatio: 3 / 4, borderRadius: 9, borderWidth: 2, borderColor: 'transparent', alignItems: 'center', justifyContent: 'center', backgroundColor: '#211b18' },
+  // Plain dark cell, no dashed outline — dashes read as an empty form field
+  // to fill in, which fights the "dead" feeling rather than fixing it.
+  jCalCellFuture: { width: '13%', aspectRatio: 3 / 4, borderRadius: 9, backgroundColor: '#2a2320', alignItems: 'center', justifyContent: 'center' },
+  jCalCellActive: { width: '13%', aspectRatio: 3 / 4, borderRadius: 9, borderWidth: 2, borderColor: 'transparent', alignItems: 'center', justifyContent: 'center', backgroundColor: '#3b2f27', overflow: 'hidden' },
+  jCalCellPb: { borderColor: RivalColors.rankAnchors.unrivaled },
+  jCalCellRace: { borderColor: '#ff5c5c' },
+  jCalCellPhoto: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%' },
+  // Reserved space above the day number — see the comment at its call sites.
+  jCalIconSlot: { height: 22, alignItems: 'center', justifyContent: 'center' },
+  jCalDaynum: { fontSize: 12, fontWeight: '800', color: RivalColors.accentText, opacity: 0.35 },
+  jCalDaynumFuture: { fontSize: 12, fontWeight: '800', color: 'rgba(255,255,255,0.28)' },
+  jCalDaynumActive: { fontSize: 12, fontWeight: '800', color: 'rgba(255,255,255,0.85)' },
+  jCalDaynumPhoto: { fontSize: 12, fontWeight: '800', color: '#fff', textShadowColor: 'rgba(0,0,0,0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
+  jCalLegend: { flexDirection: 'row', justifyContent: 'center', gap: 16, paddingTop: 14 },
+  jCalLegendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  jCalLegendSwatch: { width: 11, height: 11, borderRadius: 3, backgroundColor: '#3b2f27' },
+  jCalLegendSwatchPb: { backgroundColor: RivalColors.rankAnchors.unrivaled },
+  jCalLegendSwatchRace: { backgroundColor: '#ff5c5c' },
+  jCalLegendText: { fontFamily: 'Georgia, "Times New Roman", serif', fontStyle: 'italic', fontSize: 11, fontWeight: '500', color: RivalColors.textSecondary },
+
+  // Hero recap card — matches mockup .recap-card exactly.
+  recapCard: {
+    marginTop: -10,
+    borderRadius: 12, paddingTop: 13, paddingHorizontal: 15, paddingBottom: 15,
+    borderWidth: 1, borderColor: 'rgba(255,181,158,0.14)',
+    borderLeftWidth: 3, borderLeftColor: RivalColors.accentFill,
+    borderRightWidth: 3, borderRightColor: RivalColors.accentFill,
+    backgroundColor: '#2d241f',
+    ...(Platform.OS === 'web' ? {
+      backgroundImage: 'radial-gradient(circle at -10% -15%, rgba(255,209,190,0.14) 0%, rgba(255,209,190,0) 70%), linear-gradient(135deg, #231e1b 0%, #2d241f 55%, #3b2821 100%)',
+    } as any : {}),
+    gap: 9,
+  },
+  // Collapsed, the card is just the title row — tighter padding reads as a
+  // sleek pill instead of a mostly-empty full-size card.
+  recapCardCollapsed: { paddingTop: 8, paddingHorizontal: 12, paddingBottom: 8 },
+  recapTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  recapTitle: { fontFamily: 'Georgia, "Times New Roman", serif', fontStyle: 'italic', fontWeight: '500', fontSize: 20, color: RivalColors.textPrimary },
+  recapEffortInline: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  recapEffortNumCol: { alignItems: 'flex-end' },
+  recapEffortNum: { fontSize: 19, fontWeight: '600', color: RivalColors.textPrimary },
+  recapEffortLabel: { fontFamily: 'Georgia, "Times New Roman", serif', fontStyle: 'italic', fontWeight: '700', fontSize: 10, letterSpacing: 0.4, color: RivalColors.textPrimary, textTransform: 'uppercase' },
+  recapChevronOpen: { transform: [{ rotate: '180deg' }] },
+  recapStatgrid: { flexDirection: 'row', backgroundColor: 'rgba(19,19,19,0.55)', borderWidth: 1, borderColor: '#323232', borderRadius: 12, paddingVertical: 13, paddingHorizontal: 3 },
+  recapStatcell: { flex: 1, alignItems: 'center', gap: 6, paddingHorizontal: 3 },
+  recapStatcellDivider: { borderLeftWidth: 1, borderLeftColor: 'rgba(50,50,50,0.6)' },
+  recapStatValue: { fontSize: 20, fontWeight: '700', color: RivalColors.textPrimary, lineHeight: 20 },
+  recapStatUnit: { fontSize: 10, fontWeight: '700', color: RivalColors.textSecondary, marginLeft: 2 },
+  recapStatTitle: { fontSize: 9, fontWeight: '600', letterSpacing: 0.6, textTransform: 'uppercase', color: RivalColors.textSecondary },
+  recapQuote: { fontSize: 11, fontStyle: 'italic', fontWeight: '700', color: RivalColors.accentText, paddingTop: 7, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)' },
+
+  // Momentum strip (streak/delta) — not in the mockup, kept so real signal isn't lost.
+  momentumRow: { flexDirection: 'row', gap: 8, marginTop: -4 },
+  momentumChip: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  momentumChipText: { fontSize: 11, fontStyle: 'italic', color: RivalColors.textSecondary },
+
+  jWeekDateRange: { fontSize: 11, fontWeight: '600', color: RivalColors.textSecondary },
+
+  // Bigger 2-up grid tile (was a fixed 132×192 horizontal-scroll tile) — each
+  // takes roughly half the row width and keeps the mockup's 3:4 aspect ratio,
+  // so photos stand out more in the extra space the full-screen week frees up.
+  // flexGrow:0 keeps every card at a uniform 48% width — a lone odd card on
+  // the last line used to flexGrow:1 and stretch to fill the row, which read
+  // as inconsistent card sizing (and threw off jAddCard sharing that line).
+  jGridCard: { flexBasis: '48%', flexGrow: 0, flexShrink: 0, minWidth: 140, aspectRatio: 3 / 4, borderRadius: 20, overflow: 'hidden', backgroundColor: '#211c19', position: 'relative' },
+  // Occupies a full grid column (matches jGridCard's flexBasis) so the
+  // narrower jAddCard centers within whichever column the wrap naturally
+  // puts it in, instead of hugging the left edge of a shared row.
+  jAddCardSlot: { flexBasis: '48%', flexGrow: 0, flexShrink: 0, minWidth: 140, alignItems: 'center', justifyContent: 'center' },
+  // Empty-week state (no activities logged yet this week) — a comparison
+  // card in place of the bare grid, so Monday reads as a scoreboard rather
+  // than a broken page.
+  jWeekEmptyWrap: { alignItems: 'center', paddingTop: 8 },
+  jWeekEmptyCard: {
+    width: '100%', borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.04)',
+    paddingVertical: 22, paddingHorizontal: 20, alignItems: 'center', gap: 6, marginBottom: 4,
+  },
+  jWeekEmptyTitle: { fontFamily: 'Georgia, "Times New Roman", serif', fontStyle: 'italic', fontSize: 16, color: 'rgba(255,255,255,0.75)', marginTop: 2 },
+  jWeekEmptySub: { fontSize: 12, color: RivalColors.textSecondary, textAlign: 'center' },
+  // width is relative to the slot now (was flexBasis relative to the grid) —
+  // 81% preserves the same visual size as before (38.88% of the old 48% grid
+  // column). Height unchanged.
+  jAddCard: {
+    width: '81%', minWidth: 113, aspectRatio: 2.7 / 2.4948, borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 24,
+  },
+  // Same serif family/italic as jCardName ("Swim"/"Ride" titles), but kept
+  // at the original size/weight — just the font, not the bold treatment.
+  jAddCardText: { fontFamily: 'Georgia, "Times New Roman", serif', fontStyle: 'italic', fontWeight: '500', fontSize: 15, letterSpacing: 0.3, color: 'rgba(255,255,255,0.6)' },
+  jCardPhoto: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%' },
+  jCardArt: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#2d241f',
+    ...(Platform.OS === 'web' ? {
+      backgroundImage: 'radial-gradient(ellipse 90% 60% at 50% 40%, rgba(255,209,190,0.10) 0%, rgba(19,19,19,0) 65%), linear-gradient(160deg, #231e1b 0%, #2d241f 55%, #3b2821 100%)',
+    } as any : {}),
+  },
+  jCardScrim: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    ...(Platform.OS === 'web' ? { backgroundImage: 'linear-gradient(180deg, rgba(0,0,0,0) 42%, rgba(8,8,8,0.88) 100%)' } as any : { backgroundColor: 'rgba(8,8,8,0.35)' }),
+  },
+  jCardDayBadge: { position: 'absolute', top: 10, left: 0, right: 0, alignItems: 'center' },
+  jCardDayText: { fontFamily: 'Georgia, "Times New Roman", serif', fontStyle: 'italic', fontWeight: '500', fontSize: 13, color: 'rgba(255,255,255,0.75)' },
+  jCardBody: { position: 'absolute', left: 12, right: 12, bottom: 12, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 6 },
+  jCardName: { fontFamily: 'Georgia, "Times New Roman", serif', fontStyle: 'italic', fontWeight: '800', fontSize: 16, letterSpacing: 0.3, color: '#fff', lineHeight: 19 },
+  jCardStat: { fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.65)', marginTop: 2 },
+  jCardEffort: { alignItems: 'center', gap: 1 },
+  jCardEffortNum: { fontSize: 13, fontWeight: '700', color: 'rgba(255,255,255,0.65)', lineHeight: 13 },
+  jCardEffortLabel: { fontSize: 7, fontWeight: '800', letterSpacing: 0.3, textTransform: 'uppercase', color: 'rgba(255,255,255,0.65)', opacity: 0.85 },
+  jCardPin: { position: 'absolute', top: 10, right: 10, zIndex: 4 },
+  jCardRing: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderWidth: 2.5, borderRadius: 20 },
+});
