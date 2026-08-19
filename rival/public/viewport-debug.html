@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>RIVAL viewport debug</title>
+<style>
+  :root { color-scheme: dark; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background:#0e0e0e; color:#eee;
+    font:13px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
+    /* deliberately NOT height-clamped: this page is a plain flowing
+       document, exactly like the reference site that renders correctly. */
+    min-height: 100vh;
+    padding: env(safe-area-inset-top) 12px env(safe-area-inset-bottom);
+  }
+  h1 { font-size:14px; color:#D97757; letter-spacing:2px; padding:14px 0 8px; }
+  table { width:100%; border-collapse:collapse; }
+  td { padding:3px 4px; border-bottom:1px solid #1e1e1e; vertical-align:top; }
+  td:first-child { color:#888; white-space:nowrap; padding-right:10px; }
+  td:last-child { text-align:right; color:#fff; font-weight:600; }
+  .sect { color:#F5B759; padding:14px 4px 4px; font-size:11px; letter-spacing:1.5px; }
+  /* Probes: elements sized in each viewport unit, measured via JS. */
+  .probe { position:absolute; visibility:hidden; width:1px; top:0; left:0; }
+  #pvh{height:100vh} #psvh{height:100svh} #plvh{height:100lvh} #pdvh{height:100dvh}
+  /* A fixed full-screen outline so you can SEE where 100vh actually lands. */
+  #edge {
+    position:fixed; inset:0; height:100vh;
+    border:2px solid rgba(217,119,87,.55); pointer-events:none; z-index:9;
+  }
+  #foot { padding:20px 0 40px; color:#666; }
+  .hl { color:#7ee787; }
+  .bad { color:#ff7b72; }
+</style>
+</head>
+<body>
+<div id="edge"></div>
+<div class="probe" id="pvh"></div><div class="probe" id="psvh"></div>
+<div class="probe" id="plvh"></div><div class="probe" id="pdvh"></div>
+
+<h1>RIVAL — VIEWPORT GROUND TRUTH</h1>
+<div class="sect">LIVE (updates on scroll/resize)</div>
+<table id="live"></table>
+<div class="sect">VIEWPORT UNITS (computed px)</div>
+<table id="units"></table>
+<div class="sect">SAFE AREA INSETS</div>
+<table id="safe"></table>
+<div class="sect">ENVIRONMENT</div>
+<table id="env"></table>
+<div id="foot">
+  The orange outline is exactly 100vh.<br>
+  Scroll this page and watch whether the numbers change —<br>
+  that tells us if the URL bar collapses on document scroll.<br><br>
+  Scroll down for the spacer test &darr;
+</div>
+<div style="height:150vh;background:linear-gradient(#141414,#0e0e0e);border-top:1px solid #333;padding:20px 0">
+  <div style="color:#666">spacer — keep scrolling</div>
+</div>
+<div style="padding:20px 0 60px;color:#F5B759">
+  BOTTOM OF DOCUMENT. If you can read this line clearly and it is not hidden
+  behind the URL bar, natural document scrolling reaches the true bottom.
+</div>
+
+<script>
+function px(el){ return el ? el.getBoundingClientRect().height.toFixed(1) : 'n/a'; }
+function rows(tbl, data){
+  document.getElementById(tbl).innerHTML = data
+    .map(function(r){ return '<tr><td>'+r[0]+'</td><td>'+r[1]+'</td></tr>'; }).join('');
+}
+function readInset(name){
+  var d = document.createElement('div');
+  d.style.cssText = 'position:fixed;height:env(safe-area-inset-'+name+');';
+  document.body.appendChild(d);
+  var v = getComputedStyle(d).height;
+  d.remove();
+  return v;
+}
+function update(){
+  var vv = window.visualViewport;
+  rows('live', [
+    ['window.innerHeight', window.innerHeight],
+    ['window.innerWidth', window.innerWidth],
+    ['visualViewport.height', vv ? vv.height.toFixed(1) : 'unsupported'],
+    ['visualViewport.offsetTop', vv ? vv.offsetTop.toFixed(1) : '-'],
+    ['visualViewport.scale', vv ? vv.scale : '-'],
+    ['chrome gap (inner - vv)', vv ? '<span class="'+((window.innerHeight-vv.height)>1?'bad':'hl')+'">'
+        + (window.innerHeight - vv.height).toFixed(1) + '</span>' : '-'],
+    ['document.scrollTop', (document.scrollingElement||document.documentElement).scrollTop.toFixed(1)],
+    ['body.scrollHeight', document.body.scrollHeight],
+  ]);
+  rows('units', [
+    ['100vh', px(document.getElementById('pvh'))],
+    ['100svh (small)', px(document.getElementById('psvh'))],
+    ['100lvh (large)', px(document.getElementById('plvh'))],
+    ['100dvh (dynamic)', px(document.getElementById('pdvh'))],
+    ['screen.height', screen.height],
+    ['devicePixelRatio', devicePixelRatio],
+  ]);
+  rows('safe', [
+    ['inset-top', readInset('top')],
+    ['inset-bottom', readInset('bottom')],
+    ['inset-left', readInset('left')],
+    ['inset-right', readInset('right')],
+  ]);
+  var standalone = (window.navigator.standalone === true) ||
+    (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+  rows('env', [
+    ['standalone (home screen)', '<span class="'+(standalone?'hl':'')+'">'+standalone+'</span>'],
+    ['orientation', (screen.orientation && screen.orientation.type) || 'n/a'],
+    ['UA', '<span style="font-size:10px;word-break:break-all">'+navigator.userAgent+'</span>'],
+  ]);
+}
+update();
+addEventListener('resize', update);
+addEventListener('scroll', update, true);
+if (window.visualViewport){
+  visualViewport.addEventListener('resize', update);
+  visualViewport.addEventListener('scroll', update);
+}
+setInterval(update, 500);
+</script>
+</body>
+</html>
