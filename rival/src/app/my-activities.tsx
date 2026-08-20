@@ -3,6 +3,7 @@ import { StyleSheet, TouchableOpacity, View, Text, TextInput, ScrollView, Image,
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { supabase } from '../lib/supabase';
+import { notify } from '../lib/notify';
 import { formatDuration, formatDurationClock } from '../lib/format';
 import { calculateStreak } from '../lib/streak';
 import { displayToIsoDate, isoToDisplayDate } from '../lib/dateFormat';
@@ -540,7 +541,8 @@ export default function MyActivitiesScreen() {
         // shown — the crop/photo appeared not to "swap." Focal point resets
         // to center since it was measured against the old image.
         if (firstNewPhotoUrl) {
-          await supabase.from('activities').update({ photo_url: firstNewPhotoUrl, photo_focal_x: null, photo_focal_y: null }).eq('id', activityId);
+          const { error: photoErr } = await supabase.from('activities').update({ photo_url: firstNewPhotoUrl, photo_focal_x: null, photo_focal_y: null }).eq('id', activityId);
+          if (photoErr) notify("Couldn't set that as the cover photo", photoErr.message);
           setAllActivities(prev => prev.map(a =>
             a.id === activityId ? { ...a, photo_url: firstNewPhotoUrl!, photo_focal_x: null, photo_focal_y: null } : a
           ));
@@ -2165,7 +2167,8 @@ export default function MyActivitiesScreen() {
               setDiaryList(prev => prev ? prev.map(a =>
                 a.id === activityId ? { ...a, photo_url: previousUrl, photo_focal_x: previousFocalX, photo_focal_y: previousFocalY } : a
               ) : prev);
-              await supabase.from('activities').update({ photo_url: previousUrl, photo_focal_x: previousFocalX, photo_focal_y: previousFocalY }).eq('id', activityId);
+              const { error: revertErr } = await supabase.from('activities').update({ photo_url: previousUrl, photo_focal_x: previousFocalX, photo_focal_y: previousFocalY }).eq('id', activityId);
+              if (revertErr) notify("Couldn't undo that photo change", revertErr.message);
             }}
             onConfirm={async (x, y) => {
               const { activityId } = positioningPhoto;
@@ -2176,7 +2179,8 @@ export default function MyActivitiesScreen() {
               setDiaryList(prev => prev ? prev.map(a =>
                 a.id === activityId ? { ...a, photo_focal_x: x, photo_focal_y: y } : a
               ) : prev);
-              await supabase.from('activities').update({ photo_focal_x: x, photo_focal_y: y }).eq('id', activityId);
+              const { error: focalErr } = await supabase.from('activities').update({ photo_focal_x: x, photo_focal_y: y }).eq('id', activityId);
+              if (focalErr) notify("Couldn't save the photo position", focalErr.message);
             }}
           />
         )}

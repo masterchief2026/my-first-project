@@ -23,6 +23,7 @@ import { Image, ImageBackground, Platform, ScrollView, StyleSheet, Text, TextInp
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { supabase } from '../lib/supabase';
+import { notify } from '../lib/notify';
 import { formatDisplayName, formatTeamName } from '../lib/identity';
 import { formatDuration } from '../lib/format';
 import { computeActivityInsight, ActivityInsight, InsightActivity, InsightTone } from '../lib/activityInsights';
@@ -429,13 +430,15 @@ export default function TeamHub() {
     const key = boardTargetKey(postId);
     const existing = (boardReactionsMap[key] || []).find(r => r.user_id === currentUserId);
     if (existing) {
-      await supabase.from('feed_reactions').delete().eq('target_type', 'board').eq('target_id', postId).eq('user_id', currentUserId);
+      const { error } = await supabase.from('feed_reactions').delete().eq('target_type', 'board').eq('target_id', postId).eq('user_id', currentUserId);
+      if (error) return;
       setBoardReactionsMap(prev => ({ ...prev, [key]: (prev[key] || []).filter(r => r.user_id !== currentUserId) }));
     } else {
-      await supabase.from('feed_reactions').upsert(
+      const { error } = await supabase.from('feed_reactions').upsert(
         { league_id: id, target_type: 'board', target_id: postId, user_id: currentUserId, emoji: 'like' },
         { onConflict: 'target_type,target_id,user_id' }
       );
+      if (error) return;
       setBoardReactionsMap(prev => ({ ...prev, [key]: [...(prev[key] || []).filter(r => r.user_id !== currentUserId), { user_id: currentUserId, emoji: 'like' }] }));
     }
   }
@@ -454,10 +457,15 @@ export default function TeamHub() {
     const text = (boardCommentDrafts[key] || '').trim();
     if (!text) return;
     setBoardCommentDrafts(prev => ({ ...prev, [key]: '' }));
-    const { data: inserted } = await supabase.from('feed_comments')
+    const { data: inserted, error: cErr } = await supabase.from('feed_comments')
       .insert({ league_id: id, target_type: 'board', target_id: postId, user_id: currentUserId, body: text })
       .select('id, user_id, body, created_at')
       .single();
+    if (cErr) {
+      setBoardCommentDrafts(prev => ({ ...prev, [key]: text }));
+      notify("Couldn't post that comment", cErr.message);
+      return;
+    }
     if (inserted) setBoardCommentsMap(prev => ({ ...prev, [key]: [...(prev[key] || []), inserted] }));
   }
 

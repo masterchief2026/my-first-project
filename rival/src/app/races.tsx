@@ -3,6 +3,7 @@ import { StyleSheet, TouchableOpacity, View, Text, ScrollView, TextInput, Modal,
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { supabase } from '../lib/supabase';
+import { notify } from '../lib/notify';
 import { formatDisplayName } from '../lib/identity';
 import { isoToDisplayDate, displayToIsoDate } from '../lib/dateFormat';
 import { formatGoalTimeMask } from '../lib/format';
@@ -274,9 +275,11 @@ export default function RacesScreen() {
   async function toggleInterest(race: Race) {
     if (race.user_id === userId) return;
     if (race.i_am_interested) {
-      await supabase.from('race_interests').delete().eq('race_id', race.id).eq('user_id', userId);
+      const { error } = await supabase.from('race_interests').delete().eq('race_id', race.id).eq('user_id', userId);
+      if (error) notify("Couldn't update your interest", error.message);
     } else {
-      await supabase.from('race_interests').insert({ race_id: race.id, user_id: userId });
+      const { error } = await supabase.from('race_interests').insert({ race_id: race.id, user_id: userId });
+      if (error) notify("Couldn't update your interest", error.message);
     }
     load();
   }
@@ -293,13 +296,25 @@ export default function RacesScreen() {
       goal_finish_time: goalFinishTime.trim() || null,
     };
     if (editingRace) {
-      await supabase.from('races').update(payload).eq('id', editingRace.id);
+      const { error: updErr } = await supabase.from('races').update(payload).eq('id', editingRace.id);
+      if (updErr) {
+        // Clear the spinner and leave the modal open with their input intact,
+        // rather than returning past setSaving(false) below.
+        setSaving(false);
+        notify("Couldn't save that race", updErr.message);
+        return;
+      }
     } else {
-      const { data: newRace } = await supabase
+      const { data: newRace, error: newErr } = await supabase
         .from('races')
         .insert({ ...payload, user_id: userId, is_public: true })
         .select('id')
         .single();
+      if (newErr) {
+        setSaving(false);
+        notify("Couldn't add that race", newErr.message);
+        return;
+      }
       if (newRace) notifyLeagueMatesOfNewRace(newRace.id);
     }
     setSaving(false);
@@ -358,14 +373,23 @@ export default function RacesScreen() {
 
   async function deleteRace(id: string) {
     if (typeof window !== 'undefined' && !window.confirm('Delete this race?')) return;
-    await supabase.from('races').delete().eq('id', id);
+    const { error } = await supabase.from('races').delete().eq('id', id);
+    if (error) {
+      notify("Couldn't delete that race", error.message);
+      return;
+    }
     setRaces((prev) => prev.filter((r) => r.id !== id));
   }
 
   async function saveActualFinishTime() {
     if (!finishModalRace || !actualFinishInput.trim()) return;
     setSavingFinish(true);
-    await supabase.from('races').update({ actual_finish_time: actualFinishInput.trim() }).eq('id', finishModalRace.id);
+    const { error } = await supabase.from('races').update({ actual_finish_time: actualFinishInput.trim() }).eq('id', finishModalRace.id);
+    if (error) {
+      setSavingFinish(false);
+      notify("Couldn't save your finish time", error.message);
+      return;
+    }
     setSavingFinish(false);
     setFinishModalRace(null);
     setActualFinishInput('');

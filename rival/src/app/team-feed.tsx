@@ -5,6 +5,7 @@ import { useWindowDimensions } from 'react-native';
 import { useFocusEffect, router } from 'expo-router';
 import { Asset } from 'expo-asset';
 import { supabase } from '../lib/supabase';
+import { notify } from '../lib/notify';
 import { formatDisplayName, formatTeamName } from '../lib/identity';
 import { formatDuration } from '../lib/format';
 import { computeActivityInsight, ActivityInsight, InsightActivity, InsightTone } from '../lib/activityInsights';
@@ -328,13 +329,17 @@ export default function TeamFeedScreen() {
     const key = feedTargetKey(targetType, targetId);
     const existing = (reactionsMap[key] || []).find((r) => r.user_id === currentUserId);
     if (existing?.emoji === emoji) {
-      await supabase.from('feed_reactions').delete().eq('target_type', targetType).eq('target_id', targetId).eq('user_id', currentUserId);
+      const { error } = await supabase.from('feed_reactions').delete().eq('target_type', targetType).eq('target_id', targetId).eq('user_id', currentUserId);
+      // A rejected tap on a reaction isn't worth a dialog, but the UI must not
+      // keep asserting a state the server refused.
+      if (error) return;
       setReactionsMap((prev) => ({ ...prev, [key]: (prev[key] || []).filter((r) => r.user_id !== currentUserId) }));
     } else {
-      await supabase.from('feed_reactions').upsert(
+      const { error } = await supabase.from('feed_reactions').upsert(
         { league_id: teamId, target_type: targetType, target_id: targetId, user_id: currentUserId, emoji },
         { onConflict: 'target_type,target_id,user_id' },
       );
+      if (error) return;
       setReactionsMap((prev) => ({
         ...prev,
         [key]: [...(prev[key] || []).filter((r) => r.user_id !== currentUserId), { user_id: currentUserId, emoji }],
@@ -357,10 +362,17 @@ export default function TeamFeedScreen() {
     if (!text) return;
 
     setCommentDrafts((prev) => ({ ...prev, [key]: '' }));
-    const { data: inserted } = await supabase.from('feed_comments')
+    const { data: inserted, error: cErr } = await supabase.from('feed_comments')
       .insert({ league_id: teamId, target_type: targetType, target_id: targetId, user_id: currentUserId, body: text })
       .select('id, user_id, body, created_at')
       .single();
+    if (cErr) {
+      // The draft was cleared optimistically — hand the text back rather than
+      // losing a comment they just wrote.
+      setCommentDrafts((prev) => ({ ...prev, [key]: text }));
+      notify("Couldn't post that comment", cErr.message);
+      return;
+    }
     if (inserted) {
       setCommentsMap((prev) => ({ ...prev, [key]: [...(prev[key] || []), inserted] }));
     }
