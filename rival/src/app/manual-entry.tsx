@@ -289,7 +289,15 @@ export default function ManualEntryScreen() {
         activityId = editId as string;
         // Re-sync the PR tracker's lift rows with whatever's now in the form
         // — simplest correct approach is drop-and-reinsert rather than diffing.
-        await supabase.from('exercise_entries').delete().eq('activity_id', activityId);
+        // If the old rows can't be cleared, re-inserting below would DOUBLE the
+        // athlete's lifts for this workout and corrupt their PR history, so stop
+        // rather than press on.
+        const { error: clearErr } = await supabase.from('exercise_entries').delete().eq('activity_id', activityId);
+        if (clearErr) {
+          setErrorMsg(`Couldn't update your lifts: ${clearErr.message}`);
+          setSaving(false);
+          return;
+        }
       } else {
         const { data: inserted, error } = await supabase
           .from('activities')
@@ -337,7 +345,11 @@ export default function ManualEntryScreen() {
         }))
         .filter((e) => !!e.weight_kg && !!e.exercise_name);
       if (liftEntries.length > 0) {
-        await supabase.from('exercise_entries').insert(liftEntries);
+        const { error: liftErr } = await supabase.from('exercise_entries').insert(liftEntries);
+        // The activity itself is already saved, so this is reported rather than
+        // fatal -- but silently dropping the lifts would leave the PR tracker
+        // quietly wrong.
+        if (liftErr) setErrorMsg(`Workout saved, but the lifts didn't attach: ${liftErr.message}`);
       }
 
       // Upload media, set the first photo as the activity's cover.
@@ -350,11 +362,13 @@ export default function ManualEntryScreen() {
           .upload(path, item.blob, { contentType: item.mimeType, upsert: true });
         if (storageErr) { console.error('Media upload failed:', storageErr.message); continue; }
         const { data: urlData } = supabase.storage.from('activity-photos').getPublicUrl(path);
-        await supabase.from('activity_media').insert({ activity_id: activityId, media_url: urlData.publicUrl, media_type: item.type });
+        const { error: mediaErr } = await supabase.from('activity_media').insert({ activity_id: activityId, media_url: urlData.publicUrl, media_type: item.type });
+        if (mediaErr) { console.error('Media row insert failed:', mediaErr.message); continue; }
         if (item.type === 'photo' && !firstPhotoUrl) firstPhotoUrl = urlData.publicUrl;
       }
       if (firstPhotoUrl) {
-        await supabase.from('activities').update({ photo_url: firstPhotoUrl }).eq('id', activityId);
+        const { error: coverErr } = await supabase.from('activities').update({ photo_url: firstPhotoUrl }).eq('id', activityId);
+        if (coverErr) setErrorMsg(`Workout saved, but the cover photo didn't set: ${coverErr.message}`);
       }
 
       // Milestones are earned off total hours — recheck fire-and-forget.

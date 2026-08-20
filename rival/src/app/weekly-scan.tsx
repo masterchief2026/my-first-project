@@ -219,7 +219,10 @@ export default function WeeklyScanScreen() {
             performed_at: day.date.toISOString(),
           }));
         if (liftEntries.length > 0) {
-          await supabase.from('exercise_entries').insert(liftEntries);
+          // The activity row is already in; dropping the lifts silently would
+          // leave the PR tracker quietly short.
+          const { error: liftErr } = await supabase.from('exercise_entries').insert(liftEntries);
+          if (liftErr) setErrorMsg(`Saved, but the lifts didn't attach: ${liftErr.message}`);
         }
 
         setResults((prev) => prev!.map((r, ri) => ri === i ? {
@@ -245,7 +248,12 @@ export default function WeeklyScanScreen() {
     const trimmed = editingName.trim();
     if (!trimmed) { setEditingIndex(null); return; }
 
-    await supabase.from('activities').update({ name: trimmed, name_locked: true }).eq('id', result.activityId);
+    const { error: nameErr } = await supabase.from('activities').update({ name: trimmed, name_locked: true }).eq('id', result.activityId);
+    if (nameErr) {
+      setErrorMsg(`Couldn't rename that workout: ${nameErr.message}`);
+      setEditingIndex(null);
+      return;
+    }
     setResults((prev) => prev!.map((r, ri) => ri === index ? { ...r, name: trimmed } : r));
     setEditingIndex(null);
   }
@@ -335,16 +343,18 @@ export default function WeeklyScanScreen() {
 
         const { data: urlData } = supabase.storage.from('activity-photos').getPublicUrl(path);
 
-        await supabase.from('activity_media').insert({
+        const { error: mediaErr } = await supabase.from('activity_media').insert({
           activity_id: activityId,
           media_url: urlData.publicUrl,
           media_type: item.mediaType,
         });
+        if (mediaErr) { setErrorMsg(`A photo didn't attach: ${mediaErr.message}`); continue; }
 
         if (item.mediaType === 'photo') {
           photoCount++;
           if (existing === 0 && photoCount === 1) {
-            await supabase.from('activities').update({ photo_url: urlData.publicUrl }).eq('id', activityId);
+            const { error: coverErr } = await supabase.from('activities').update({ photo_url: urlData.publicUrl }).eq('id', activityId);
+            if (coverErr) setErrorMsg(`Cover photo didn't set: ${coverErr.message}`);
           }
         } else {
           videoCount++;
