@@ -684,15 +684,19 @@ export default function HomeScreen() {
       weekEnd.setHours(23, 59, 59, 999);
       const daysRemaining = Math.max(0, Math.ceil((weekEnd.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
 
+      // Batched, not per-league. This used to run TWO awaited queries inside a
+      // loop over every team — activities, then profiles — so an athlete in
+      // four teams waited on eight sequential round trips before Today could
+      // render. Effort for the week is per-user and independent of team, so it
+      // can all be fetched once and grouped in memory; the teams only decide
+      // WHICH users appear in each list.
+      // allMemberIds is already in scope above — every member across every team.
       const leaders: WeeklyLeader[] = [];
-      for (const league of leagueListWithCounts) {
-        const leagueMemberIds = memberIdsByLeague[league.id] || [];
-        if (leagueMemberIds.length === 0) continue;
-
+      if (allMemberIds.length > 0) {
         const { data: weekActivities } = await supabase
           .from('activities')
           .select('user_id, effort_score')
-          .in('user_id', leagueMemberIds)
+          .in('user_id', allMemberIds)
           .gte('started_at', weekStart.toISOString());
 
         const pointsByUser: Record<string, number> = {};
@@ -700,39 +704,44 @@ export default function HomeScreen() {
           pointsByUser[a.user_id] = (pointsByUser[a.user_id] || 0) + (a.effort_score || 0);
         });
 
-        // Full ranked list (not just the podium) — the viewer's own rank
-        // might be 4th+, and the card still needs to tell that story.
-        const rankedIds = Object.keys(pointsByUser)
-          .filter((id) => pointsByUser[id] > 0)
-          .sort((a, b) => pointsByUser[b] - pointsByUser[a]);
-        if (rankedIds.length === 0) continue;
+        // Work out every ranked athlete across every team first, so their
+        // profiles come back in a single request too.
+        const rankedByLeague: Record<string, string[]> = {};
+        const everyRankedId = new Set<string>();
+        for (const league of leagueListWithCounts) {
+          const ids = (memberIdsByLeague[league.id] || [])
+            .filter((id) => (pointsByUser[id] || 0) > 0)
+            .sort((a, b) => pointsByUser[b] - pointsByUser[a]);
+          if (ids.length === 0) continue;
+          rankedByLeague[league.id] = ids;
+          ids.forEach((id) => everyRankedId.add(id));
+        }
 
-        const { data: profiles } = await supabase
-          .from('users')
-          .select('id, display_name, avatar_url, email')
-          .in('id', rankedIds);
         const profileById: Record<string, any> = {};
-        (profiles || []).forEach((p: any) => { profileById[p.id] = p; });
+        if (everyRankedId.size > 0) {
+          const { data: profiles } = await supabase
+            .from('users')
+            .select('id, display_name, avatar_url, email')
+            .in('id', Array.from(everyRankedId));
+          (profiles || []).forEach((p: any) => { profileById[p.id] = p; });
+        }
 
-        // First name + last initial always, regardless of the user's
-        // chosen display style (e.g. username_only) — a leaderboard reads
-        // better with names than handles, unlike league.tsx's member list
-        // which respects that preference.
-        const standings: WeeklyLeaderEntry[] = rankedIds.map((id) => ({
-          userId: id,
-          name: weeklyLeaderName(profileById[id]),
-          avatarUrl: profileById[id]?.avatar_url || null,
-          points: Math.round(pointsByUser[id]),
-          isSelf: id === uId,
-        }));
-
-        // TEMP DEBUG — injects a fake 3rd teammate into the REAL standings
-        // (Ricky's real account only has 2) purely so the 3-column podium
-        // can be previewed on his own logged-in device. Revert this block.
-        const previewStandings = standings.length === 2
-          ? [...standings, { userId: 'debug-3rd', name: 'Jordan', avatarUrl: null, points: Math.max(1, Math.round(standings[1].points * 0.8)), isSelf: false }]
-          : standings;
-        leaders.push({ leagueId: league.id, teamName: formatTeamName(league.name), daysRemaining, standings: previewStandings });
+        for (const league of leagueListWithCounts) {
+          const rankedIds = rankedByLeague[league.id];
+          if (!rankedIds) continue;
+          // First name + last initial always, regardless of the user's chosen
+          // display style (e.g. username_only) — a leaderboard reads better
+          // with names than handles, unlike league.tsx's member list which
+          // respects that preference.
+          const standings: WeeklyLeaderEntry[] = rankedIds.map((id) => ({
+            userId: id,
+            name: weeklyLeaderName(profileById[id]),
+            avatarUrl: profileById[id]?.avatar_url || null,
+            points: Math.round(pointsByUser[id]),
+            isSelf: id === uId,
+          }));
+          leaders.push({ leagueId: league.id, teamName: formatTeamName(league.name), daysRemaining, standings });
+        }
       }
       setWeeklyLeaders(leaders);
     } else {
