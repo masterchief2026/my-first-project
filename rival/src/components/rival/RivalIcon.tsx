@@ -31,6 +31,8 @@ const ICONS = {
   edit: 'edit',
   more: 'more-vert',
   close: 'close',
+  eye: 'visibility',
+  eyeOff: 'visibility-off',
   add: 'add',
   check: 'check',
   refresh: 'refresh',

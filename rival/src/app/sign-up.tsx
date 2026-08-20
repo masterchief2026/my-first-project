@@ -1,8 +1,11 @@
 import { useState } from 'react';
-import { StyleSheet, TouchableOpacity, View, Text, TextInput } from 'react-native';
+import { StyleSheet, TouchableOpacity, View, Text, TextInput, Platform, Image as RNImage } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { Asset } from 'expo-asset';
 import { supabase } from '../lib/supabase';
+import { RivalButton, RivalIcon } from '../components/rival';
+import { RivalColors, RivalRadius, RivalType } from '../constants/rivalTheme';
 
 export default function SignUpScreen() {
   const [displayName, setDisplayName] = useState('');
@@ -38,186 +41,213 @@ export default function SignUpScreen() {
     router.replace('/home');
   }
 
+  // Same treatment as sign-in: react-native-web's ImageBackground paints its
+  // image on an inner div that hardcodes centred positioning, so a focal point
+  // passed via imageStyle is silently ignored. A real DOM <img> with
+  // object-position behaves correctly; native falls back to <Image>.
+  const bgUri = Platform.OS === 'web'
+    ? Asset.fromModule(require('../../assets/images/backgrounds/optimized/a-small-group-of-diverse-athletes-2.jpg')).uri
+    : undefined;
+
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
+    <View style={styles.bg}>
+      {Platform.OS === 'web' ? (
+        // @ts-ignore — intentional escape hatch to a real DOM element; RN Web's renderer is react-dom
+        <img
+          src={bgUri}
+          style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: '50% center', display: 'block' }}
+        />
+      ) : (
+        <RNImage
+          source={require('../../assets/images/backgrounds/optimized/a-small-group-of-diverse-athletes-2.jpg')}
+          style={StyleSheet.absoluteFill}
+          resizeMode="cover"
+        />
+      )}
+      <View style={styles.scrim} />
 
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Text style={styles.back}>← Back</Text>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.content}>
+
+          <TouchableOpacity style={styles.back} onPress={() => router.back()}>
+            <Text style={styles.backText}>← Back</Text>
           </TouchableOpacity>
-          <Text style={styles.title}>Create Account</Text>
-          <Text style={styles.subtitle}>Join RIVAL and start competing</Text>
-        </View>
 
-        <View style={styles.form}>
-          {error ? (
-            <View style={styles.errorBox}>
-              <Text style={styles.errorText}>{error}</Text>
-            </View>
-          ) : null}
+          <Text style={styles.logo}>RIVAL</Text>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Display Name</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="How friends will see you"
-              placeholderTextColor="#6b7280"
-              value={displayName}
-              onChangeText={setDisplayName}
-              autoCapitalize="words"
-            />
-          </View>
+          <View style={styles.card}>
+            <Text style={styles.title}>Create Account</Text>
+            <Text style={styles.subtitle}>Join RIVAL and start competing</Text>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Email</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="your@email.com"
-              placeholderTextColor="#6b7280"
-              value={email}
-              onChangeText={setEmail}
-              autoCapitalize="none"
-              keyboardType="email-address"
-            />
-          </View>
+            {error ? (
+              <View style={styles.errorBox}>
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            ) : null}
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Password</Text>
-            <View style={styles.passwordRow}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Display Name</Text>
               <TextInput
-                style={styles.passwordInput}
-                placeholder="Min 6 characters"
-                placeholderTextColor="#6b7280"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry={!showPassword}
+                style={styles.input}
+                placeholder="How friends will see you"
+                placeholderTextColor={RivalColors.textSecondary}
+                value={displayName}
+                onChangeText={setDisplayName}
+                autoCapitalize="words"
               />
-              <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeButton}>
-                <Text style={styles.eyeText}>{showPassword ? '🙈' : '👁️'}</Text>
-              </TouchableOpacity>
             </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Email</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="your@email.com"
+                placeholderTextColor={RivalColors.textSecondary}
+                value={email}
+                onChangeText={setEmail}
+                autoCapitalize="none"
+                keyboardType="email-address"
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Password</Text>
+              <View style={styles.passwordRow}>
+                <TextInput
+                  style={styles.passwordInput}
+                  placeholder="Min 6 characters"
+                  placeholderTextColor={RivalColors.textSecondary}
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry={!showPassword}
+                />
+                <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeButton}>
+                  <RivalIcon name={showPassword ? 'eyeOff' : 'eye'} size={20} color={RivalColors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <RivalButton
+              label={loading ? 'Creating account...' : 'Create Account'}
+              onPress={handleSignUp}
+              disabled={loading}
+              style={styles.submitBtn}
+            />
+
+            <TouchableOpacity onPress={() => router.push('/sign-in')}>
+              <Text style={styles.link}>Already have an account? Sign in</Text>
+            </TouchableOpacity>
           </View>
 
-          <TouchableOpacity
-            style={[styles.primaryButton, loading && styles.disabled]}
-            onPress={handleSignUp}
-            disabled={loading}
-          >
-            <Text style={styles.primaryButtonText}>
-              {loading ? 'Creating account...' : 'Create Account'}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity onPress={() => router.push('/sign-in')}>
-            <Text style={styles.link}>Already have an account? Sign in</Text>
-          </TouchableOpacity>
         </View>
-
-      </View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 }
 
+// Deliberately mirrors sign-in.tsx. The two screens sit either side of one
+// decision, and sign-up had never been brought onto Refined Ember — it was
+// still flat #111111 with the pre-Ember magenta and lime, so creating an
+// account looked like a different product from signing in to one.
 const styles = StyleSheet.create({
+  bg: {
+    flex: 1,
+    position: 'relative',
+    backgroundColor: RivalColors.surfaceLowest,
+  },
+  scrim: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(14,14,14,0.35)',
+  },
   container: {
     flex: 1,
-    backgroundColor: '#111111',
   },
   content: {
     flex: 1,
     paddingHorizontal: 24,
     paddingTop: 16,
-  },
-  header: {
-    marginBottom: 40,
-    gap: 8,
+    justifyContent: 'center',
   },
   back: {
-    color: '#E91E8C',
+    position: 'absolute',
+    top: 16,
+    left: 24,
+  },
+  backText: {
+    color: RivalColors.textPrimary,
     fontSize: 16,
-    marginBottom: 16,
+  },
+  logo: {
+    ...RivalType.titleMd,
+    color: RivalColors.textPrimary,
+    letterSpacing: 6,
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  card: {
+    backgroundColor: 'rgba(19,19,19,0.75)',
+    borderRadius: RivalRadius.lg,
+    padding: 24,
+    gap: 16,
   },
   title: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: '#FFFFFF',
+    ...RivalType.headlineLgMobile,
+    color: RivalColors.textPrimary,
+    textTransform: 'uppercase',
   },
   subtitle: {
-    fontSize: 16,
-    color: '#999999',
-  },
-  form: {
-    gap: 20,
+    ...RivalType.bodyMd,
+    color: RivalColors.textSecondary,
+    marginTop: -8,
   },
   errorBox: {
-    backgroundColor: '#450a0a',
-    borderRadius: 8,
+    backgroundColor: RivalColors.errorContainer,
+    borderRadius: RivalRadius.DEFAULT,
     padding: 12,
-    borderWidth: 1,
-    borderColor: '#dc2626',
   },
   errorText: {
-    color: '#fca5a5',
+    color: RivalColors.error,
     fontSize: 14,
   },
   inputGroup: {
     gap: 8,
   },
   label: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
+    ...RivalType.labelCaps,
+    fontSize: 12,
+    color: RivalColors.onSurfaceVariant,
   },
   input: {
-    backgroundColor: '#111111',
-    borderRadius: 12,
+    backgroundColor: RivalColors.surfaceBright,
+    borderRadius: RivalRadius.DEFAULT,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    color: '#FFFFFF',
+    color: RivalColors.textPrimary,
     fontSize: 16,
-    borderWidth: 1,
-    borderColor: '#8DC63F',
   },
   passwordRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#111111',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#8DC63F',
+    backgroundColor: RivalColors.surfaceBright,
+    borderRadius: RivalRadius.DEFAULT,
   },
   passwordInput: {
     flex: 1,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    color: '#FFFFFF',
+    color: RivalColors.textPrimary,
     fontSize: 16,
   },
   eyeButton: {
     paddingHorizontal: 14,
-    paddingVertical: 14,
+    paddingVertical: 12,
   },
-  eyeText: {
-    fontSize: 18,
-  },
-  primaryButton: {
-    backgroundColor: '#E91E8C',
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: 'center',
+  submitBtn: {
     marginTop: 8,
   },
-  disabled: {
-    opacity: 0.6,
-  },
-  primaryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '700',
-  },
   link: {
-    color: '#999999',
+    color: RivalColors.textSecondary,
     fontSize: 14,
     textAlign: 'center',
   },
