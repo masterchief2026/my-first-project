@@ -12,7 +12,7 @@ import { getLevel } from '../lib/xp';
 import { computeGoalProgress, goalUnit, GoalRow } from '../lib/goalProgress';
 import { formatTeamName } from '../lib/identity';
 import { RivalButton, RivalCard, RivalProgressBar, RivalIcon, RivalTopNav } from '../components/rival';
-import { RivalColors, RivalRadius, RivalType, RivalFontFamily } from '../constants/rivalTheme';
+import { RivalColors, RivalRadius, RivalType, RivalFontFamily, RivalSerifFamily } from '../constants/rivalTheme';
 import { BREAKPOINT_WIDE_LAYOUT } from '../constants/breakpoints';
 
 type League = { id: string; name: string; invite_code: string; logo_url: string | null; recentCount?: number };
@@ -1848,10 +1848,17 @@ const styles = StyleSheet.create({
       : { backgroundColor: 'rgba(217,119,87,0.08)' }),
   },
   mFocusKicker: { ...RivalType.labelCaps, fontSize: 11, letterSpacing: 2, color: 'rgba(255,181,158,0.65)' },
-  mFocusTitle: { ...RivalType.bodyMd, fontSize: 15, color: RivalColors.textPrimary, marginTop: 6, marginBottom: 24 },
+  mFocusTitle: { ...RivalType.bodyMd, fontFamily: RivalSerifFamily, fontStyle: 'italic', fontWeight: '700', fontSize: 17, color: RivalColors.textPrimary, marginTop: 6, marginBottom: 24 },
   mFocusHeroRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginBottom: 4 },
+  // Display numbers use the editorial serif the app already speaks on Team Feed
+  // and Team Hub (Ricky's call, 2026-08-20, from design-preview-today-type).
+  // Selective by design: the number and the card title only -- kickers, units,
+  // labels and body text stay Manrope, so this reads as an accent rather than a
+  // change of typeface. Weight drops to 700 because Georgia has no 800 and
+  // rendered a synthetic bold; the tighter letter-spacing suited Manrope's
+  // geometry, not a serif's, so it goes too.
   mFocusHeroNumber: {
-    fontFamily: RivalFontFamily, fontSize: 44, fontWeight: '800', letterSpacing: -0.4, color: RivalColors.accentFill,
+    fontFamily: RivalSerifFamily, fontStyle: 'italic', fontSize: 46, fontWeight: '700', color: RivalColors.accentFill,
     ...(Platform.OS === 'web' ? {
       backgroundImage: 'linear-gradient(180deg, #FFFFFF 0%, #D97757 150%)',
       backgroundClip: 'text', WebkitBackgroundClip: 'text', color: 'transparent',
@@ -2061,7 +2068,7 @@ const styles = StyleSheet.create({
   mLegacyKicker: { ...RivalType.labelCaps, fontSize: 11, letterSpacing: 3, color: RivalColors.accentFill },
   mLegacySubtitle: { fontFamily: RivalFontFamily, fontSize: 13, color: RivalColors.textSecondary, marginTop: 4 },
   mLegacyHeroNumber: {
-    fontFamily: RivalFontFamily, fontSize: 44, fontWeight: '800', letterSpacing: -0.4, color: RivalColors.accentFill,
+    fontFamily: RivalSerifFamily, fontStyle: 'italic', fontSize: 46, fontWeight: '700', color: RivalColors.accentFill,
     ...(Platform.OS === 'web' ? {
       backgroundImage: 'linear-gradient(180deg, #FFFFFF 0%, #D97757 150%)',
       backgroundClip: 'text', WebkitBackgroundClip: 'text', color: 'transparent',
