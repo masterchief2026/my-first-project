@@ -41,9 +41,12 @@ export default function AchievementsScreen() {
     // Find newly earned ones not yet saved
     const toSave = calculated.filter((id) => !savedIds.has(id));
     if (toSave.length > 0) {
-      await supabase.from('user_achievements').insert(
+      // Auto-awarded while viewing; they'll be re-checked next visit, so this
+      // logs rather than interrupts.
+      const { error: awardErr } = await supabase.from('user_achievements').insert(
         toSave.map((achievement_id) => ({ user_id: user.id, achievement_id }))
       );
+      if (awardErr) console.error('Achievement award failed:', awardErr.message);
       setNewlyEarned(toSave);
     }
 

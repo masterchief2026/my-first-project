@@ -3,6 +3,7 @@ import { StyleSheet, TouchableOpacity, View, Text, TextInput, ScrollView, Activi
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { supabase } from '../lib/supabase';
+import { notify } from '../lib/notify';
 
 type ScoringRow = {
   activity_type: string;
@@ -104,7 +105,8 @@ export default function AdminScreen() {
   }
 
   async function deleteRow(type: string) {
-    await supabase.from('scoring_config').delete().eq('activity_type', type);
+    const { error } = await supabase.from('scoring_config').delete().eq('activity_type', type);
+    if (error) { notify("Couldn't reset that scoring rule", error.message); return; }
     setRows((prev) => prev.filter((r) => r.activity_type !== type));
   }
 

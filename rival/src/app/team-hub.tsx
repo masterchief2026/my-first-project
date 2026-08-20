@@ -439,6 +439,7 @@ export default function TeamHub() {
         { onConflict: 'target_type,target_id,user_id' }
       );
       if (error) return;
+      if (error) return;
       setBoardReactionsMap(prev => ({ ...prev, [key]: [...(prev[key] || []).filter(r => r.user_id !== currentUserId), { user_id: currentUserId, emoji: 'like' }] }));
     }
   }
@@ -512,10 +513,11 @@ export default function TeamHub() {
     const key = feedTargetKey(targetId);
     const existing = (reactionsMap[key] || []).find(r => r.user_id === currentUserId);
     if (existing && existing.emoji === emoji) {
-      await supabase.from('feed_reactions').delete().eq('target_type', 'activity').eq('target_id', targetId).eq('user_id', currentUserId);
+      const { error } = await supabase.from('feed_reactions').delete().eq('target_type', 'activity').eq('target_id', targetId).eq('user_id', currentUserId);
+      if (error) return;
       setReactionsMap(prev => ({ ...prev, [key]: (prev[key] || []).filter(r => r.user_id !== currentUserId) }));
     } else {
-      await supabase.from('feed_reactions').upsert(
+      const { error } = await supabase.from('feed_reactions').upsert(
         { league_id: id, target_type: 'activity', target_id: targetId, user_id: currentUserId, emoji },
         { onConflict: 'target_type,target_id,user_id' }
       );

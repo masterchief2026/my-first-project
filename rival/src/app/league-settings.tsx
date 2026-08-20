@@ -359,7 +359,13 @@ export default function LeagueSettingsScreen() {
               onPress={async () => {
                 const newVal = !isPrivate;
                 setIsPrivate(newVal);
-                await supabase.from('leagues').update({ is_private: newVal }).eq('id', id);
+                const { error } = await supabase.from('leagues').update({ is_private: newVal }).eq('id', id);
+                if (error) {
+                  // Put the switch back. Showing "Private" over a team that is
+                  // still discoverable is a privacy failure, not a cosmetic one.
+                  setIsPrivate(!newVal);
+                  notify("Couldn't change who can find this team", error.message);
+                }
               }}
             >
               <Text style={styles.visibilityToggleText}>{isPrivate ? 'Make Public' : 'Make Private'}</Text>

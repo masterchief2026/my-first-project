@@ -3,6 +3,7 @@ import { StyleSheet, TouchableOpacity, View, Text, ScrollView, TextInput, Modal,
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { supabase } from '../lib/supabase';
+import { notify } from '../lib/notify';
 import { CANONICAL_LIFTS, matchCanonicalLift } from './scan-workout';
 import { RivalIcon, RivalTopNav, RivalFixedBackground } from '../components/rival';
 import { RivalColors, RivalRadius, RivalType } from '../constants/rivalTheme';
@@ -90,7 +91,7 @@ export default function LiftsScreen() {
     if (!exerciseName || !weight || weight <= 0) return;
 
     setSaving(true);
-    await supabase.from('exercise_entries').insert({
+    const { error } = await supabase.from('exercise_entries').insert({
       user_id: user.id,
       exercise_name: exerciseName,
       weight_kg: weight,
@@ -98,6 +99,10 @@ export default function LiftsScreen() {
       performed_at: new Date().toISOString(),
     });
     setSaving(false);
+    if (error) {
+      notify("Couldn't log that lift", error.message);
+      return;
+    }
     if (exerciseName) setFocused(exerciseName);
     setLogModalFor(null);
     load();

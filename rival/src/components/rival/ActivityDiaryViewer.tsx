@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, PanResponder, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Image } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '../../lib/supabase';
+import { notify } from '../../lib/notify';
 import { formatDurationClock } from '../../lib/format';
 import { RivalColors, RivalRadius, RivalSerifFamily } from '../../constants/rivalTheme';
 import { RivalIcon, activityIconName } from './RivalIcon';
@@ -192,7 +193,11 @@ export function ActivityDiaryViewer({
     if (!activity) return;
     const next = !activity.pinned;
     onUpdate(activity.id, { pinned: next });
-    await supabase.from('activities').update({ pinned: next }).eq('id', activity.id);
+    const { error } = await supabase.from('activities').update({ pinned: next }).eq('id', activity.id);
+    if (error) {
+      onUpdate(activity.id, { pinned: !next });   // put it back
+      notify("Couldn't pin that activity", error.message);
+    }
   }
 
   function advance(dir: 1 | -1) {

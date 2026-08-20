@@ -1010,7 +1010,10 @@ export default function LeagueScreen() {
         const winnerId = !progress || progress.challenger === progress.opponent
           ? null
           : progress.challenger > progress.opponent ? c.challenger_id : c.opponent_id;
-        await supabase.from('league_challenges').update({ status: 'completed', winner_id: winnerId }).eq('id', c.id);
+        // Background sweep that settles finished challenges on load. Logs
+        // rather than interrupts: it retries on the next visit anyway.
+        const { error: doneErr } = await supabase.from('league_challenges').update({ status: 'completed', winner_id: winnerId }).eq('id', c.id);
+        if (doneErr) console.error('Challenge completion failed:', doneErr.message);
         setChallenges(prev => prev.map(x => x.id === c.id ? { ...x, status: 'completed', winner_id: winnerId } : x));
       }
     }
@@ -1113,7 +1116,10 @@ export default function LeagueScreen() {
         const p = map[c.id];
         const winnerId = !p || p.challenger === p.opponent ? null
           : p.challenger > p.opponent ? c.challenger_league_id : c.opponent_league_id;
-        await supabase.from('league_vs_league_challenges').update({ status: 'completed', winner_league_id: winnerId }).eq('id', c.id);
+        // Background sweep that settles finished challenges on load. Logs
+        // rather than interrupts: it retries on the next visit anyway.
+        const { error: doneErr } = await supabase.from('league_vs_league_challenges').update({ status: 'completed', winner_league_id: winnerId }).eq('id', c.id);
+        if (doneErr) console.error('Challenge completion failed:', doneErr.message);
         setLvlChallenges(prev => prev.map(x => x.id === c.id ? { ...x, status: 'completed', winner_league_id: winnerId } : x));
       }
     }
@@ -1200,7 +1206,10 @@ export default function LeagueScreen() {
       notify("Couldn't post session", error?.message || 'Please try again.');
       return;
     }
-    await supabase.from('league_session_rsvps').insert({ message_id: inserted.id, user_id: currentUserId });
+    // Auto-RSVP the creator to their own session. Non-fatal: the session
+    // exists, they can tap to join like anyone else.
+    const { error: selfRsvpErr } = await supabase.from('league_session_rsvps').insert({ message_id: inserted.id, user_id: currentUserId });
+    if (selfRsvpErr) console.error('Creator auto-RSVP failed:', selfRsvpErr.message);
     setShowSessionComposer(false);
     setSessionLocation('');
     setSessionNote('');
@@ -1227,7 +1236,10 @@ export default function LeagueScreen() {
     }
 
     if (inserted) {
-      await supabase.from('league_session_rsvps').insert({ message_id: inserted.id, user_id: currentUserId });
+      // Auto-RSVP the creator to their own session. Non-fatal: the session
+    // exists, they can tap to join like anyone else.
+    const { error: selfRsvpErr } = await supabase.from('league_session_rsvps').insert({ message_id: inserted.id, user_id: currentUserId });
+    if (selfRsvpErr) console.error('Creator auto-RSVP failed:', selfRsvpErr.message);
 
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {

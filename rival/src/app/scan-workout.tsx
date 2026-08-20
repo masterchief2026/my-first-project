@@ -776,11 +776,12 @@ export default function ScanWorkoutScreen() {
 
         const { data: urlData } = supabase.storage.from('activity-photos').getPublicUrl(path);
 
-        await supabase.from('activity_media').insert({
+        const { error: mediaErr } = await supabase.from('activity_media').insert({
           activity_id: activityId,
           media_url: urlData.publicUrl,
           media_type: item.type,
         });
+        if (mediaErr) { console.error('Media row insert failed:', mediaErr.message); continue; }
 
         if (item.type === 'photo' && !firstPhotoUrl) {
           firstPhotoUrl = urlData.publicUrl;
