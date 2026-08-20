@@ -88,23 +88,44 @@ export default function PlanScreen() {
 
     // League standings
     const leagueMemberships = (membershipsRes.data || []).map((m: any) => m.leagues).filter(Boolean);
-    const leagueStandings: LeagueStanding[] = await Promise.all(
-      leagueMemberships.map(async (league: any) => {
-        const { data: membersData } = await supabase
-          .from('league_members').select('user_id, users(display_name, email, username, display_style)').eq('league_id', league.id).eq('status', 'active');
+    // Two queries total, not one per league plus one per member of every
+    // league. This was nested fan-out: four teams of fifteen meant sixty-one
+    // requests before the plan could render.
+    const leagueIds = leagueMemberships.map((l: any) => l.id);
+    let leagueStandings: LeagueStanding[] = [];
 
-        const members = await Promise.all(
-          (membersData || []).map(async (m: any) => {
-            const { data: acts } = await supabase
-              .from('activities').select('effort_score')
-              .eq('user_id', m.user_id)
-              .gte('started_at', weekStart.toISOString())
-              .lt('started_at', weekEnd.toISOString());
-            const score = (acts || []).reduce((s, a) => s + (a.effort_score || 0), 0);
-            const name = formatDisplayName(m.users);
-            return { user_id: m.user_id, name, score: Math.round(score * 10) / 10 };
-          })
-        );
+    if (leagueIds.length > 0) {
+      const { data: allMembers } = await supabase
+        .from('league_members')
+        .select('league_id, user_id, users(display_name, email, username, display_style)')
+        .in('league_id', leagueIds)
+        .eq('status', 'active');
+
+      const everyMemberId = Array.from(new Set((allMembers || []).map((m: any) => m.user_id)));
+      const { data: acts } = everyMemberId.length
+        ? await supabase
+            .from('activities').select('user_id, effort_score')
+            .in('user_id', everyMemberId)
+            .gte('started_at', weekStart.toISOString())
+            .lt('started_at', weekEnd.toISOString())
+        : { data: [] as any[] };
+
+      const scoreByUser: Record<string, number> = {};
+      (acts || []).forEach((a: any) => {
+        scoreByUser[a.user_id] = (scoreByUser[a.user_id] || 0) + (a.effort_score || 0);
+      });
+
+      const membersByLeague: Record<string, any[]> = {};
+      (allMembers || []).forEach((m: any) => {
+        (membersByLeague[m.league_id] ||= []).push(m);
+      });
+
+      leagueStandings = leagueMemberships.map((league: any) => {
+        const members = (membersByLeague[league.id] || []).map((m: any) => ({
+          user_id: m.user_id,
+          name: formatDisplayName(m.users),
+          score: Math.round((scoreByUser[m.user_id] || 0) * 10) / 10,
+        }));
 
         const sorted = [...members].sort((a, b) => b.score - a.score);
         const currentRank = sorted.findIndex((m) => m.user_id === user.id) + 1;
@@ -119,8 +140,8 @@ export default function PlanScreen() {
           myProjectedScore: myScore,
           members: sorted,
         };
-      })
-    );
+      });
+    }
 
     setLeagues(leagueStandings);
     setLoading(false);
