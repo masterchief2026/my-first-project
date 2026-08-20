@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { StyleSheet, TouchableOpacity, View, Text, ScrollView, Image, Platform, ActivityIndicator, TextInput, Alert } from 'react-native';
+import { StyleSheet, TouchableOpacity, View, Text, ScrollView, Image, Platform, ActivityIndicator, TextInput } from 'react-native';
+import { notify } from '../lib/notify';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
@@ -387,7 +388,7 @@ export default function WeeklyScanScreen() {
                   <View key={i} style={[styles.dayCard, hasPhotos && styles.dayCardActive, isFuture && styles.dayCardDisabled]}>
                     <TouchableOpacity
                       onPress={() => isFuture
-                        ? Alert.alert("Can't log a future workout", "You can only log activities for today or earlier — come back once you've actually done it!")
+                        ? notify("Can't log a future workout", "You can only log activities for today or earlier — come back once you've actually done it!")
                         : pickPhotosForDay(i)}
                       style={styles.dayCardTouchable}
                     >

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { StyleSheet, TouchableOpacity, View, Text, TextInput, ScrollView, Alert, Image, Platform } from 'react-native';
+import { StyleSheet, TouchableOpacity, View, Text, TextInput, ScrollView, Image, Platform } from 'react-native';
+import { notify } from '../lib/notify';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { supabase } from '../lib/supabase';
@@ -118,7 +119,7 @@ export default function LeagueSettingsScreen() {
     if (approve) {
       const { error } = await supabase.from('league_members').update({ status: 'active' }).eq('league_id', id).eq('user_id', userId);
       if (error) {
-        Alert.alert("Couldn't approve", error.message);
+        notify("Couldn't approve", error.message);
         setRespondingTo(null);
         return;
       }
@@ -127,7 +128,7 @@ export default function LeagueSettingsScreen() {
     } else {
       const { error } = await supabase.from('league_members').delete().eq('league_id', id).eq('user_id', userId);
       if (error) {
-        Alert.alert("Couldn't decline", error.message);
+        notify("Couldn't decline", error.message);
         setRespondingTo(null);
         return;
       }
@@ -204,7 +205,7 @@ export default function LeagueSettingsScreen() {
       .eq('user_id', userId);
 
     if (error) {
-      Alert.alert("Couldn't remove member", error.message);
+      notify("Couldn't remove member", error.message);
       return;
     }
     setMembers((prev) => prev.filter((m) => m.user_id !== userId));
@@ -219,7 +220,7 @@ export default function LeagueSettingsScreen() {
       .eq('user_id', userId);
 
     if (error) {
-      Alert.alert("Couldn't update role", error.message);
+      notify("Couldn't update role", error.message);
       return;
     }
     setMembers((prev) =>
