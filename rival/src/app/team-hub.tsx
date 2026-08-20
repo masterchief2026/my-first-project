@@ -51,7 +51,7 @@ function tintFor(name: string): { bg: string; color: string } {
 }
 
 const SERIF = 'Georgia, "Times New Roman", serif';
-const HERO_PHOTO = require('../../assets/images/backgrounds/optimized/coastal-highway-triathlete-dusk-3.png');
+const HERO_PHOTO = require('../../assets/images/backgrounds/optimized/coastal-highway-triathlete-dusk-3.jpg');
 
 // Swim/Rowing distances are shown in metres, not km — same convention as
 // my-activities.tsx's formatDistance/METERS_SPORTS.

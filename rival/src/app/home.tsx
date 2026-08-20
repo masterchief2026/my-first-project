@@ -840,7 +840,7 @@ export default function HomeScreen() {
                     so it never travels with the content — only the podium/
                     text pages across on top of this fixed backdrop. */}
                 <Image
-                  source={require('../../assets/images/backgrounds/optimized/podium-smoke.png')}
+                  source={require('../../assets/images/backgrounds/optimized/podium-smoke.jpg')}
                   style={styles.mPodiumSmoke}
                   resizeMode="cover"
                 />

@@ -48,7 +48,7 @@ function feedTargetKey(type: string, id: string) {
   return `${type}:${id}`;
 }
 
-const HERO_PHOTO = require('../../assets/images/backgrounds/optimized/team-feed-hero-dusk-ridge-2.png');
+const HERO_PHOTO = require('../../assets/images/backgrounds/optimized/team-feed-hero-dusk-ridge-2.jpg');
 
 // Same react-native-web workaround as team-hub.tsx's HeroPhoto — ImageBackground
 // hardcodes backgroundPosition/no gradients on the div that actually paints

@@ -211,7 +211,7 @@ function TeamChallengeRing({ pct, value, unit, size = 176, thickness = 13 }: { p
   );
 }
 
-const TEAM_CHALLENGE_PHOTO = require('../../assets/images/backgrounds/optimized/coastal-highway-triathlete-dusk-3.png');
+const TEAM_CHALLENGE_PHOTO = require('../../assets/images/backgrounds/optimized/coastal-highway-triathlete-dusk-3.jpg');
 
 // Same technique as RivalFixedBackground (see that file's comment for the
 // full explanation of why): react-native-web's ImageBackground hardcodes

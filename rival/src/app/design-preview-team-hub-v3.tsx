@@ -14,7 +14,7 @@ import { RivalAvatar } from '../components/rival/RivalAvatar';
 import { RivalIcon, RivalIconName } from '../components/rival/RivalIcon';
 import { RivalColors, RivalType } from '../constants/rivalTheme';
 
-const HERO_PHOTO = require('../../assets/images/backgrounds/optimized/coastal-highway-triathlete-dusk-3.png');
+const HERO_PHOTO = require('../../assets/images/backgrounds/optimized/coastal-highway-triathlete-dusk-3.jpg');
 
 // react-native-web's ImageBackground/Image hardcode `background-position:
 // center` on the inner layer that actually paints the photo — the `style`/

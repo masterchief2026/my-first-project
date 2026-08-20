@@ -1,3 +1,9 @@
+// The Manrope webfont lives here. It used to be imported only by
+// constants/theme.ts, a starter-template module whose consumers were deleted --
+// which silently dropped the stylesheet from the build entirely and fell every
+// heading back to the browser's default serif. Imported at the app root now, so
+// it cannot be orphaned by removing a screen again.
+import '../global.css';
 import { useEffect, useState } from 'react';
 import { Platform, View } from 'react-native';
 import { Stack } from 'expo-router';
