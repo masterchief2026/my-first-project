@@ -130,7 +130,12 @@ export function RivalTopNav({ active, centerSlot, hideBar }: { active?: Section;
     // icons/labels. Giving the clearance padding to the pill itself (as before)
     // stretched its own visible background/border down through that empty
     // space, reading as a tall bar with dead space inside it.
-    <View style={[styles.bottomNavOuter, { bottom: navBottomOffset, paddingBottom: insets.bottom + 6 } as any]}>
+    // paddingBottom is the home-indicator clearance. insets.bottom is 34pt on a
+    // notched iPhone, which floated the pill a visible 40pt off the bottom edge
+    // and read as dead space under the nav. The indicator itself only needs
+    // ~14pt to clear, so trim the inset rather than honouring it wholesale;
+    // browser tabs (insets.bottom === 0) keep the original small padding.
+    <View style={[styles.bottomNavOuter, { bottom: navBottomOffset, paddingBottom: insets.bottom > 0 ? Math.max(insets.bottom - 20, 8) : 6 } as any]}>
       <View style={[styles.bottomNav, navShrunk && styles.bottomNavShrunk]}>
         {LINKS.map((l) => {
           const isActive = active === l.key;
@@ -160,7 +165,14 @@ export function RivalTopNav({ active, centerSlot, hideBar }: { active?: Section;
   }
 
   return (
-    <View style={[styles.bar, narrow && styles.barNarrow]}>
+    // Screens wrap this in a SafeAreaView, which pads the whole app down past
+    // the status bar / Dynamic Island (59pt in standalone). That left the inset
+    // strip painting the bare page background ABOVE the nav, reading as dead
+    // space over the header. Pull the bar back up through that padding and add
+    // it back as internal padding instead, so the bar's own background runs
+    // edge-to-edge under the status bar while its content stays clear of it.
+    // insets.top is 0 in a browser tab, where this is a no-op.
+    <View style={[styles.bar, narrow && styles.barNarrow, insets.top > 0 && ({ marginTop: -insets.top, paddingTop: insets.top } as any)]}>
       <View style={[styles.row, narrow && styles.rowNarrow]}>
         <TouchableOpacity
           onPress={() => router.push('/home')}
@@ -396,8 +408,19 @@ const styles = StyleSheet.create({
   // with dead space inside it instead of a snug pill sitting above the clearance.
   bottomNavOuter: {
     position: 'fixed' as any,
-    left: 16, right: 16,
+    left: 0, right: 0,
     zIndex: 200,
+    paddingHorizontal: 16,
+    // The wrapper reserves the home-indicator clearance BELOW the pill. Left
+    // transparent (as it was), that strip is a window onto the scrolling
+    // content behind it: in standalone the wrapper is 96px tall on an iPhone
+    // 15 Pro, so the next row of cards shows through under the pill and reads
+    // as content sliced off at the bottom of the screen. Fading to the page
+    // colour closes that window without turning the floating pill back into a
+    // full-width bar -- content dissolves underneath it instead of being cut.
+    ...(Platform.OS === 'web'
+      ? { backgroundImage: 'linear-gradient(180deg, rgba(19,19,19,0) 0%, rgba(19,19,19,0.75) 38%, rgba(19,19,19,0.97) 70%, #131313 100%)' } as any
+      : {}),
   },
   bottomNav: {
     flexDirection: 'row', justifyContent: 'space-between',
