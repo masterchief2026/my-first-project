@@ -676,33 +676,46 @@ export default function LeagueScreen() {
     const { start, end } = getWeekWindow(offset);
     const { start: lastStart, end: lastEnd } = getWeekWindow(offset - 1);
 
-    const membersWithScores = await Promise.all(
-      membersData.map(async (m: any) => {
-        const [weekRes, prevRes, allRes] = await Promise.all([
-          supabase.from('activities').select('effort_score, duration_seconds').eq('user_id', m.user_id)
-            .gte('started_at', start.toISOString()).lt('started_at', end.toISOString()),
-          supabase.from('activities').select('effort_score').eq('user_id', m.user_id)
-            .gte('started_at', lastStart.toISOString()).lt('started_at', lastEnd.toISOString()),
-          supabase.from('activities').select('effort_score').eq('user_id', m.user_id)
-            .gte('started_at', getSeasonStartISO()),
-        ]);
+    // Three queries for the whole team, not three PER MEMBER. This previously
+    // fanned out inside a map — a twenty-person team fired sixty requests at
+    // once, which is slow to settle and heavy on the connection pool. Effort
+    // rows carry user_id, so the same numbers come back from one query per
+    // window and a group-by in memory.
+    const memberIds = membersData.map((m: any) => m.user_id);
+    const sumBy = (rows: any[] | null | undefined, field = 'effort_score') => {
+      const acc: Record<string, number> = {};
+      (rows || []).forEach((r: any) => {
+        acc[r.user_id] = (acc[r.user_id] || 0) + (r[field] || 0);
+      });
+      return acc;
+    };
 
-        const total = weekRes.data?.reduce((s, a) => s + (a.effort_score || 0), 0) ?? 0;
-        const weekTimeMinutes = Math.round((weekRes.data?.reduce((s, a) => s + (a.duration_seconds || 0), 0) ?? 0) / 60);
-        const lastWeekTotal = prevRes.data?.reduce((s, a) => s + (a.effort_score || 0), 0) ?? 0;
-        const allTimeXp = allRes.data?.reduce((s, a) => s + (a.effort_score || 0), 0) ?? 0;
+    const [weekRes, prevRes, allRes] = await Promise.all([
+      supabase.from('activities').select('user_id, effort_score, duration_seconds').in('user_id', memberIds)
+        .gte('started_at', start.toISOString()).lt('started_at', end.toISOString()),
+      supabase.from('activities').select('user_id, effort_score').in('user_id', memberIds)
+        .gte('started_at', lastStart.toISOString()).lt('started_at', lastEnd.toISOString()),
+      supabase.from('activities').select('user_id, effort_score').in('user_id', memberIds)
+        .gte('started_at', getSeasonStartISO()),
+    ]);
 
-        return {
-          ...m,
-          total_score: Math.round(total * 10) / 10,
-          last_week_score: Math.round(lastWeekTotal * 10) / 10,
-          all_time_xp: allTimeXp,
-          rank_change: null as number | null,
-          isHot: false,
-          week_time_minutes: weekTimeMinutes,
-        };
-      })
-    );
+    const weekByUser = sumBy(weekRes.data);
+    const weekSecondsByUser = sumBy(weekRes.data, 'duration_seconds');
+    const prevByUser = sumBy(prevRes.data);
+    const allByUser = sumBy(allRes.data);
+
+    const membersWithScores = membersData.map((m: any) => {
+      const total = weekByUser[m.user_id] || 0;
+      return {
+        ...m,
+        total_score: Math.round(total * 10) / 10,
+        last_week_score: Math.round((prevByUser[m.user_id] || 0) * 10) / 10,
+        all_time_xp: allByUser[m.user_id] || 0,
+        rank_change: null as number | null,
+        isHot: false,
+        week_time_minutes: Math.round((weekSecondsByUser[m.user_id] || 0) / 60),
+      };
+    });
 
     // MVP = highest scorer in the prior week
     const mvp = [...membersWithScores]
