@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { StyleSheet, TouchableOpacity, View, Text, TextInput, ScrollView, Image, Platform, ImageBackground, useWindowDimensions, RefreshControl } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { supabase } from '../lib/supabase';
 import { formatDuration, formatDurationClock } from '../lib/format';
@@ -257,6 +257,7 @@ function WeekStatPill({ title, dateRange, activities }: { title: string; dateRan
 }
 
 export default function MyActivitiesScreen() {
+  const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
   // Below this, RivalTopNav shows its floating bottom tab bar instead of the
   // desktop link row — the FAB needs to clear it, not sit underneath it.
@@ -985,7 +986,13 @@ export default function MyActivitiesScreen() {
             and hides anything outside it that has a higher zIndex than
             container's own. Its zIndex here (50) only needs to beat the
             photo/scrim behind it and stay under the nav's 100. */}
-        {mobileNav && <View style={styles.navBacking} />}
+        {/* Height tracks the nav's real extent: RivalTopNav now reaches UP
+            through the status-bar inset (so its own background runs edge to
+            edge instead of leaving a bare strip above it), which means this
+            backing has to cover that inset too. Left at a flat 62 it stopped
+            short, and this screen's bright sky photo showed through the top of
+            the bar — reading as a nav that didn't match the strip above it. */}
+        {mobileNav && <View style={[styles.navBacking, { height: insets.top + 62 }]} />}
         <RivalTopNav active="activity" />
 
         {mobileNav ? (

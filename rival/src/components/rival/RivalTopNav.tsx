@@ -411,17 +411,15 @@ const styles = StyleSheet.create({
     left: 0, right: 0,
     zIndex: 200,
     paddingHorizontal: 16,
-    // The wrapper reserves the home-indicator clearance BELOW the pill. Left
-    // transparent (as it was), that strip is a window onto the scrolling
-    // content behind it: in standalone the wrapper is 96px tall on an iPhone
-    // 15 Pro, so the next row of cards shows through under the pill and reads
-    // as content sliced off at the bottom of the screen. Fading to the page
-    // colour closes that window without turning the floating pill back into a
-    // full-width bar -- content dissolves underneath it instead of being cut.
-    ...(Platform.OS === 'web'
-      ? { backgroundImage: 'linear-gradient(180deg, rgba(19,19,19,0) 0%, rgba(19,19,19,0.75) 38%, rgba(19,19,19,0.97) 70%, #131313 100%)' } as any
-      : {}),
+    // No background of its own. An earlier attempt faded this strip to #131313
+    // to stop scrolling content showing through the home-indicator clearance,
+    // but that colour is Today's flat backdrop -- over the photographic
+    // backgrounds on Activity and Team Feed it read as a dark shadow boxed in
+    // around the pill. The clearance is now small enough (see paddingBottom
+    // above) that content passing behind it is not distracting, and a floating
+    // pill is supposed to float over the page, not sit on a slab.
   },
+
   bottomNav: {
     flexDirection: 'row', justifyContent: 'space-between',
     backgroundColor: '#1c1c1c',
