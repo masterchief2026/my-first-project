@@ -36,7 +36,11 @@ type FeedItem =
   | { kind: 'race'; id: string; userId: string; name: string; raceName: string; raceDate: string; ts: string }
   | { kind: 'session'; id: string; userId: string; ts: string; name: string; message: ChatMessage };
 
-const AVATAR_COLORS = ['#E91E8C', '#8DC63F', '#FF6B35', '#4FC3F7', '#AB47BC', '#26A69A'];
+// Deterministic per-person fallback colours (see the hash below). Six hues are
+// still needed to tell teammates apart at a glance; these are drawn from a warm
+// palette that sits alongside Refined Ember, rather than the old brand magenta
+// and lime which now read as artefacts of the previous design.
+const AVATAR_COLORS = ['#D97757', '#F5B759', '#C2694A', '#E8A87C', '#A85638', '#8C6E54'];
 
 function avatarColor(name: string): string {
   let hash = 0;
@@ -2566,7 +2570,7 @@ export default function LeagueScreen() {
                           <View style={styles.challengeProgressBlock}>
                             <Text style={styles.challengeProgressLabel}>{memberName(c.challenger_id)}</Text>
                             <View style={styles.challengeTrack}>
-                              <View style={[styles.challengeBar, { width: `${Math.round((p.challenger / max) * 100)}%`, backgroundColor: '#E91E8C' } as any]} />
+                              <View style={[styles.challengeBar, { width: `${Math.round((p.challenger / max) * 100)}%`, backgroundColor: RivalColors.accentFill } as any]} />
                             </View>
                             <Text style={styles.challengeProgressScore}>{p.challenger}</Text>
                           </View>
@@ -2630,7 +2634,7 @@ export default function LeagueScreen() {
                       onPress={() => setLvlTargetLeague(l.id)}
                     >
                       <Text style={styles.lvlLeaguePickerText}>{formatTeamName(l.name)}</Text>
-                      {lvlTargetLeague === l.id && <Text style={{ color: '#8DC63F' }}>✓</Text>}
+                      {lvlTargetLeague === l.id && <Text style={{ color: RivalColors.accentText }}>✓</Text>}
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -2711,7 +2715,7 @@ export default function LeagueScreen() {
                   <View style={styles.challengeProgressBlock}>
                     <Text style={styles.challengeProgressLabel}>{challengerName}</Text>
                     <View style={styles.challengeTrack}>
-                      <View style={[styles.challengeBar, { width: `${Math.round((ourScore / max) * 100)}%`, backgroundColor: '#E91E8C' } as any]} />
+                      <View style={[styles.challengeBar, { width: `${Math.round((ourScore / max) * 100)}%`, backgroundColor: RivalColors.accentFill } as any]} />
                     </View>
                     <Text style={styles.challengeProgressScore}>{ourScore}</Text>
                   </View>

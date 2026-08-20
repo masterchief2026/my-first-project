@@ -190,7 +190,7 @@ const styles = StyleSheet.create({
   heroTitle: { fontSize: 30, fontWeight: '900', color: RivalColors.textPrimary, textAlign: 'center' },
   heroSub: { fontSize: 14, color: RivalColors.textSecondary, textAlign: 'center' },
 
-  timeHeroCard: { backgroundColor: '#0D1A0D', borderRadius: 16, padding: 24, alignItems: 'center', marginBottom: 16, borderWidth: 1, borderColor: '#8DC63F44', gap: 6 },
+  timeHeroCard: { backgroundColor: '#0D1A0D', borderRadius: 16, padding: 24, alignItems: 'center', marginBottom: 16, borderWidth: 1, borderColor: 'rgba(255,181,158,0.27)', gap: 6 },
   timeHeroLabel: { fontSize: 11, fontWeight: '700', color: RivalColors.accentText, textTransform: 'uppercase', letterSpacing: 1 },
   timeHeroValue: { fontSize: 52, fontWeight: '900', color: RivalColors.accentText },
   timeHeroTrend: { fontSize: 12, color: '#4a7c4a' },
@@ -206,6 +206,6 @@ const styles = StyleSheet.create({
   highlightValue: { fontSize: 22, fontWeight: '800', color: RivalColors.textPrimary },
   highlightSub: { fontSize: 13, color: RivalColors.accentFill, fontWeight: '700' },
 
-  closingCard: { backgroundColor: '#1A0A12', borderRadius: 14, padding: 20, borderWidth: 1, borderColor: '#E91E8C33' },
+  closingCard: { backgroundColor: '#1A0A12', borderRadius: 14, padding: 20, borderWidth: 1, borderColor: 'rgba(217,119,87,0.20)' },
   closingText: { fontSize: 15, color: '#CCCCCC', lineHeight: 24, fontStyle: 'italic', textAlign: 'center' },
 });
