@@ -8,7 +8,7 @@ import { getLevel, xpProgressInLevel, LEVELS } from '../lib/xp';
 import { calculateStreak, StreakResult } from '../lib/streak';
 import { getSeasonStartISO, getCurrentSeasonYear, daysUntilSeasonEnd } from '../lib/season';
 import { RivalCard, RivalProgressBar, RivalIcon, RivalTopNav } from '../components/rival';
-import { RivalColors, RivalRadius, RivalType, RANK_LEVEL_COLORS } from '../constants/rivalTheme';
+import { RivalColors, RivalRadius, RivalType, RANK_LEVEL_COLORS, RivalSerifFamily } from '../constants/rivalTheme';
 
 // Refined Ember rank ramp only has 4 confirmed anchor colors from the Stitch
 // export (see rivalTheme.ts) — the interpolated 10-level ramp is provisional.
@@ -400,7 +400,8 @@ const styles = StyleSheet.create({
   loadingText: { color: RivalColors.textSecondary, fontSize: 16 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 },
   back: { color: RivalColors.accentText, fontSize: 16, width: 48 },
-  headerTitle: { ...RivalType.titleMd, color: RivalColors.textPrimary },
+  // Page title in the editorial serif, matching Today / Activity / Team Feed.
+  headerTitle: { ...RivalType.titleMd, fontFamily: RivalSerifFamily, fontStyle: 'italic', fontWeight: '600', color: RivalColors.textPrimary },
 
   rankCard: { marginBottom: 16, alignItems: 'center', gap: 10 },
   rankAvatar: {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { RivalColors } from '../constants/rivalTheme';
+import { RivalColors, RivalSerifFamily } from '../constants/rivalTheme';
 import { StyleSheet, TouchableOpacity, View, Text, TextInput, ScrollView, Image, Platform } from 'react-native';
 import { notify } from '../lib/notify';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -474,8 +474,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   title: {
-    fontSize: 32,
-    fontWeight: '900',
+    fontFamily: RivalSerifFamily,
+    fontStyle: 'italic',
+    fontSize: 26,
+    fontWeight: '700',
     color: RivalColors.textPrimary,
     marginBottom: 28,
   },
