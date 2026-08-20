@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { RivalColors } from '../constants/rivalTheme';
 import { StyleSheet, View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -124,12 +125,12 @@ export default function AchievementsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#111111' },
+  container: { flex: 1, backgroundColor: RivalColors.surfaceLow },
   content: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 48 },
   header: { marginBottom: 24 },
-  back: { color: '#E91E8C', fontSize: 16 },
-  title: { fontSize: 32, fontWeight: '900', color: '#FFFFFF', marginBottom: 4 },
-  subtitle: { fontSize: 14, color: '#999999', marginBottom: 24 },
+  back: { color: RivalColors.accentFill, fontSize: 16 },
+  title: { fontSize: 32, fontWeight: '900', color: RivalColors.textPrimary, marginBottom: 4 },
+  subtitle: { fontSize: 14, color: RivalColors.textSecondary, marginBottom: 24 },
   newBanner: {
     backgroundColor: '#fbbf2420',
     borderRadius: 12,
@@ -139,14 +140,14 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     gap: 4,
   },
-  newBannerTitle: { fontSize: 15, fontWeight: '800', color: '#fbbf24' },
+  newBannerTitle: { fontSize: 15, fontWeight: '800', color: RivalColors.accentGold },
   newBannerSub: { fontSize: 13, color: '#fcd34d' },
-  emptyText: { color: '#999999', textAlign: 'center', paddingVertical: 24 },
+  emptyText: { color: RivalColors.textSecondary, textAlign: 'center', paddingVertical: 24 },
   section: { marginBottom: 32 },
   sectionTitle: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#999999',
+    color: RivalColors.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 1,
     marginBottom: 12,
@@ -167,15 +168,15 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   badgeEarned: {
-    backgroundColor: '#111111',
-    borderColor: '#E91E8C',
+    backgroundColor: RivalColors.surfaceLow,
+    borderColor: RivalColors.accentFill,
   },
   badgeLocked: {
     backgroundColor: '#1E1E1E',
-    borderColor: '#2A2A2A',
+    borderColor: RivalColors.surfaceHigh,
   },
   badgeNew: {
-    borderColor: '#fbbf24',
+    borderColor: RivalColors.accentGold,
     backgroundColor: '#fbbf2411',
   },
   badgeIcon: { fontSize: 28 },
@@ -183,13 +184,13 @@ const styles = StyleSheet.create({
   badgeName: {
     fontSize: 12,
     fontWeight: '800',
-    color: '#FFFFFF',
+    color: RivalColors.textPrimary,
     textAlign: 'center',
   },
   badgeNameLocked: { color: '#444444' },
   badgeDesc: {
     fontSize: 10,
-    color: '#999999',
+    color: RivalColors.textSecondary,
     textAlign: 'center',
     lineHeight: 14,
   },
@@ -201,6 +202,6 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#fbbf24',
+    backgroundColor: RivalColors.accentGold,
   },
 });

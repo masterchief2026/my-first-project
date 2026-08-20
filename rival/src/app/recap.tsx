@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { RivalColors } from '../constants/rivalTheme';
 import { StyleSheet, TouchableOpacity, View, Text, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -70,7 +71,7 @@ export default function RecapScreen() {
 
         {loading && (
           <View style={styles.centered}>
-            <ActivityIndicator color="#8DC63F" size="large" />
+            <ActivityIndicator color={RivalColors.accentText} size="large" />
             <Text style={styles.loadingText}>Building your recap…</Text>
           </View>
         )}
@@ -124,7 +125,7 @@ export default function RecapScreen() {
                 )}
               </View>
               <View style={styles.statCard}>
-                <Text style={[styles.statValue, { color: '#E91E8C' }]}>{recap.total_effort.toLocaleString()}</Text>
+                <Text style={[styles.statValue, { color: RivalColors.accentFill }]}>{recap.total_effort.toLocaleString()}</Text>
                 <Text style={styles.statLabel}>Total Effort</Text>
               </View>
               {recap.total_distance_km > 0 && (
@@ -176,34 +177,34 @@ export default function RecapScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#111111' },
+  container: { flex: 1, backgroundColor: RivalColors.surfaceLow },
   content: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 40 },
   header: { marginBottom: 16 },
-  back: { color: '#E91E8C', fontSize: 16 },
+  back: { color: RivalColors.accentFill, fontSize: 16 },
   centered: { alignItems: 'center', marginTop: 80, gap: 16 },
-  loadingText: { color: '#999999', fontSize: 16 },
+  loadingText: { color: RivalColors.textSecondary, fontSize: 16 },
   errorText: { color: '#f87171', textAlign: 'center', marginTop: 40 },
 
   heroBlock: { alignItems: 'center', marginBottom: 28, gap: 4 },
   heroEmoji: { fontSize: 52 },
-  heroTitle: { fontSize: 30, fontWeight: '900', color: '#FFFFFF', textAlign: 'center' },
-  heroSub: { fontSize: 14, color: '#999999', textAlign: 'center' },
+  heroTitle: { fontSize: 30, fontWeight: '900', color: RivalColors.textPrimary, textAlign: 'center' },
+  heroSub: { fontSize: 14, color: RivalColors.textSecondary, textAlign: 'center' },
 
   timeHeroCard: { backgroundColor: '#0D1A0D', borderRadius: 16, padding: 24, alignItems: 'center', marginBottom: 16, borderWidth: 1, borderColor: '#8DC63F44', gap: 6 },
-  timeHeroLabel: { fontSize: 11, fontWeight: '700', color: '#8DC63F', textTransform: 'uppercase', letterSpacing: 1 },
-  timeHeroValue: { fontSize: 52, fontWeight: '900', color: '#8DC63F' },
+  timeHeroLabel: { fontSize: 11, fontWeight: '700', color: RivalColors.accentText, textTransform: 'uppercase', letterSpacing: 1 },
+  timeHeroValue: { fontSize: 52, fontWeight: '900', color: RivalColors.accentText },
   timeHeroTrend: { fontSize: 12, color: '#4a7c4a' },
 
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16 },
-  statCard: { flex: 1, minWidth: '45%', backgroundColor: '#1A1A1A', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: '#2A2A2A', gap: 4 },
-  statValue: { fontSize: 28, fontWeight: '900', color: '#FFFFFF' },
-  statLabel: { fontSize: 11, color: '#666666', fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
-  statTrend: { fontSize: 11, color: '#8DC63F', fontWeight: '600', marginTop: 2 },
+  statCard: { flex: 1, minWidth: '45%', backgroundColor: RivalColors.surfaceContainer, borderRadius: 14, padding: 16, borderWidth: 1, borderColor: RivalColors.surfaceHigh, gap: 4 },
+  statValue: { fontSize: 28, fontWeight: '900', color: RivalColors.textPrimary },
+  statLabel: { fontSize: 11, color: RivalColors.textSecondary, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
+  statTrend: { fontSize: 11, color: RivalColors.accentText, fontWeight: '600', marginTop: 2 },
 
-  highlightCard: { backgroundColor: '#1A1A1A', borderRadius: 14, padding: 18, marginBottom: 12, borderWidth: 1, borderColor: '#2A2A2A', gap: 6 },
-  highlightLabel: { fontSize: 12, color: '#999999', fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
-  highlightValue: { fontSize: 22, fontWeight: '800', color: '#FFFFFF' },
-  highlightSub: { fontSize: 13, color: '#E91E8C', fontWeight: '700' },
+  highlightCard: { backgroundColor: RivalColors.surfaceContainer, borderRadius: 14, padding: 18, marginBottom: 12, borderWidth: 1, borderColor: RivalColors.surfaceHigh, gap: 6 },
+  highlightLabel: { fontSize: 12, color: RivalColors.textSecondary, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
+  highlightValue: { fontSize: 22, fontWeight: '800', color: RivalColors.textPrimary },
+  highlightSub: { fontSize: 13, color: RivalColors.accentFill, fontWeight: '700' },
 
   closingCard: { backgroundColor: '#1A0A12', borderRadius: 14, padding: 20, borderWidth: 1, borderColor: '#E91E8C33' },
   closingText: { fontSize: 15, color: '#CCCCCC', lineHeight: 24, fontStyle: 'italic', textAlign: 'center' },

@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import { RivalColors } from '../constants/rivalTheme';
 import { StyleSheet, TouchableOpacity, View, Text, ScrollView, TextInput, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
@@ -224,13 +225,13 @@ export default function PlanScreen() {
           <View style={styles.xpDivider} />
           <View style={styles.xpBlock}>
             <Text style={styles.xpBlockLabel}>Planned</Text>
-            <Text style={[styles.xpBlockValue, { color: '#8DC63F' }]}>+{Math.round(totalPlannedXp * 10) / 10}</Text>
+            <Text style={[styles.xpBlockValue, { color: RivalColors.accentText }]}>+{Math.round(totalPlannedXp * 10) / 10}</Text>
             <Text style={styles.xpBlockUnit}>Effort</Text>
           </View>
           <View style={styles.xpDivider} />
           <View style={styles.xpBlock}>
             <Text style={styles.xpBlockLabel}>Projected</Text>
-            <Text style={[styles.xpBlockValue, { color: '#E91E8C' }]}>{projectedTotal}</Text>
+            <Text style={[styles.xpBlockValue, { color: RivalColors.accentFill }]}>{projectedTotal}</Text>
             <Text style={styles.xpBlockUnit}>Effort</Text>
           </View>
         </View>
@@ -300,11 +301,11 @@ export default function PlanScreen() {
                       return (
                         <View key={member.user_id} style={[styles.miniRow, isMe && styles.miniRowMe]}>
                           <Text style={styles.miniRank}>{idx + 1}.</Text>
-                          <Text style={[styles.miniName, isMe && { color: '#FFFFFF', fontWeight: '800' }]}>
+                          <Text style={[styles.miniName, isMe && { color: RivalColors.textPrimary, fontWeight: '800' }]}>
                             {isMe ? 'You' : member.name}
                           </Text>
                           <View style={styles.miniScoreBlock}>
-                            <Text style={[styles.miniScore, isMe && { color: '#E91E8C' }]}>
+                            <Text style={[styles.miniScore, isMe && { color: RivalColors.accentFill }]}>
                               {Math.round(projScore * 10) / 10} Effort
                             </Text>
                             {isMe && totalPlannedXp > 0 && (
@@ -392,7 +393,7 @@ export default function PlanScreen() {
                 <TextInput
                   style={styles.modalInput}
                   placeholder="e.g. 45"
-                  placeholderTextColor="#555555"
+                  placeholderTextColor={RivalColors.textSecondary}
                   value={duration}
                   onChangeText={setDuration}
                   keyboardType="decimal-pad"
@@ -451,42 +452,42 @@ export default function PlanScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#111111' },
+  container: { flex: 1, backgroundColor: RivalColors.surfaceLow },
   content: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 48 },
   header: { marginBottom: 24 },
-  back: { color: '#E91E8C', fontSize: 16 },
-  title: { fontSize: 32, fontWeight: '900', color: '#FFFFFF', marginBottom: 6 },
-  subtitle: { fontSize: 14, color: '#666666', marginBottom: 24, lineHeight: 20 },
+  back: { color: RivalColors.accentFill, fontSize: 16 },
+  title: { fontSize: 32, fontWeight: '900', color: RivalColors.textPrimary, marginBottom: 6 },
+  subtitle: { fontSize: 14, color: RivalColors.textSecondary, marginBottom: 24, lineHeight: 20 },
 
   xpCard: {
-    backgroundColor: '#1A1A1A',
+    backgroundColor: RivalColors.surfaceContainer,
     borderRadius: 16,
     padding: 20,
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 28,
     borderWidth: 1,
-    borderColor: '#2A2A2A',
+    borderColor: RivalColors.surfaceHigh,
   },
   xpBlock: { flex: 1, alignItems: 'center', gap: 2 },
-  xpBlockLabel: { fontSize: 11, color: '#666666', textTransform: 'uppercase', letterSpacing: 0.5 },
-  xpBlockValue: { fontSize: 28, fontWeight: '900', color: '#FFFFFF' },
-  xpBlockUnit: { fontSize: 11, color: '#555555', fontWeight: '600' },
-  xpDivider: { width: 1, height: 48, backgroundColor: '#2A2A2A' },
+  xpBlockLabel: { fontSize: 11, color: RivalColors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5 },
+  xpBlockValue: { fontSize: 28, fontWeight: '900', color: RivalColors.textPrimary },
+  xpBlockUnit: { fontSize: 11, color: RivalColors.textSecondary, fontWeight: '600' },
+  xpDivider: { width: 1, height: 48, backgroundColor: RivalColors.surfaceHigh },
 
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  sectionTitle: { fontSize: 18, fontWeight: '800', color: '#FFFFFF' },
-  addBtn: { backgroundColor: '#E91E8C', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8 },
-  addBtnText: { color: '#FFFFFF', fontWeight: '700', fontSize: 14 },
+  sectionTitle: { fontSize: 18, fontWeight: '800', color: RivalColors.textPrimary },
+  addBtn: { backgroundColor: RivalColors.accentFill, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8 },
+  addBtnText: { color: RivalColors.textPrimary, fontWeight: '700', fontSize: 14 },
 
   emptyPlanned: { paddingVertical: 28, alignItems: 'center', gap: 6 },
-  emptyPlannedText: { fontSize: 14, color: '#555555' },
+  emptyPlannedText: { fontSize: 14, color: RivalColors.textSecondary },
   emptyPlannedSub: { fontSize: 12, color: '#444444' },
 
   plannedRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1A1A1A',
+    backgroundColor: RivalColors.surfaceContainer,
     borderRadius: 12,
     padding: 14,
     marginBottom: 8,
@@ -496,27 +497,27 @@ const styles = StyleSheet.create({
   },
   plannedIcon: { fontSize: 22 },
   plannedInfo: { flex: 1, gap: 2 },
-  plannedType: { fontSize: 15, fontWeight: '700', color: '#FFFFFF' },
-  plannedMeta: { fontSize: 12, color: '#666666' },
-  plannedXp: { fontSize: 16, fontWeight: '800', color: '#8DC63F' },
+  plannedType: { fontSize: 15, fontWeight: '700', color: RivalColors.textPrimary },
+  plannedMeta: { fontSize: 12, color: RivalColors.textSecondary },
+  plannedXp: { fontSize: 16, fontWeight: '800', color: RivalColors.accentText },
   removeBtn: { padding: 4 },
   removeBtnText: { color: '#444444', fontSize: 16 },
 
   leagueCard: {
-    backgroundColor: '#1A1A1A',
+    backgroundColor: RivalColors.surfaceContainer,
     borderRadius: 14,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#2A2A2A',
+    borderColor: RivalColors.surfaceHigh,
     gap: 12,
   },
   leagueCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  leagueName: { fontSize: 16, fontWeight: '800', color: '#FFFFFF' },
+  leagueName: { fontSize: 16, fontWeight: '800', color: RivalColors.textPrimary },
   rankChangeBlock: {},
-  rankUp: { fontSize: 14, fontWeight: '800', color: '#4ade80' },
+  rankUp: { fontSize: 14, fontWeight: '800', color: RivalColors.accentGold },
   rankDown: { fontSize: 14, fontWeight: '800', color: '#f87171' },
-  rankSame: { fontSize: 13, color: '#555555' },
+  rankSame: { fontSize: 13, color: RivalColors.textSecondary },
 
   miniLeaderboard: { gap: 6 },
   miniRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4 },
@@ -528,55 +529,55 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E91E8C33',
   },
-  miniRank: { fontSize: 13, color: '#555555', width: 20 },
-  miniName: { flex: 1, fontSize: 13, color: '#999999' },
+  miniRank: { fontSize: 13, color: RivalColors.textSecondary, width: 20 },
+  miniName: { flex: 1, fontSize: 13, color: RivalColors.textSecondary },
   miniScoreBlock: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  miniScore: { fontSize: 13, fontWeight: '700', color: '#999999' },
-  miniBonus: { fontSize: 11, color: '#8DC63F', fontWeight: '700' },
+  miniScore: { fontSize: 13, fontWeight: '700', color: RivalColors.textSecondary },
+  miniBonus: { fontSize: 11, color: RivalColors.accentText, fontWeight: '700' },
   moreMembers: { fontSize: 12, color: '#444444', textAlign: 'center', paddingTop: 4 },
 
   noLeagues: { paddingVertical: 24, alignItems: 'center' },
-  noLeaguesText: { fontSize: 14, color: '#555555', textAlign: 'center' },
+  noLeaguesText: { fontSize: 14, color: RivalColors.textSecondary, textAlign: 'center' },
 
   disclaimer: { fontSize: 11, color: '#3A3A3A', textAlign: 'center', marginTop: 24, fontStyle: 'italic' },
 
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'flex-end' },
   modalScroll: { maxHeight: '90%' },
-  modalCard: { backgroundColor: '#1A1A1A', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 28, gap: 14 },
+  modalCard: { backgroundColor: RivalColors.surfaceContainer, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 28, gap: 14 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  modalTitle: { fontSize: 22, fontWeight: '900', color: '#FFFFFF' },
-  doneBtn: { backgroundColor: '#E91E8C', paddingHorizontal: 18, paddingVertical: 8, borderRadius: 20 },
-  doneBtnText: { color: '#FFFFFF', fontWeight: '700', fontSize: 15 },
-  modalLabel: { fontSize: 12, fontWeight: '700', color: '#666666', textTransform: 'uppercase', letterSpacing: 1 },
+  modalTitle: { fontSize: 22, fontWeight: '900', color: RivalColors.textPrimary },
+  doneBtn: { backgroundColor: RivalColors.accentFill, paddingHorizontal: 18, paddingVertical: 8, borderRadius: 20 },
+  doneBtnText: { color: RivalColors.textPrimary, fontWeight: '700', fontSize: 15 },
+  modalLabel: { fontSize: 12, fontWeight: '700', color: RivalColors.textSecondary, textTransform: 'uppercase', letterSpacing: 1 },
   typeScroll: { flexGrow: 0 },
   typeRow: { flexDirection: 'row', gap: 8, paddingBottom: 4 },
-  typeChip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: '#2A2A2A', backgroundColor: '#222222' },
-  typeChipActive: { backgroundColor: '#E91E8C', borderColor: '#E91E8C' },
-  typeChipText: { fontSize: 13, color: '#666666', fontWeight: '600' },
-  typeChipTextActive: { color: '#FFFFFF' },
-  modalInput: { backgroundColor: '#222222', borderRadius: 10, padding: 14, color: '#FFFFFF', fontSize: 18, borderWidth: 1, borderColor: '#2A2A2A' },
+  typeChip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: RivalColors.surfaceHigh, backgroundColor: RivalColors.surfaceContainer },
+  typeChipActive: { backgroundColor: RivalColors.accentFill, borderColor: RivalColors.accentFill },
+  typeChipText: { fontSize: 13, color: RivalColors.textSecondary, fontWeight: '600' },
+  typeChipTextActive: { color: RivalColors.textPrimary },
+  modalInput: { backgroundColor: RivalColors.surfaceContainer, borderRadius: 10, padding: 14, color: RivalColors.textPrimary, fontSize: 18, borderWidth: 1, borderColor: RivalColors.surfaceHigh },
   previewRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#8DC63F11', borderRadius: 10, padding: 12, borderWidth: 1, borderColor: '#8DC63F33' },
-  previewLabel: { fontSize: 13, color: '#999999' },
-  previewXp: { fontSize: 18, fontWeight: '900', color: '#8DC63F' },
+  previewLabel: { fontSize: 13, color: RivalColors.textSecondary },
+  previewXp: { fontSize: 18, fontWeight: '900', color: RivalColors.accentText },
 
-  stepperRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#222222', borderRadius: 12, borderWidth: 1, borderColor: '#2A2A2A', padding: 8, marginBottom: 12 },
-  stepperBtn: { width: 44, height: 44, borderRadius: 10, backgroundColor: '#2A2A2A', alignItems: 'center', justifyContent: 'center' },
-  stepperBtnText: { fontSize: 22, fontWeight: '700', color: '#FFFFFF', lineHeight: 26 },
+  stepperRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: RivalColors.surfaceContainer, borderRadius: 12, borderWidth: 1, borderColor: RivalColors.surfaceHigh, padding: 8, marginBottom: 12 },
+  stepperBtn: { width: 44, height: 44, borderRadius: 10, backgroundColor: RivalColors.surfaceHigh, alignItems: 'center', justifyContent: 'center' },
+  stepperBtnText: { fontSize: 22, fontWeight: '700', color: RivalColors.textPrimary, lineHeight: 26 },
   stepperValueBlock: { alignItems: 'center', flex: 1 },
-  stepperValue: { fontSize: 28, fontWeight: '900', color: '#FFFFFF' },
-  stepperSub: { fontSize: 12, color: '#666666', marginTop: 2 },
-  addWorkoutBtn: { backgroundColor: '#8DC63F', paddingVertical: 14, borderRadius: 10, alignItems: 'center' },
-  addWorkoutBtnText: { color: '#111111', fontSize: 16, fontWeight: '800' },
+  stepperValue: { fontSize: 28, fontWeight: '900', color: RivalColors.textPrimary },
+  stepperSub: { fontSize: 12, color: RivalColors.textSecondary, marginTop: 2 },
+  addWorkoutBtn: { backgroundColor: RivalColors.accentText, paddingVertical: 14, borderRadius: 10, alignItems: 'center' },
+  addWorkoutBtnText: { color: RivalColors.surfaceLow, fontSize: 16, fontWeight: '800' },
   saveBtnDisabled: { opacity: 0.4 },
-  saveBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
-  modalDivider: { height: 1, backgroundColor: '#2A2A2A', marginVertical: 4 },
+  saveBtnText: { color: RivalColors.textPrimary, fontSize: 16, fontWeight: '700' },
+  modalDivider: { height: 1, backgroundColor: RivalColors.surfaceHigh, marginVertical: 4 },
   modalPlannedRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6 },
   modalPlannedIcon: { fontSize: 18 },
   modalPlannedInfo: { flex: 1 },
-  modalPlannedType: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
-  modalPlannedMeta: { fontSize: 12, color: '#555555' },
-  modalPlannedXp: { fontSize: 14, fontWeight: '700', color: '#8DC63F' },
-  modalTotalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8, borderTopWidth: 1, borderTopColor: '#2A2A2A' },
-  modalTotalLabel: { fontSize: 13, color: '#666666', fontWeight: '600' },
-  modalTotalXp: { fontSize: 16, fontWeight: '900', color: '#8DC63F' },
+  modalPlannedType: { fontSize: 14, fontWeight: '700', color: RivalColors.textPrimary },
+  modalPlannedMeta: { fontSize: 12, color: RivalColors.textSecondary },
+  modalPlannedXp: { fontSize: 14, fontWeight: '700', color: RivalColors.accentText },
+  modalTotalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8, borderTopWidth: 1, borderTopColor: RivalColors.surfaceHigh },
+  modalTotalLabel: { fontSize: 13, color: RivalColors.textSecondary, fontWeight: '600' },
+  modalTotalXp: { fontSize: 16, fontWeight: '900', color: RivalColors.accentText },
 });
