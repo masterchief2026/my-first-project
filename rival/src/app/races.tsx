@@ -7,7 +7,9 @@ import { notify } from '../lib/notify';
 import { formatDisplayName } from '../lib/identity';
 import { isoToDisplayDate, displayToIsoDate } from '../lib/dateFormat';
 import { formatGoalTimeMask } from '../lib/format';
-import { RivalTopNav } from '../components/rival';
+import { RivalTopNav, RivalPageHeader, RivalIcon } from '../components/rival';
+import type { RivalIconName } from '../components/rival';
+import { RivalColors, RivalSerifFamily } from '../constants/rivalTheme';
 
 const RACE_TYPES = ['Run', 'Ride', 'Swim', 'Triathlon', 'HYROX', 'CrossFit', 'Other', 'Custom'];
 
@@ -38,9 +40,11 @@ const RACE_DIRECTORIES: RaceDirectory[] = [
   { name: 'RaceRoster', description: 'Largest Canadian race registration platform', url: 'https://raceroster.com/events?province=BC', types: ['Run', 'Triathlon', 'Ride', 'Swim', 'Other'] },
 ];
 
-const RACE_TYPE_ICONS: Record<string, string> = {
-  Run: '🏃', Ride: '🚴', Swim: '🏊', Triathlon: '🏅',
-  HYROX: '⚡', CrossFit: '🏋️', Other: '🏁', Custom: '🎨',
+// Real icons, not emoji — emoji render differently on every platform and sit
+// outside the design system's colour and weight rules.
+const RACE_TYPE_ICONS: Record<string, RivalIconName> = {
+  Run: 'run', Ride: 'ride', Swim: 'swim', Triathlon: 'medal',
+  HYROX: 'bolt', CrossFit: 'crossfit', Other: 'flag', Custom: 'flag',
 };
 
 const HYROX_STATIONS: { name: string; distance_km: number }[] = [
@@ -147,10 +151,10 @@ function TrainingBar({ avgWeeklyKm, distanceKm }: { avgWeeklyKm: number; distanc
     <View style={styles.trainingSection}>
       <View style={styles.trainingLabelRow}>
         <Text style={styles.trainingLabel}>Weekly avg vs race distance</Text>
-        <Text style={[styles.trainingPct, done && { color: '#4ade80' }]}>{displayPct}%</Text>
+        <Text style={[styles.trainingPct, done && { color: RivalColors.accentGold }]}>{displayPct}%</Text>
       </View>
       <View style={styles.trainingTrack}>
-        <View style={[styles.trainingFill, { width: `${displayPct}%`, backgroundColor: done ? '#16a34a' : '#E91E8C' }]} />
+        <View style={[styles.trainingFill, { width: `${displayPct}%`, backgroundColor: done ? RivalColors.accentFill : RivalColors.accentFill }]} />
       </View>
       <Text style={styles.trainingMeta}>
         {avgWeeklyKm.toFixed(1)} km/week avg · {distanceKm} km race
@@ -412,10 +416,7 @@ export default function RacesScreen() {
         </View>
 
         <View style={styles.titleRow}>
-          <View>
-            <Text style={styles.title}>Races</Text>
-            <Text style={styles.subtitle}>What are you training for?</Text>
-          </View>
+          <RivalPageHeader title="Races" subtitle="What are you training for?" rules={false} />
           <View style={styles.titleButtons}>
             <TouchableOpacity style={styles.findBtn} onPress={() => { setFindFilter(null); setShowFind(true); }}>
               <Text style={styles.findBtnText}>Find</Text>
@@ -481,7 +482,7 @@ export default function RacesScreen() {
 
               <View style={styles.raceHeader}>
                 <View style={styles.raceTypeRow}>
-                  <Text style={styles.raceTypeIcon}>{RACE_TYPE_ICONS[race.race_type] ?? '🏁'}</Text>
+                  <RivalIcon name={RACE_TYPE_ICONS[race.race_type] ?? 'flag'} size={26} color={RivalColors.accentText} />
                   <View style={styles.raceMeta}>
                     <Text style={styles.raceTypeLabel}>{race.race_type.toUpperCase()}</Text>
                     {!isOwn && <Text style={styles.raceOwner}>{ownerName}</Text>}
@@ -503,9 +504,22 @@ export default function RacesScreen() {
               <Text style={styles.raceName}>{race.name}</Text>
 
               <View style={styles.raceDetails}>
-                {race.location ? <Text style={styles.raceDetail}>📍 {race.location}</Text> : null}
-                {race.distance_km > 0 && <Text style={styles.raceDetail}>📏 {race.distance_km} km</Text>}
-                <Text style={styles.raceDetail}>📅 {formatRaceDate(race.race_date)}</Text>
+                {race.location ? (
+                  <View style={styles.raceDetailRow}>
+                    <RivalIcon name="location" size={13} color={RivalColors.textSecondary} />
+                    <Text style={styles.raceDetail}>{race.location}</Text>
+                  </View>
+                ) : null}
+                {race.distance_km > 0 && (
+                  <View style={styles.raceDetailRow}>
+                    <RivalIcon name="distance" size={13} color={RivalColors.textSecondary} />
+                    <Text style={styles.raceDetail}>{race.distance_km} km</Text>
+                  </View>
+                )}
+                <View style={styles.raceDetailRow}>
+                  <RivalIcon name="calendar" size={13} color={RivalColors.textSecondary} />
+                  <Text style={styles.raceDetail}>{formatRaceDate(race.race_date)}</Text>
+                </View>
               </View>
 
               {race.disciplines && race.disciplines.length > 0 && (
@@ -609,7 +623,7 @@ export default function RacesScreen() {
             <Text style={styles.modalTitle}>{editingRace ? 'Edit Race' : 'Add a Race'}</Text>
 
             <Text style={styles.modalLabel}>Race name</Text>
-            <TextInput style={styles.modalInput} placeholder="e.g. Auckland Half Marathon" placeholderTextColor="#555555" value={raceName} onChangeText={setRaceName} />
+            <TextInput style={styles.modalInput} placeholder="e.g. Auckland Half Marathon" placeholderTextColor={RivalColors.textSecondary} value={raceName} onChangeText={setRaceName} />
 
             <Text style={styles.modalLabel}>Type</Text>
             <View style={styles.segmentRow}>
@@ -623,17 +637,17 @@ export default function RacesScreen() {
             {raceType !== 'Triathlon' && raceType !== 'HYROX' && raceType !== 'CrossFit' && raceType !== 'Custom' && (
               <>
                 <Text style={styles.modalLabel}>Distance (km)</Text>
-                <TextInput style={styles.modalInput} placeholder="21.1" placeholderTextColor="#555555" value={distanceKm} onChangeText={setDistanceKm} keyboardType="decimal-pad" />
+                <TextInput style={styles.modalInput} placeholder="21.1" placeholderTextColor={RivalColors.textSecondary} value={distanceKm} onChangeText={setDistanceKm} keyboardType="decimal-pad" />
               </>
             )}
 
             {raceType === 'Triathlon' && (
               <>
                 <Text style={styles.modalLabel}>Disciplines</Text>
-                {[['🏊 Swim (km)', triSwim, setTriSwim, '1.9'], ['🚴 Bike (km)', triBike, setTriBike, '90'], ['🏃 Run (km)', triRun, setTriRun, '21.1']].map(([label, val, setter, ph]: any) => (
+                {[['Swim (km)', triSwim, setTriSwim, '1.9'], ['Bike (km)', triBike, setTriBike, '90'], ['Run (km)', triRun, setTriRun, '21.1']].map(([label, val, setter, ph]: any) => (
                   <View key={label} style={styles.disciplineInputRow}>
                     <Text style={styles.disciplineInputLabel}>{label}</Text>
-                    <TextInput style={[styles.modalInput, styles.disciplineInput]} placeholder={ph} placeholderTextColor="#555555" value={val} onChangeText={setter} keyboardType="decimal-pad" />
+                    <TextInput style={[styles.modalInput, styles.disciplineInput]} placeholder={ph} placeholderTextColor={RivalColors.textSecondary} value={val} onChangeText={setter} keyboardType="decimal-pad" />
                   </View>
                 ))}
                 {computedDistance() > 0 && <Text style={styles.distanceSummary}>Total: {computedDistance().toFixed(1)} km</Text>}
@@ -645,8 +659,8 @@ export default function RacesScreen() {
                 <Text style={styles.modalLabel}>Disciplines</Text>
                 {customDisciplines.map((d, i) => (
                   <View key={i} style={styles.customDisciplineRow}>
-                    <TextInput style={[styles.modalInput, { flex: 1 }]} placeholder="e.g. Kayak" placeholderTextColor="#555555" value={d.name} onChangeText={(v) => updateCustomDiscipline(i, 'name', v)} />
-                    <TextInput style={[styles.modalInput, styles.disciplineInput]} placeholder="km" placeholderTextColor="#555555" value={d.distance} onChangeText={(v) => updateCustomDiscipline(i, 'distance', v)} keyboardType="decimal-pad" />
+                    <TextInput style={[styles.modalInput, { flex: 1 }]} placeholder="e.g. Kayak" placeholderTextColor={RivalColors.textSecondary} value={d.name} onChangeText={(v) => updateCustomDiscipline(i, 'name', v)} />
+                    <TextInput style={[styles.modalInput, styles.disciplineInput]} placeholder="km" placeholderTextColor={RivalColors.textSecondary} value={d.distance} onChangeText={(v) => updateCustomDiscipline(i, 'distance', v)} keyboardType="decimal-pad" />
                     {customDisciplines.length > 1 && (
                       <TouchableOpacity onPress={() => removeCustomDiscipline(i)}><Text style={styles.removeDisc}>✕</Text></TouchableOpacity>
                     )}
@@ -695,16 +709,16 @@ export default function RacesScreen() {
             )}
 
             <Text style={styles.modalLabel}>Race date (DD/MM/YYYY)</Text>
-            <TextInput style={styles.modalInput} placeholder="18/10/2026" placeholderTextColor="#555555" value={raceDate} onChangeText={setRaceDate} keyboardType="numbers-and-punctuation" />
+            <TextInput style={styles.modalInput} placeholder="18/10/2026" placeholderTextColor={RivalColors.textSecondary} value={raceDate} onChangeText={setRaceDate} keyboardType="numbers-and-punctuation" />
 
             <Text style={styles.modalLabel}>Location (optional)</Text>
-            <TextInput style={styles.modalInput} placeholder="Auckland, NZ" placeholderTextColor="#555555" value={location} onChangeText={setLocation} />
+            <TextInput style={styles.modalInput} placeholder="Auckland, NZ" placeholderTextColor={RivalColors.textSecondary} value={location} onChangeText={setLocation} />
 
             <Text style={styles.modalLabel}>Registration link (optional)</Text>
-            <TextInput style={styles.modalInput} placeholder="https://…" placeholderTextColor="#555555" value={regUrl} onChangeText={setRegUrl} autoCapitalize="none" />
+            <TextInput style={styles.modalInput} placeholder="https://…" placeholderTextColor={RivalColors.textSecondary} value={regUrl} onChangeText={setRegUrl} autoCapitalize="none" />
 
             <Text style={styles.modalLabel}>Goal finish time (optional)</Text>
-            <TextInput style={styles.modalInput} placeholder="00:00:00" placeholderTextColor="#555555" value={goalFinishTime} onChangeText={v => setGoalFinishTime(formatGoalTimeMask(v))} keyboardType="number-pad" autoCapitalize="none" />
+            <TextInput style={styles.modalInput} placeholder="00:00:00" placeholderTextColor={RivalColors.textSecondary} value={goalFinishTime} onChangeText={v => setGoalFinishTime(formatGoalTimeMask(v))} keyboardType="number-pad" autoCapitalize="none" />
             <Text style={styles.goalTimeHint}>
               {goalFinishTime.trim()
                 ? `🎯 Aiming for ${goalFinishTime.trim()} — let's make it happen.`
@@ -802,7 +816,7 @@ export default function RacesScreen() {
 
             <Text style={[styles.modalLabel, { marginTop: 16 }]}>Your finish time</Text>
             <TextInput
-              style={styles.modalInput} placeholder="e.g. 1:52:34" placeholderTextColor="#555555"
+              style={styles.modalInput} placeholder="e.g. 1:52:34" placeholderTextColor={RivalColors.textSecondary}
               value={actualFinishInput} onChangeText={setActualFinishInput}
               autoCapitalize="none" autoFocus
             />
@@ -837,154 +851,155 @@ export default function RacesScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#111111' },
+  container: { flex: 1, backgroundColor: RivalColors.surfaceLow },
   content: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 48 },
   header: { marginBottom: 24 },
-  back: { color: '#E91E8C', fontSize: 16 },
+  back: { color: RivalColors.accentFill, fontSize: 16 },
 
-  titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 },
-  title: { fontSize: 32, fontWeight: '900', color: '#FFFFFF', marginBottom: 4 },
-  subtitle: { fontSize: 14, color: '#666666' },
+  titleRow: { flexDirection: 'column', alignItems: 'center', gap: 12, marginBottom: 24 },
+  title: { fontSize: 32, fontWeight: '900', color: RivalColors.textPrimary, marginBottom: 4 },
+  subtitle: { fontSize: 14, color: RivalColors.textSecondary },
   titleButtons: { flexDirection: 'row', gap: 8, alignItems: 'center' },
-  findBtn: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: '#8DC63F' },
-  findBtnText: { color: '#8DC63F', fontWeight: '700', fontSize: 15 },
-  addBtn: { backgroundColor: '#E91E8C', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10 },
-  addBtnText: { color: '#FFFFFF', fontWeight: '700', fontSize: 15 },
+  findBtn: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: RivalColors.accentText },
+  findBtnText: { color: RivalColors.accentText, fontWeight: '700', fontSize: 15 },
+  addBtn: { backgroundColor: RivalColors.accentFill, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10 },
+  addBtnText: { color: RivalColors.textPrimary, fontWeight: '700', fontSize: 15 },
 
-  findModalCard: { backgroundColor: '#1A1A1A', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 28, paddingBottom: 0, maxHeight: '85%', marginTop: 'auto' },
+  findModalCard: { backgroundColor: RivalColors.surfaceContainer, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 28, paddingBottom: 0, maxHeight: '85%', marginTop: 'auto' },
   findModalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  findModalClose: { color: '#666666', fontSize: 20, padding: 4 },
-  findModalSub: { fontSize: 13, color: '#666666', marginBottom: 16 },
+  findModalClose: { color: RivalColors.textSecondary, fontSize: 20, padding: 4 },
+  findModalSub: { fontSize: 13, color: RivalColors.textSecondary, marginBottom: 16 },
   findFilterScroll: { flexGrow: 0, marginBottom: 16 },
   findFilterRow: { flexDirection: 'row', gap: 8, paddingBottom: 4 },
-  findFilterChip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, borderWidth: 1, borderColor: '#2A2A2A', backgroundColor: '#222222' },
-  findFilterChipActive: { backgroundColor: '#8DC63F', borderColor: '#8DC63F' },
-  findFilterText: { fontSize: 13, fontWeight: '600', color: '#666666' },
-  findFilterTextActive: { color: '#111111' },
+  findFilterChip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, borderWidth: 1, borderColor: RivalColors.surfaceHigh, backgroundColor: RivalColors.surfaceContainer },
+  findFilterChipActive: { backgroundColor: RivalColors.accentText, borderColor: RivalColors.accentText },
+  findFilterText: { fontSize: 13, fontWeight: '600', color: RivalColors.textSecondary },
+  findFilterTextActive: { color: RivalColors.surfaceLow },
   findDirectoryList: { marginHorizontal: -28, paddingHorizontal: 28 },
-  directoryCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#222222', borderRadius: 12, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: '#2A2A2A', gap: 12 },
+  directoryCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: RivalColors.surfaceContainer, borderRadius: 12, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: RivalColors.surfaceHigh, gap: 12 },
   directoryInfo: { flex: 1, gap: 4 },
-  directoryName: { fontSize: 15, fontWeight: '700', color: '#FFFFFF' },
-  directoryDesc: { fontSize: 12, color: '#666666' },
+  directoryName: { fontSize: 15, fontWeight: '700', color: RivalColors.textPrimary },
+  directoryDesc: { fontSize: 12, color: RivalColors.textSecondary },
   directoryTypes: { flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginTop: 2 },
-  directoryTypeChip: { backgroundColor: '#1A1A1A', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: '#2A2A2A' },
-  directoryTypeText: { fontSize: 10, color: '#999999', fontWeight: '600' },
-  directoryArrow: { fontSize: 18, color: '#8DC63F' },
+  directoryTypeChip: { backgroundColor: RivalColors.surfaceContainer, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: RivalColors.surfaceHigh },
+  directoryTypeText: { fontSize: 10, color: RivalColors.textSecondary, fontWeight: '600' },
+  directoryArrow: { fontSize: 18, color: RivalColors.accentText },
 
   tabs: { flexDirection: 'row', gap: 8, marginBottom: 20 },
-  tab: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: '#2A2A2A', backgroundColor: '#1A1A1A' },
-  tabActive: { backgroundColor: '#E91E8C', borderColor: '#E91E8C' },
-  tabText: { color: '#666666', fontSize: 13, fontWeight: '600' },
-  tabTextActive: { color: '#FFFFFF' },
+  tab: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: RivalColors.surfaceHigh, backgroundColor: RivalColors.surfaceContainer },
+  tabActive: { backgroundColor: RivalColors.accentFill, borderColor: RivalColors.accentFill },
+  tabText: { color: RivalColors.textSecondary, fontSize: 13, fontWeight: '600' },
+  tabTextActive: { color: RivalColors.textPrimary },
 
   emptyState: { paddingVertical: 40, alignItems: 'center', gap: 10 },
   emptyIcon: { fontSize: 36 },
-  emptyText: { color: '#666666', textAlign: 'center', fontSize: 14, lineHeight: 20 },
+  emptyText: { color: RivalColors.textSecondary, textAlign: 'center', fontSize: 14, lineHeight: 20 },
 
   raceCard: {
-    backgroundColor: '#1A1A1A',
+    backgroundColor: RivalColors.surfaceContainer,
     borderRadius: 16, padding: 20, marginBottom: 16,
-    borderWidth: 1, borderColor: '#2A2A2A', gap: 12,
+    borderWidth: 1, borderColor: RivalColors.surfaceHigh, gap: 12,
   },
-  raceCardOwn: { borderColor: '#8DC63F' },
+  raceCardOwn: { borderColor: RivalColors.accentText },
   raceCardCompleted: { opacity: 0.7 },
 
   raceHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   raceTypeRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   raceTypeIcon: { fontSize: 28 },
   raceMeta: { gap: 2 },
-  raceTypeLabel: { fontSize: 11, fontWeight: '800', color: '#E91E8C', letterSpacing: 1 },
-  raceOwner: { fontSize: 12, color: '#999999' },
-  raceOwnerYou: { fontSize: 12, color: '#8DC63F', fontWeight: '600' },
+  raceTypeLabel: { fontSize: 11, fontWeight: '800', color: RivalColors.accentFill, letterSpacing: 1 },
+  raceOwner: { fontSize: 12, color: RivalColors.textSecondary },
+  raceOwnerYou: { fontSize: 12, color: RivalColors.accentText, fontWeight: '600' },
   ownActions: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  editBtn: { color: '#E91E8C', fontSize: 14, fontWeight: '700' },
-  deleteBtn: { color: '#555555', fontSize: 18, padding: 4 },
+  editBtn: { color: RivalColors.accentFill, fontSize: 14, fontWeight: '700' },
+  deleteBtn: { color: RivalColors.textSecondary, fontSize: 18, padding: 4 },
 
-  raceName: { fontSize: 22, fontWeight: '900', color: '#FFFFFF' },
+  raceName: { fontFamily: RivalSerifFamily, fontStyle: 'italic', fontSize: 22, fontWeight: '700', color: RivalColors.textPrimary },
   raceDetails: { gap: 4 },
-  raceDetail: { fontSize: 13, color: '#999999' },
+  raceDetailRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  raceDetail: { fontSize: 13, color: RivalColors.textSecondary },
 
   disciplinesRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  disciplineChip: { backgroundColor: '#222222', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: '#2A2A2A' },
-  disciplineChipText: { color: '#999999', fontSize: 12, fontWeight: '600' },
+  disciplineChip: { backgroundColor: RivalColors.surfaceContainer, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: RivalColors.surfaceHigh },
+  disciplineChipText: { color: RivalColors.textSecondary, fontSize: 12, fontWeight: '600' },
 
   countdownRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
-  countdownNum: { fontSize: 36, fontWeight: '900', color: '#FFFFFF' },
-  countdownLabel: { fontSize: 14, color: '#999999', fontWeight: '600' },
+  countdownNum: { fontSize: 36, fontWeight: '900', color: RivalColors.textPrimary },
+  countdownLabel: { fontSize: 14, color: RivalColors.textSecondary, fontWeight: '600' },
 
-  goalTimeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#222222', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: '#2A2A2A' },
-  goalTimeLabel: { fontSize: 12, color: '#999999', fontWeight: '600' },
-  goalTimeValue: { fontSize: 15, color: '#E91E8C', fontWeight: '800' },
+  goalTimeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: RivalColors.surfaceContainer, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: RivalColors.surfaceHigh },
+  goalTimeLabel: { fontSize: 12, color: RivalColors.textSecondary, fontWeight: '600' },
+  goalTimeValue: { fontSize: 15, color: RivalColors.accentFill, fontWeight: '800' },
 
-  completedBadge: { backgroundColor: '#16a34a20', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, alignSelf: 'flex-start', borderWidth: 1, borderColor: '#16a34a50' },
-  completedBadgeText: { color: '#4ade80', fontSize: 13, fontWeight: '700' },
+  completedBadge: { backgroundColor: 'rgba(245,183,89,0.12)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, alignSelf: 'flex-start', borderWidth: 1, borderColor: 'rgba(245,183,89,0.35)' },
+  completedBadgeText: { color: RivalColors.accentGold, fontSize: 13, fontWeight: '700' },
 
-  finishTimesBlock: { backgroundColor: '#222222', borderRadius: 12, padding: 14, gap: 8, borderWidth: 1, borderColor: '#2A2A2A' },
+  finishTimesBlock: { backgroundColor: RivalColors.surfaceContainer, borderRadius: 12, padding: 14, gap: 8, borderWidth: 1, borderColor: RivalColors.surfaceHigh },
   finishTimeRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  finishTimeLabel: { fontSize: 12, color: '#999999', fontWeight: '600' },
-  finishTimeValue: { fontSize: 16, color: '#FFFFFF', fontWeight: '800' },
-  finishBeat: { color: '#4ade80' },
-  finishMissed: { color: '#fbbf24' },
-  finishMessage: { fontSize: 13, color: '#999999', fontStyle: 'italic', lineHeight: 19, marginTop: 4 },
+  finishTimeLabel: { fontSize: 12, color: RivalColors.textSecondary, fontWeight: '600' },
+  finishTimeValue: { fontSize: 16, color: RivalColors.textPrimary, fontWeight: '800' },
+  finishBeat: { color: RivalColors.accentGold },
+  finishMissed: { color: RivalColors.accentGold },
+  finishMessage: { fontSize: 13, color: RivalColors.textSecondary, fontStyle: 'italic', lineHeight: 19, marginTop: 4 },
 
-  logFinishBtn: { borderWidth: 1, borderColor: '#E91E8C', borderRadius: 10, paddingVertical: 10, alignItems: 'center' },
-  logFinishBtnText: { color: '#E91E8C', fontSize: 14, fontWeight: '700' },
+  logFinishBtn: { borderWidth: 1, borderColor: RivalColors.accentFill, borderRadius: 10, paddingVertical: 10, alignItems: 'center' },
+  logFinishBtnText: { color: RivalColors.accentFill, fontSize: 14, fontWeight: '700' },
 
   trainingSection: { gap: 6 },
   trainingLabelRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  trainingLabel: { fontSize: 12, color: '#999999', fontWeight: '600' },
-  trainingPct: { fontSize: 12, color: '#E91E8C', fontWeight: '700' },
-  trainingTrack: { height: 8, backgroundColor: '#2A2A2A', borderRadius: 4 },
+  trainingLabel: { fontSize: 12, color: RivalColors.textSecondary, fontWeight: '600' },
+  trainingPct: { fontSize: 12, color: RivalColors.accentFill, fontWeight: '700' },
+  trainingTrack: { height: 8, backgroundColor: RivalColors.surfaceHigh, borderRadius: 4 },
   trainingFill: { height: '100%', borderRadius: 4 },
-  trainingMeta: { fontSize: 11, color: '#555555' },
+  trainingMeta: { fontSize: 11, color: RivalColors.textSecondary },
 
   raceFooter: { flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
-  interestedBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: '#E91E8C' },
-  interestedBtnActive: { backgroundColor: '#E91E8C' },
-  interestedBtnText: { color: '#E91E8C', fontWeight: '700', fontSize: 13 },
-  interestedBtnTextActive: { color: '#FFFFFF' },
-  interestCount: { fontSize: 12, color: '#999999', flex: 1 },
-  registerLink: { color: '#8DC63F', fontSize: 13, fontWeight: '700' },
+  interestedBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: RivalColors.accentFill },
+  interestedBtnActive: { backgroundColor: RivalColors.accentFill },
+  interestedBtnText: { color: RivalColors.accentFill, fontWeight: '700', fontSize: 13 },
+  interestedBtnTextActive: { color: RivalColors.textPrimary },
+  interestCount: { fontSize: 12, color: RivalColors.textSecondary, flex: 1 },
+  registerLink: { color: RivalColors.accentText, fontSize: 13, fontWeight: '700' },
 
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'flex-end' },
   modalScroll: { maxHeight: '90%' },
-  modalCard: { backgroundColor: '#1A1A1A', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 28, gap: 12 },
-  modalTitle: { fontSize: 22, fontWeight: '900', color: '#FFFFFF', marginBottom: 4 },
-  modalLabel: { fontSize: 12, fontWeight: '700', color: '#666666', textTransform: 'uppercase', letterSpacing: 1 },
-  modalInput: { backgroundColor: '#222222', borderRadius: 10, padding: 14, color: '#FFFFFF', fontSize: 16, borderWidth: 1, borderColor: '#2A2A2A' },
+  modalCard: { backgroundColor: RivalColors.surfaceContainer, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 28, gap: 12 },
+  modalTitle: { fontSize: 22, fontWeight: '900', color: RivalColors.textPrimary, marginBottom: 4 },
+  modalLabel: { fontSize: 12, fontWeight: '700', color: RivalColors.textSecondary, textTransform: 'uppercase', letterSpacing: 1 },
+  modalInput: { backgroundColor: RivalColors.surfaceContainer, borderRadius: 10, padding: 14, color: RivalColors.textPrimary, fontSize: 16, borderWidth: 1, borderColor: RivalColors.surfaceHigh },
 
   segmentRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
-  segment: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: '#2A2A2A', backgroundColor: '#222222' },
-  segmentActive: { backgroundColor: '#E91E8C', borderColor: '#E91E8C' },
-  segmentText: { color: '#666666', fontSize: 13, fontWeight: '600' },
-  segmentTextActive: { color: '#FFFFFF' },
+  segment: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: RivalColors.surfaceHigh, backgroundColor: RivalColors.surfaceContainer },
+  segmentActive: { backgroundColor: RivalColors.accentFill, borderColor: RivalColors.accentFill },
+  segmentText: { color: RivalColors.textSecondary, fontSize: 13, fontWeight: '600' },
+  segmentTextActive: { color: RivalColors.textPrimary },
 
   disciplineInputRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  disciplineInputLabel: { color: '#999999', fontSize: 14, fontWeight: '600', width: 100 },
+  disciplineInputLabel: { color: RivalColors.textSecondary, fontSize: 14, fontWeight: '600', width: 100 },
   disciplineInput: { flex: 1 },
-  distanceSummary: { fontSize: 14, color: '#E91E8C', fontWeight: '700', textAlign: 'right' },
+  distanceSummary: { fontSize: 14, color: RivalColors.accentFill, fontWeight: '700', textAlign: 'right' },
   customDisciplineRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  removeDisc: { color: '#555555', fontSize: 18, paddingHorizontal: 4 },
-  addDisciplineBtn: { paddingVertical: 10, borderRadius: 8, borderWidth: 1, borderColor: '#2A2A2A', alignItems: 'center' },
-  addDisciplineBtnText: { color: '#E91E8C', fontWeight: '700', fontSize: 14 },
+  removeDisc: { color: RivalColors.textSecondary, fontSize: 18, paddingHorizontal: 4 },
+  addDisciplineBtn: { paddingVertical: 10, borderRadius: 8, borderWidth: 1, borderColor: RivalColors.surfaceHigh, alignItems: 'center' },
+  addDisciplineBtnText: { color: RivalColors.accentFill, fontWeight: '700', fontSize: 14 },
 
-  infoBox: { backgroundColor: '#222222', borderRadius: 10, padding: 14, borderWidth: 1, borderColor: '#2A2A2A', gap: 4 },
-  infoBoxTitle: { fontSize: 14, fontWeight: '800', color: '#FFFFFF' },
-  infoBoxText: { fontSize: 12, color: '#999999', lineHeight: 18 },
-  infoBoxAccent: { fontSize: 12, color: '#E91E8C', fontWeight: '700' },
+  infoBox: { backgroundColor: RivalColors.surfaceContainer, borderRadius: 10, padding: 14, borderWidth: 1, borderColor: RivalColors.surfaceHigh, gap: 4 },
+  infoBoxTitle: { fontSize: 14, fontWeight: '800', color: RivalColors.textPrimary },
+  infoBoxText: { fontSize: 12, color: RivalColors.textSecondary, lineHeight: 18 },
+  infoBoxAccent: { fontSize: 12, color: RivalColors.accentFill, fontWeight: '700' },
 
-  goalTimeHint: { fontSize: 12, color: '#555555', fontStyle: 'italic' },
+  goalTimeHint: { fontSize: 12, color: RivalColors.textSecondary, fontStyle: 'italic' },
 
-  finishModalCard: { backgroundColor: '#1A1A1A', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 28, gap: 12, marginTop: 'auto' },
-  finishModalRaceName: { fontSize: 16, color: '#999999', marginBottom: 4 },
-  finishPreviewBox: { backgroundColor: '#222222', borderRadius: 10, padding: 14, borderWidth: 1, borderColor: '#2A2A2A' },
-  finishPreviewMessage: { fontSize: 14, color: '#FFFFFF', fontStyle: 'italic', lineHeight: 20 },
-  finishModalHint: { fontSize: 13, color: '#555555', fontStyle: 'italic' },
+  finishModalCard: { backgroundColor: RivalColors.surfaceContainer, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 28, gap: 12, marginTop: 'auto' },
+  finishModalRaceName: { fontSize: 16, color: RivalColors.textSecondary, marginBottom: 4 },
+  finishPreviewBox: { backgroundColor: RivalColors.surfaceContainer, borderRadius: 10, padding: 14, borderWidth: 1, borderColor: RivalColors.surfaceHigh },
+  finishPreviewMessage: { fontSize: 14, color: RivalColors.textPrimary, fontStyle: 'italic', lineHeight: 20 },
+  finishModalHint: { fontSize: 13, color: RivalColors.textSecondary, fontStyle: 'italic' },
 
   modalButtons: { flexDirection: 'row', gap: 12, marginTop: 8 },
-  cancelButton: { flex: 1, paddingVertical: 14, borderRadius: 10, alignItems: 'center', borderWidth: 1, borderColor: '#2A2A2A' },
-  cancelButtonText: { color: '#666666', fontSize: 16, fontWeight: '600' },
-  saveButton: { flex: 2, backgroundColor: '#E91E8C', paddingVertical: 14, borderRadius: 10, alignItems: 'center' },
+  cancelButton: { flex: 1, paddingVertical: 14, borderRadius: 10, alignItems: 'center', borderWidth: 1, borderColor: RivalColors.surfaceHigh },
+  cancelButtonText: { color: RivalColors.textSecondary, fontSize: 16, fontWeight: '600' },
+  saveButton: { flex: 2, backgroundColor: RivalColors.accentFill, paddingVertical: 14, borderRadius: 10, alignItems: 'center' },
   saveButtonDisabled: { opacity: 0.4 },
-  saveButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
+  saveButtonText: { color: RivalColors.textPrimary, fontSize: 16, fontWeight: '700' },
 });
