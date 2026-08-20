@@ -5,6 +5,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { supabase } from '../lib/supabase';
 import { displayToIsoDate } from '../lib/dateFormat';
 import { computeGoalProgress } from '../lib/goalProgress';
+import { notify } from '../lib/notify';
 import { RivalTopNav, RivalIcon } from '../components/rival';
 import { RivalColors, RivalRadius } from '../constants/rivalTheme';
 
@@ -286,7 +287,7 @@ export default function GoalsScreen() {
     setSaving(true);
     const { start, end } = getDateRange(periodType);
 
-    await supabase.from('goals').insert({
+    const { error: addErr } = await supabase.from('goals').insert({
       user_id: userId,
       goal_type: goalType,
       target_value: parseFloat(targetValue),
@@ -295,6 +296,13 @@ export default function GoalsScreen() {
       end_date: dateToLocalStr(end),
       activity_filter: goalType === 'gym_sessions' ? null : activityFilter,
     });
+    if (addErr) {
+      // Keep the form open with the values still in it rather than closing on
+      // a goal that was never created.
+      notify("Couldn't create that goal", addErr.message);
+      setSaving(false);
+      return;
+    }
 
     setSaving(false);
     setShowAdd(false);
@@ -308,7 +316,11 @@ export default function GoalsScreen() {
 
   async function deleteGoal(id: string) {
     if (typeof window !== 'undefined' && !window.confirm('Delete this goal?')) return;
-    await supabase.from('goals').delete().eq('id', id);
+    const { error } = await supabase.from('goals').delete().eq('id', id);
+    if (error) {
+      notify("Couldn't delete that goal", error.message);
+      return;
+    }
     setGoals((prev) => prev.filter((g) => g.id !== id));
   }
 
@@ -332,7 +344,11 @@ export default function GoalsScreen() {
   // a 4th row, since it's the same slot picking back up, not a new goal.
   async function tryAgainGoal(goal: Goal) {
     const { start, end } = getDateRange(goal.period_type as 'week' | 'month');
-    await supabase.from('goals').insert({
+    // Insert the replacement BEFORE removing the old row, and abort if it
+    // fails: unchecked, a failed insert followed by a successful delete left
+    // the athlete with no goal at all -- silent data loss on a button labelled
+    // "try again".
+    const { error: insErr } = await supabase.from('goals').insert({
       user_id: userId,
       goal_type: goal.goal_type,
       target_value: goal.target_value,
@@ -341,7 +357,15 @@ export default function GoalsScreen() {
       end_date: dateToLocalStr(end),
       activity_filter: goal.activity_filter,
     });
-    await supabase.from('goals').delete().eq('id', goal.id);
+    if (insErr) {
+      notify("Couldn't start that goal again", insErr.message);
+      return;
+    }
+    const { error: delErr } = await supabase.from('goals').delete().eq('id', goal.id);
+    if (delErr) {
+      // The new goal exists, so nothing is lost; the old one just lingers.
+      notify('Started a fresh goal', 'The finished one could not be cleared away — you may see both for now.');
+    }
     load();
   }
 
