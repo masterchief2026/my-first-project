@@ -400,7 +400,11 @@ export default function LeagueScreen() {
   }
 
   async function saveGoal() {
-    await supabase.from('league_members').update({ personal_goal: goalDraft.trim() || null }).eq('league_id', id).eq('user_id', currentUserId);
+    const { error } = await supabase.from('league_members').update({ personal_goal: goalDraft.trim() || null }).eq('league_id', id).eq('user_id', currentUserId);
+    if (error) {
+      notify("Couldn't save your goal", error.message);
+      return;
+    }
     setMembers(prev => prev.map(m => m.user_id === currentUserId ? { ...m, personal_goal: goalDraft.trim() || null } : m));
     setEditingGoal(false);
   }
@@ -765,7 +769,8 @@ export default function LeagueScreen() {
           .upload(path, file, { contentType: file.type, upsert: true });
         if (!storageErr) {
           const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path);
-          await supabase.from('leagues').update({ logo_url: urlData.publicUrl }).eq('id', id);
+          const { error: logoErr } = await supabase.from('leagues').update({ logo_url: urlData.publicUrl }).eq('id', id);
+          if (logoErr) notify("Couldn't update the team logo", logoErr.message);
           setLeague(prev => prev ? { ...prev, logo_url: urlData.publicUrl } : prev);
         }
       } finally {
@@ -1022,7 +1027,7 @@ export default function LeagueScreen() {
     const endDateStr = `${ey}-${String(em).padStart(2, '0')}-${String(ed).padStart(2, '0')}`;
 
     setPostingChallenge(true);
-    const { data: inserted } = await supabase.from('league_challenges').insert({
+    const { data: inserted, error: insErr } = await supabase.from('league_challenges').insert({
       league_id: id,
       challenger_id: currentUserId,
       opponent_id: challengeModalFor,
@@ -1031,6 +1036,11 @@ export default function LeagueScreen() {
       end_date: endDateStr,
       status: 'pending',
     }).select('id').single();
+    if (insErr) {
+      setPostingChallenge(false);
+      notify("Couldn't create that challenge", insErr.message);
+      return;
+    }
     setPostingChallenge(false);
     setChallengeModalFor(null);
     if (inserted) fireChallengeNotification('1v1_sent', inserted.id);
@@ -1039,9 +1049,11 @@ export default function LeagueScreen() {
 
   async function respondToChallenge(challengeId: string, accept: boolean) {
     if (!accept) {
-      await supabase.from('league_challenges').update({ status: 'declined' }).eq('id', challengeId);
+      const { error: decErr } = await supabase.from('league_challenges').update({ status: 'declined' }).eq('id', challengeId);
+      if (decErr) { notify("Couldn't decline that challenge", decErr.message); return; }
     } else {
-      await supabase.from('league_challenges').update({ status: 'active' }).eq('id', challengeId);
+      const { error: accErr } = await supabase.from('league_challenges').update({ status: 'active' }).eq('id', challengeId);
+      if (accErr) { notify("Couldn't accept that challenge", accErr.message); return; }
     }
     fireChallengeNotification('1v1_response', challengeId, { accept });
     loadChallenges();
@@ -1122,11 +1134,16 @@ export default function LeagueScreen() {
     const [ey, em, ed] = [end.getFullYear(), end.getMonth() + 1, end.getDate()];
     const endDateStr = `${ey}-${String(em).padStart(2, '0')}-${String(ed).padStart(2, '0')}`;
     setPostingLvl(true);
-    const { data: inserted } = await supabase.from('league_vs_league_challenges').insert({
+    const { data: inserted, error: insErr } = await supabase.from('league_vs_league_challenges').insert({
       challenger_league_id: id, opponent_league_id: lvlTargetLeague,
       created_by: currentUserId, metric: lvlMetric,
       start_date: today, end_date: endDateStr, status: 'pending',
     }).select('id').single();
+    if (insErr) {
+      setPostingLvl(false);
+      notify("Couldn't create that challenge", insErr.message);
+      return;
+    }
     setPostingLvl(false);
     setShowLvlModal(false);
     setLvlTargetLeague(null);
@@ -1145,9 +1162,16 @@ export default function LeagueScreen() {
     const text = chatInput.trim();
     if (!text || !currentUserId) return;
     setChatInput('');
-    await supabase.from('league_messages').insert({
+    const { error } = await supabase.from('league_messages').insert({
       league_id: id, user_id: currentUserId, kind: 'text', body: text,
     });
+    if (error) {
+      // The input was cleared optimistically — put the text back so a failed
+      // send doesn't silently swallow what they typed.
+      setChatInput(text);
+      notify("Couldn't send that message", error.message);
+      return;
+    }
     loadChat();
   }
 
@@ -1189,11 +1213,18 @@ export default function LeagueScreen() {
     const scheduledAt = new Date(Date.now() + quickTrainMinutes * 60 * 1000);
 
     setPostingQuickTrain(true);
-    const { data: inserted } = await supabase.from('league_messages').insert({
+    const { data: inserted, error: insErr } = await supabase.from('league_messages').insert({
       league_id: id, user_id: currentUserId, kind: 'session',
       activity_type: quickTrainType, scheduled_at: scheduledAt.toISOString(),
       location: quickTrainLocation.trim() || null,
     }).select('id').single();
+    if (insErr) {
+      // Must clear the spinner too — an early return that skips it leaves the
+      // button stuck in its posting state with no way back.
+      setPostingQuickTrain(false);
+      notify("Couldn't create that session", insErr.message);
+      return;
+    }
 
     if (inserted) {
       await supabase.from('league_session_rsvps').insert({ message_id: inserted.id, user_id: currentUserId });
@@ -1224,10 +1255,12 @@ export default function LeagueScreen() {
     if (!currentUserId) return;
     const joined = (rsvpMap[messageId] || []).includes(currentUserId);
     if (joined) {
-      await supabase.from('league_session_rsvps').delete().eq('message_id', messageId).eq('user_id', currentUserId);
+      const { error: rsvpOutErr } = await supabase.from('league_session_rsvps').delete().eq('message_id', messageId).eq('user_id', currentUserId);
+      if (rsvpOutErr) { notify("Couldn't update your RSVP", rsvpOutErr.message); loadChat(); return; }
       setRsvpMap(prev => ({ ...prev, [messageId]: (prev[messageId] || []).filter(u => u !== currentUserId) }));
     } else {
-      await supabase.from('league_session_rsvps').insert({ message_id: messageId, user_id: currentUserId });
+      const { error: rsvpInErr } = await supabase.from('league_session_rsvps').insert({ message_id: messageId, user_id: currentUserId });
+      if (rsvpInErr) { notify("Couldn't update your RSVP", rsvpInErr.message); loadChat(); return; }
       setRsvpMap(prev => ({ ...prev, [messageId]: [...(prev[messageId] || []), currentUserId] }));
     }
   }
@@ -1256,10 +1289,14 @@ export default function LeagueScreen() {
     const existing = (reactionsMap[key] || []).find(r => r.user_id === currentUserId);
 
     if (existing && existing.emoji === emoji) {
-      await supabase.from('feed_reactions').delete().eq('target_type', targetType).eq('target_id', targetId).eq('user_id', currentUserId);
+      // Reactions are a quiet, high-frequency tap — resync rather than
+      // interrupting with a dialog, but never leave the UI showing a reaction
+      // the server rejected.
+      const { error: unreactErr } = await supabase.from('feed_reactions').delete().eq('target_type', targetType).eq('target_id', targetId).eq('user_id', currentUserId);
+      if (unreactErr) loadChat();
       setReactionsMap(prev => ({ ...prev, [key]: (prev[key] || []).filter(r => r.user_id !== currentUserId) }));
     } else {
-      await supabase.from('feed_reactions').upsert(
+      const { error: reactErr } = await supabase.from('feed_reactions').upsert(
         { league_id: id, target_type: targetType, target_id: targetId, user_id: currentUserId, emoji },
         { onConflict: 'target_type,target_id,user_id' }
       );
