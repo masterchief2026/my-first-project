@@ -10,7 +10,7 @@ import { formatDisplayName, formatTeamName } from '../lib/identity';
 import { isoToDisplayDate, displayToIsoDate } from '../lib/dateFormat';
 import { getSeasonStartISO, daysUntilSeasonEnd } from '../lib/season';
 import { matchCanonicalLift } from './scan-workout';
-import { RivalColors } from '../constants/rivalTheme';
+import { RivalColors, RivalSerifFamily } from '../constants/rivalTheme';
 import { BREAKPOINT_WIDE_LAYOUT } from '../constants/breakpoints';
 import { ACTIVITY_ICONS } from '../constants/activityIcons';
 import { formatDuration } from '../lib/format';
@@ -2791,7 +2791,7 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
   teamChallengeTitle: {
-    fontFamily: 'Georgia, "Times New Roman", serif', fontStyle: 'italic', fontWeight: '700', fontSize: 18, color: '#fff', marginTop: 2,
+    fontFamily: RivalSerifFamily, fontStyle: 'italic', fontWeight: '700', fontSize: 18, color: '#fff', marginTop: 2,
     textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
   },
   teamChallengeEditBtn: { backgroundColor: 'rgba(20,20,20,0.55)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10 },
@@ -2808,17 +2808,17 @@ const styles = StyleSheet.create({
     borderRadius: 14, padding: 12,
   },
   paceIcon: { width: 34, height: 34, borderRadius: 10, backgroundColor: 'rgba(217,119,87,0.22)', alignItems: 'center', justifyContent: 'center' },
-  paceTitle: { fontFamily: 'Georgia, "Times New Roman", serif', fontStyle: 'italic', fontWeight: '700', fontSize: 14, color: '#fff' },
+  paceTitle: { fontFamily: RivalSerifFamily, fontStyle: 'italic', fontWeight: '700', fontSize: 14, color: '#fff' },
   paceSub: { fontSize: 12, color: RivalColors.onSurfaceVariant, marginTop: 2 },
   paceSubBold: { fontWeight: '800', color: '#fff' },
 
   statMiniRow: { flexDirection: 'row', gap: 8 },
   statMiniCard: { flex: 1, backgroundColor: '#2a211d', borderWidth: 1, borderColor: `${RivalColors.accentText}24`, borderRadius: 14, paddingVertical: 12, alignItems: 'center' },
   statMiniVal: { fontSize: 17, fontWeight: '800', color: '#fff', letterSpacing: -0.3 },
-  statMiniLbl: { fontFamily: 'Georgia, "Times New Roman", serif', fontStyle: 'italic', fontWeight: '700', fontSize: 9, letterSpacing: 0.4, color: 'rgba(255,255,255,0.55)', textTransform: 'uppercase', textAlign: 'center', marginTop: 4 },
+  statMiniLbl: { fontFamily: RivalSerifFamily, fontStyle: 'italic', fontWeight: '700', fontSize: 9, letterSpacing: 0.4, color: 'rgba(255,255,255,0.55)', textTransform: 'uppercase', textAlign: 'center', marginTop: 4 },
 
   teamChallengeContributors: { borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)', paddingTop: 12, gap: 2 },
-  teamChallengeSectionTitle: { fontFamily: 'Georgia, "Times New Roman", serif', fontStyle: 'italic', fontWeight: '700', fontSize: 14, color: '#fff', marginBottom: 6 },
+  teamChallengeSectionTitle: { fontFamily: RivalSerifFamily, fontStyle: 'italic', fontWeight: '700', fontSize: 14, color: '#fff', marginBottom: 6 },
   contribRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 7 },
   contribRank: { width: 14, textAlign: 'center', color: RivalColors.textSecondary, fontSize: 12, fontWeight: '700' },
   contribCrown: { position: 'absolute', top: -10, left: '50%', transform: [{ translateX: -7 }], zIndex: 2 },

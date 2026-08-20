@@ -103,6 +103,18 @@ export const RANK_LEVEL_COLORS: string[] = [
 // (src/global.css) and @expo-google-fonts/manrope for native.
 export const RivalFontFamily = 'Manrope';
 
+// The editorial accent face, used ITALIC and selectively — hero titles, athlete
+// names, event names, and small unit labels on Team Feed / Team Hub / the
+// activity diary. It is what gives those surfaces their magazine feel against
+// Manrope's neutral UI text.
+//
+// A system stack on purpose: Georgia ships on every Apple and Windows device
+// and costs nothing to load, which matters on a page that already carries a
+// photographic hero. Swapping in a webfont (Instrument Serif, Fraunces) means
+// changing this one constant — that is the reason it exists, rather than the 24
+// copies of the same string that were previously scattered across 7 screens.
+export const RivalSerifFamily = 'Georgia, "Times New Roman", serif';
+
 export const RivalType = {
   displayHero: { fontFamily: RivalFontFamily, fontSize: 48, fontWeight: '800' as const, lineHeight: 56, letterSpacing: -0.96 },
   headlineLg: { fontFamily: RivalFontFamily, fontSize: 32, fontWeight: '700' as const, lineHeight: 40, letterSpacing: -0.32 },

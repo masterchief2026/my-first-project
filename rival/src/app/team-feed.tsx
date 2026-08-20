@@ -10,7 +10,7 @@ import { formatDuration } from '../lib/format';
 import { computeActivityInsight, ActivityInsight, InsightActivity, InsightTone } from '../lib/activityInsights';
 import { matchCanonicalLift } from './scan-workout';
 import { RivalTopNav, RivalIcon, RivalIconName, activityIconName } from '../components/rival';
-import { RivalColors } from '../constants/rivalTheme';
+import { RivalColors, RivalSerifFamily } from '../constants/rivalTheme';
 import { BREAKPOINT_WIDE_LAYOUT } from '../constants/breakpoints';
 
 // Combined multi-team activity feed — separate destination from league.tsx's
@@ -690,13 +690,13 @@ const styles = StyleSheet.create({
   heroTextBlock: { alignItems: 'center', gap: 4, paddingHorizontal: 18, marginTop: 6 },
   heroGlyphRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 2 },
   heroRule: { width: 40, height: 1, backgroundColor: 'rgba(255,255,255,0.3)' },
-  heroTitle: { fontFamily: 'Georgia, "Times New Roman", serif', fontStyle: 'italic', fontWeight: '600', fontSize: 22, color: '#fff' },
+  heroTitle: { fontFamily: RivalSerifFamily, fontStyle: 'italic', fontWeight: '600', fontSize: 22, color: '#fff' },
   heroTagline: { fontSize: 12, color: 'rgba(255,255,255,0.6)' },
   heroTaglineUnderline: { width: 102, height: 1, marginTop: 8, backgroundColor: 'rgba(255,255,255,0.3)' },
 
   stateText: { fontSize: 13, color: RivalColors.textSecondary, textAlign: 'center', paddingVertical: 24 },
   emptyState: { alignItems: 'center', gap: 8, paddingVertical: 32, paddingHorizontal: 20 },
-  emptyTitle: { fontFamily: 'Georgia, "Times New Roman", serif', fontStyle: 'italic', fontWeight: '700', fontSize: 17, color: '#fff', marginTop: 4 },
+  emptyTitle: { fontFamily: RivalSerifFamily, fontStyle: 'italic', fontWeight: '700', fontSize: 17, color: '#fff', marginTop: 4 },
   emptyBody: { fontSize: 13, color: RivalColors.textSecondary, textAlign: 'center' },
   emptyBtn: { marginTop: 8, backgroundColor: RivalColors.accentFill, borderRadius: 999, paddingVertical: 10, paddingHorizontal: 20 },
   emptyBtnText: { fontSize: 13, fontWeight: '800', color: RivalColors.onAccentFill },
@@ -771,7 +771,7 @@ const styles = StyleSheet.create({
   postAvatar: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 1, overflow: 'hidden' },
   postAvatarImg: { width: 36, height: 36, borderRadius: 18 },
   postAvatarText: { fontSize: 12.5, fontWeight: '800' },
-  postName: { fontFamily: 'Georgia, "Times New Roman", serif', fontStyle: 'italic', fontWeight: '700', fontSize: 15, color: '#fff' },
+  postName: { fontFamily: RivalSerifFamily, fontStyle: 'italic', fontWeight: '700', fontSize: 15, color: '#fff' },
   postMeta: { fontSize: 11, color: 'rgba(255,255,255,0.55)', marginTop: 1 },
   postTeamTag: { color: RivalColors.accentText, fontWeight: '600' },
 
@@ -785,7 +785,7 @@ const styles = StyleSheet.create({
   statsLine: { fontSize: 14.5, fontWeight: '600', color: 'rgba(255,255,255,0.85)' },
   effortLine: { alignItems: 'flex-end' },
   effortNum: { fontSize: 19, fontWeight: '800', color: RivalColors.accentText, lineHeight: 20 },
-  effortUnit: { fontFamily: 'Georgia, "Times New Roman", serif', fontStyle: 'italic', fontWeight: '700', fontSize: 9, letterSpacing: 0.4, color: 'rgba(255,255,255,0.55)', textTransform: 'uppercase', marginTop: 1 },
+  effortUnit: { fontFamily: RivalSerifFamily, fontStyle: 'italic', fontWeight: '700', fontSize: 9, letterSpacing: 0.4, color: 'rgba(255,255,255,0.55)', textTransform: 'uppercase', marginTop: 1 },
 
   caption: { fontSize: 12.5, color: RivalColors.onSurface, lineHeight: 18, paddingHorizontal: 2 },
 
@@ -796,9 +796,9 @@ const styles = StyleSheet.create({
       backgroundImage: 'radial-gradient(ellipse 90% 60% at 50% 40%, rgba(255,209,190,0.10) 0%, rgba(19,19,19,0) 65%), linear-gradient(160deg, #231e1b 0%, #2d241f 55%, #3b2821 100%)',
     } as any : {}),
   },
-  noPhotoBody: { fontFamily: 'Georgia, "Times New Roman", serif', fontStyle: 'italic', fontSize: 13, color: 'rgba(255,255,255,0.75)', textAlign: 'center' },
+  noPhotoBody: { fontFamily: RivalSerifFamily, fontStyle: 'italic', fontSize: 13, color: 'rgba(255,255,255,0.75)', textAlign: 'center' },
   eventAction: { fontSize: 11.5, fontWeight: '700', letterSpacing: 0.4, textTransform: 'uppercase', color: '#ff5c5c' },
-  eventName: { fontFamily: 'Georgia, "Times New Roman", serif', fontStyle: 'italic', fontWeight: '700', fontSize: 18, color: '#fff', marginTop: 2 },
+  eventName: { fontFamily: RivalSerifFamily, fontStyle: 'italic', fontWeight: '700', fontSize: 18, color: '#fff', marginTop: 2 },
   eventDate: { fontSize: 12, color: 'rgba(255,255,255,0.6)', marginTop: 2 },
 
   reactionRow: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingHorizontal: 2 },

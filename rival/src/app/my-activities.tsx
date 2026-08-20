@@ -8,7 +8,7 @@ import { calculateStreak } from '../lib/streak';
 import { displayToIsoDate, isoToDisplayDate } from '../lib/dateFormat';
 import { computeActivityInsight, InsightTone } from '../lib/activityInsights';
 import { RivalTopNav, RivalIcon, activityIconName, RivalFixedBackground, ActivityDiaryViewer, DiaryActivity, PhotoPositioner, CoverImage } from '../components/rival';
-import { RivalColors, RivalRadius, RivalType } from '../constants/rivalTheme';
+import { RivalColors, RivalRadius, RivalType, RivalSerifFamily } from '../constants/rivalTheme';
 import { BREAKPOINT_TWO_UP_GRID, BREAKPOINT_SPACIOUS_GALLERY, BREAKPOINT_MOBILE_NAV } from '../constants/breakpoints';
 
 type ExerciseEntry = {
@@ -2386,10 +2386,10 @@ const styles = StyleSheet.create({
   jGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'center' },
   jSwipeHint: { alignItems: 'center', paddingTop: 4, opacity: 0.6 },
   jYearComingSoon: { alignItems: 'center', gap: 10, paddingTop: 80, paddingHorizontal: 24 },
-  jYearComingSoonTitle: { fontFamily: 'Georgia, "Times New Roman", serif', fontStyle: 'italic', fontWeight: '700', fontSize: 19, color: RivalColors.textPrimary, marginTop: 4 },
+  jYearComingSoonTitle: { fontFamily: RivalSerifFamily, fontStyle: 'italic', fontWeight: '700', fontSize: 19, color: RivalColors.textPrimary, marginTop: 4 },
   jYearComingSoonBody: { fontSize: 13, color: RivalColors.textSecondary, textAlign: 'center', lineHeight: 19 },
   jTitleBlock: { alignSelf: 'center', marginTop: 16, marginBottom: 16, paddingVertical: 8, paddingHorizontal: 20, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.12)', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.12)' },
-  jTitle: { fontFamily: 'Georgia, "Times New Roman", serif', fontStyle: 'italic', fontWeight: '500', fontSize: 17, color: 'rgba(255,255,255,0.75)', textAlign: 'center' },
+  jTitle: { fontFamily: RivalSerifFamily, fontStyle: 'italic', fontWeight: '500', fontSize: 17, color: 'rgba(255,255,255,0.75)', textAlign: 'center' },
   jSubtitle: { fontSize: 11, color: 'rgba(255,255,255,0.32)', textAlign: 'center', marginTop: 2 },
   jToolbarRow: { flexDirection: 'row', gap: 6, alignSelf: 'center' },
 
@@ -2443,7 +2443,7 @@ const styles = StyleSheet.create({
     } as any : {}),
   },
   jMonthHeader: { alignItems: 'center', paddingTop: 16, paddingBottom: 10, paddingHorizontal: 16 },
-  jMonthTitle: { fontFamily: 'Georgia, "Times New Roman", serif', fontStyle: 'italic', fontWeight: '600', fontSize: 20, color: 'rgba(255,255,255,0.92)' },
+  jMonthTitle: { fontFamily: RivalSerifFamily, fontStyle: 'italic', fontWeight: '600', fontSize: 20, color: 'rgba(255,255,255,0.92)' },
   // A plain border can't fade, so this is a separate bar with a transparent-
   // to-color-to-transparent gradient (web) — tapers to a point at each tip
   // instead of the hard-cut edge a borderBottomWidth would give.
@@ -2476,7 +2476,7 @@ const styles = StyleSheet.create({
   jCalLegendSwatch: { width: 11, height: 11, borderRadius: 3, backgroundColor: '#3b2f27' },
   jCalLegendSwatchPb: { backgroundColor: RivalColors.rankAnchors.unrivaled },
   jCalLegendSwatchRace: { backgroundColor: '#ff5c5c' },
-  jCalLegendText: { fontFamily: 'Georgia, "Times New Roman", serif', fontStyle: 'italic', fontSize: 11, fontWeight: '500', color: RivalColors.textSecondary },
+  jCalLegendText: { fontFamily: RivalSerifFamily, fontStyle: 'italic', fontSize: 11, fontWeight: '500', color: RivalColors.textSecondary },
 
   // Hero recap card — matches mockup .recap-card exactly.
   recapCard: {
@@ -2495,11 +2495,11 @@ const styles = StyleSheet.create({
   // sleek pill instead of a mostly-empty full-size card.
   recapCardCollapsed: { paddingTop: 8, paddingHorizontal: 12, paddingBottom: 8 },
   recapTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
-  recapTitle: { fontFamily: 'Georgia, "Times New Roman", serif', fontStyle: 'italic', fontWeight: '500', fontSize: 20, color: RivalColors.textPrimary },
+  recapTitle: { fontFamily: RivalSerifFamily, fontStyle: 'italic', fontWeight: '500', fontSize: 20, color: RivalColors.textPrimary },
   recapEffortInline: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   recapEffortNumCol: { alignItems: 'flex-end' },
   recapEffortNum: { fontSize: 19, fontWeight: '600', color: RivalColors.textPrimary },
-  recapEffortLabel: { fontFamily: 'Georgia, "Times New Roman", serif', fontStyle: 'italic', fontWeight: '700', fontSize: 10, letterSpacing: 0.4, color: RivalColors.textPrimary, textTransform: 'uppercase' },
+  recapEffortLabel: { fontFamily: RivalSerifFamily, fontStyle: 'italic', fontWeight: '700', fontSize: 10, letterSpacing: 0.4, color: RivalColors.textPrimary, textTransform: 'uppercase' },
   recapChevronOpen: { transform: [{ rotate: '180deg' }] },
   recapStatgrid: { flexDirection: 'row', backgroundColor: 'rgba(19,19,19,0.55)', borderWidth: 1, borderColor: '#323232', borderRadius: 12, paddingVertical: 13, paddingHorizontal: 3 },
   recapStatcell: { flex: 1, alignItems: 'center', gap: 6, paddingHorizontal: 3 },
@@ -2535,7 +2535,7 @@ const styles = StyleSheet.create({
     width: '100%', borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.04)',
     paddingVertical: 22, paddingHorizontal: 20, alignItems: 'center', gap: 6, marginBottom: 4,
   },
-  jWeekEmptyTitle: { fontFamily: 'Georgia, "Times New Roman", serif', fontStyle: 'italic', fontSize: 16, color: 'rgba(255,255,255,0.75)', marginTop: 2 },
+  jWeekEmptyTitle: { fontFamily: RivalSerifFamily, fontStyle: 'italic', fontSize: 16, color: 'rgba(255,255,255,0.75)', marginTop: 2 },
   jWeekEmptySub: { fontSize: 12, color: RivalColors.textSecondary, textAlign: 'center' },
   // width is relative to the slot now (was flexBasis relative to the grid) —
   // 81% preserves the same visual size as before (38.88% of the old 48% grid
@@ -2547,7 +2547,7 @@ const styles = StyleSheet.create({
   },
   // Same serif family/italic as jCardName ("Swim"/"Ride" titles), but kept
   // at the original size/weight — just the font, not the bold treatment.
-  jAddCardText: { fontFamily: 'Georgia, "Times New Roman", serif', fontStyle: 'italic', fontWeight: '500', fontSize: 15, letterSpacing: 0.3, color: 'rgba(255,255,255,0.6)' },
+  jAddCardText: { fontFamily: RivalSerifFamily, fontStyle: 'italic', fontWeight: '500', fontSize: 15, letterSpacing: 0.3, color: 'rgba(255,255,255,0.6)' },
   jCardPhoto: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%' },
   jCardArt: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center',
@@ -2561,9 +2561,9 @@ const styles = StyleSheet.create({
     ...(Platform.OS === 'web' ? { backgroundImage: 'linear-gradient(180deg, rgba(0,0,0,0) 42%, rgba(8,8,8,0.88) 100%)' } as any : { backgroundColor: 'rgba(8,8,8,0.35)' }),
   },
   jCardDayBadge: { position: 'absolute', top: 10, left: 0, right: 0, alignItems: 'center' },
-  jCardDayText: { fontFamily: 'Georgia, "Times New Roman", serif', fontStyle: 'italic', fontWeight: '500', fontSize: 13, color: 'rgba(255,255,255,0.75)' },
+  jCardDayText: { fontFamily: RivalSerifFamily, fontStyle: 'italic', fontWeight: '500', fontSize: 13, color: 'rgba(255,255,255,0.75)' },
   jCardBody: { position: 'absolute', left: 12, right: 12, bottom: 12, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 6 },
-  jCardName: { fontFamily: 'Georgia, "Times New Roman", serif', fontStyle: 'italic', fontWeight: '800', fontSize: 16, letterSpacing: 0.3, color: '#fff', lineHeight: 19 },
+  jCardName: { fontFamily: RivalSerifFamily, fontStyle: 'italic', fontWeight: '800', fontSize: 16, letterSpacing: 0.3, color: '#fff', lineHeight: 19 },
   jCardStat: { fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.65)', marginTop: 2 },
   jCardEffort: { alignItems: 'center', gap: 1 },
   jCardEffortNum: { fontSize: 13, fontWeight: '700', color: 'rgba(255,255,255,0.65)', lineHeight: 13 },

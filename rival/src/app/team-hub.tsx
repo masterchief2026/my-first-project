@@ -28,7 +28,7 @@ import { formatDuration } from '../lib/format';
 import { computeActivityInsight, ActivityInsight, InsightActivity, InsightTone } from '../lib/activityInsights';
 import { RivalAvatar } from '../components/rival/RivalAvatar';
 import { RivalIcon, RivalIconName, activityIconName } from '../components/rival/RivalIcon';
-import { RivalColors } from '../constants/rivalTheme';
+import { RivalColors, RivalSerifFamily } from '../constants/rivalTheme';
 import { matchCanonicalLift } from './scan-workout';
 
 const INSIGHT_ICON: Record<InsightTone, RivalIconName> = { record: 'trophy', streak: 'fire', comeback: 'trendUp' };
@@ -50,7 +50,7 @@ function tintFor(name: string): { bg: string; color: string } {
   return TINTS[Math.abs(hash) % TINTS.length];
 }
 
-const SERIF = 'Georgia, "Times New Roman", serif';
+const SERIF = RivalSerifFamily;
 const HERO_PHOTO = require('../../assets/images/backgrounds/optimized/coastal-highway-triathlete-dusk-3.jpg');
 
 // Swim/Rowing distances are shown in metres, not km — same convention as
