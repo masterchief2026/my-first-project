@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
-import { StyleSheet, TouchableOpacity, View, Text, TextInput, Platform } from 'react-native';
+import { StyleSheet, TouchableOpacity, View, Text, TextInput, Platform, Image as RNImage } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Asset } from 'expo-asset';
+import { RivalButton } from '../components/rival';
+import { RivalColors, RivalRadius, RivalType } from '../constants/rivalTheme';
 import { router } from 'expo-router';
 import { supabase } from '../lib/supabase';
 
@@ -64,8 +67,29 @@ export default function ResetPasswordScreen() {
     router.replace('/home');
   }
 
+  // Same photographic shell as sign-in and sign-up — this is the third screen
+  // in that flow and was the last one still on the flat pre-Ember background.
+  const bgUri = Platform.OS === 'web'
+    ? Asset.fromModule(require('../../assets/images/backgrounds/optimized/ridge-runners-hazy-backlit.jpg')).uri
+    : undefined;
+
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.bg}>
+      {Platform.OS === 'web' ? (
+        // @ts-ignore — intentional escape hatch to a real DOM element; RN Web's renderer is react-dom
+        <img
+          src={bgUri}
+          style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: '50% center', display: 'block' }}
+        />
+      ) : (
+        <RNImage
+          source={require('../../assets/images/backgrounds/optimized/ridge-runners-hazy-backlit.jpg')}
+          style={StyleSheet.absoluteFill}
+          resizeMode="cover"
+        />
+      )}
+      <View style={styles.scrim} />
+      <SafeAreaView style={styles.container}>
       <View style={styles.content}>
         <Text style={styles.logo}>RIVAL</Text>
 
@@ -85,7 +109,7 @@ export default function ResetPasswordScreen() {
         )}
 
         {status === 'ready' && (
-          <View style={styles.form}>
+          <View style={styles.card}>
             <Text style={styles.title}>Set a new password</Text>
 
             {error ? (
@@ -99,7 +123,7 @@ export default function ResetPasswordScreen() {
               <TextInput
                 style={styles.input}
                 placeholder="At least 6 characters"
-                placeholderTextColor="#6b7280"
+                placeholderTextColor={RivalColors.textSecondary}
                 value={newPassword}
                 onChangeText={setNewPassword}
                 secureTextEntry
@@ -111,44 +135,52 @@ export default function ResetPasswordScreen() {
               <TextInput
                 style={styles.input}
                 placeholder="Re-enter password"
-                placeholderTextColor="#6b7280"
+                placeholderTextColor={RivalColors.textSecondary}
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}
                 secureTextEntry
               />
             </View>
 
-            <TouchableOpacity
-              style={[styles.primaryButton, saving && styles.disabled]}
+            <RivalButton
+              label={saving ? 'Saving…' : 'Set New Password'}
               onPress={handleSetNewPassword}
               disabled={saving}
-            >
-              <Text style={styles.primaryButtonText}>{saving ? 'Saving…' : 'Set New Password'}</Text>
-            </TouchableOpacity>
+              style={styles.submitBtn}
+            />
           </View>
         )}
       </View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#111111' },
+  bg: { flex: 1, position: 'relative', backgroundColor: RivalColors.surfaceLowest },
+  scrim: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(14,14,14,0.35)' },
+  container: { flex: 1 },
   content: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 24, paddingHorizontal: 24 },
-  logo: { fontSize: 32, fontWeight: '900', color: '#FFFFFF', letterSpacing: 6 },
-  status: { fontSize: 16, color: '#999999', textAlign: 'center', paddingHorizontal: 20 },
-  link: { color: '#E91E8C', fontSize: 15, fontWeight: '600' },
-  form: { width: '100%', maxWidth: 360, gap: 20 },
-  title: { fontSize: 24, fontWeight: '800', color: '#FFFFFF', textAlign: 'center' },
-  errorBox: { backgroundColor: '#450a0a', borderRadius: 8, padding: 12, borderWidth: 1, borderColor: '#dc2626' },
-  errorText: { color: '#fca5a5', fontSize: 14 },
-  inputGroup: { gap: 8 },
-  label: { color: '#FFFFFF', fontSize: 14, fontWeight: '600' },
-  input: {
-    backgroundColor: '#111111', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14,
-    color: '#FFFFFF', fontSize: 16, borderWidth: 1, borderColor: '#8DC63F',
+  logo: { fontSize: 32, fontWeight: '900', color: RivalColors.textPrimary, letterSpacing: 6 },
+  status: { fontSize: 16, color: RivalColors.textSecondary, textAlign: 'center', paddingHorizontal: 20 },
+  link: { color: RivalColors.accentFill, fontSize: 15, fontWeight: '600' },
+  card: {
+    backgroundColor: 'rgba(19,19,19,0.75)',
+    borderRadius: RivalRadius.lg,
+    padding: 24,
+    gap: 16,
   },
-  primaryButton: { backgroundColor: '#E91E8C', paddingVertical: 16, borderRadius: 12, alignItems: 'center', marginTop: 8 },
+  submitBtn: { marginTop: 8 },
+  title: { fontSize: 24, fontWeight: '800', color: RivalColors.textPrimary, textAlign: 'center' },
+  errorBox: { backgroundColor: RivalColors.errorContainer, borderRadius: 8, padding: 12, borderWidth: 1, borderColor: RivalColors.error },
+  errorText: { color: RivalColors.error, fontSize: 14 },
+  inputGroup: { gap: 8 },
+  label: { color: RivalColors.textPrimary, fontSize: 14, fontWeight: '600' },
+  input: {
+    backgroundColor: RivalColors.surfaceLow, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14,
+    color: RivalColors.textPrimary, fontSize: 16, borderWidth: 1, borderColor: RivalColors.accentText,
+  },
+  primaryButton: { backgroundColor: RivalColors.accentFill, paddingVertical: 16, borderRadius: 12, alignItems: 'center', marginTop: 8 },
   disabled: { opacity: 0.6 },
-  primaryButtonText: { color: '#FFFFFF', fontSize: 18, fontWeight: '700' },
+  primaryButtonText: { color: RivalColors.textPrimary, fontSize: 18, fontWeight: '700' },
 });
