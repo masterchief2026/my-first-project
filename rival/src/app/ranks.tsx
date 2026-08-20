@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { supabase } from '../lib/supabase';
 import { LEVELS, getLevel } from '../lib/xp';
-import { RivalTopNav } from '../components/rival';
+import { RivalTopNav, RivalPageHeader } from '../components/rival';
 
 export default function RanksScreen() {
   const [totalXp, setTotalXp] = useState(0);
@@ -37,8 +37,7 @@ export default function RanksScreen() {
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.title}>Ranks</Text>
-        <Text style={styles.subtitle}>Start as a Rookie. Become Unrivaled.</Text>
+        <RivalPageHeader title="Ranks" subtitle="Start as a Rookie. Become Unrivaled." />
 
         <View style={styles.list}>
           {LEVELS.map((lvl, i) => {

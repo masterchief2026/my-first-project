@@ -6,7 +6,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { supabase } from '../lib/supabase';
 import { formatDisplayName, formatTeamName } from '../lib/identity';
 import { ACTIVITY_ICONS } from '../constants/activityIcons';
-import { RivalTopNav } from '../components/rival';
+import { RivalTopNav, RivalPageHeader } from '../components/rival';
 
 // Class-based types use sessions (1 session = 45 min) instead of free duration entry
 const SESSION_TYPES = new Set([
@@ -212,8 +212,7 @@ export default function PlanScreen() {
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.title}>Plan Your Week</Text>
-        <Text style={styles.subtitle}>Add workouts you're planning to see your projected team position.</Text>
+        <RivalPageHeader title="Plan Your Week" subtitle="See your projected team position." />
 
         {/* Current vs projected Effort */}
         <View style={styles.xpCard}>

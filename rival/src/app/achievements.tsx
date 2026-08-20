@@ -7,7 +7,7 @@ import { supabase } from '../lib/supabase';
 import { fetchAllActivities } from '../lib/fetchAllActivities';
 import { ACHIEVEMENTS, CATEGORY_LABELS, checkAchievements } from '../lib/achievements';
 import { calculateStreak } from '../lib/streak';
-import { RivalTopNav } from '../components/rival';
+import { RivalTopNav, RivalPageHeader } from '../components/rival';
 
 export default function AchievementsScreen() {
   const [earnedIds, setEarnedIds] = useState<Set<string>>(new Set());
@@ -69,8 +69,7 @@ export default function AchievementsScreen() {
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.title}>Achievements</Text>
-        <Text style={styles.subtitle}>{earnedCount} of {ACHIEVEMENTS.length} unlocked</Text>
+        <RivalPageHeader title="Achievements" subtitle={`${earnedCount} of ${ACHIEVEMENTS.length} unlocked`} />
 
         {newlyEarned.length > 0 && (
           <View style={styles.newBanner}>

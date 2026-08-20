@@ -6,8 +6,8 @@ import { supabase } from '../lib/supabase';
 import { displayToIsoDate } from '../lib/dateFormat';
 import { computeGoalProgress } from '../lib/goalProgress';
 import { notify } from '../lib/notify';
-import { RivalTopNav, RivalIcon } from '../components/rival';
-import { RivalColors, RivalRadius } from '../constants/rivalTheme';
+import { RivalTopNav, RivalIcon, RivalPageHeader } from '../components/rival';
+import { RivalColors, RivalRadius, RivalSerifFamily } from '../constants/rivalTheme';
 
 type Goal = {
   id: string;
@@ -41,7 +41,7 @@ const GOAL_ABBR: Record<string, string> = {
 
 const GOAL_BAR_COLOR: Record<string, string> = {
   distance: RivalColors.accentText,
-  elevation: '#2563eb',
+  elevation: RivalColors.accentFill,
   gym_sessions: RivalColors.accentFill,
 };
 
@@ -199,7 +199,7 @@ function ProgressBar({
           return (
             <View
               key={cp}
-              style={[styles.tick, { left: `${cpPct}%`, backgroundColor: reached ? '#ffffff' : '#C0D8A0' }]}
+              style={[styles.tick, { left: `${cpPct}%`, backgroundColor: reached ? RivalColors.textPrimary : 'rgba(255,181,158,0.45)' }]}
             />
           );
         })}
@@ -388,8 +388,7 @@ export default function GoalsScreen() {
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.title}>Goals</Text>
-        <Text style={styles.subtitle}>Track what you're working towards.</Text>
+        <RivalPageHeader title="Goals" subtitle="Track what you're working towards." />
 
         {loading && <Text style={styles.emptyText}>Loading…</Text>}
 
@@ -628,10 +627,10 @@ const styles = StyleSheet.create({
   },
   deleteBtnText: { color: RivalColors.textSecondary, fontSize: 12, fontWeight: '700' },
   celebrationBanner: {
-    backgroundColor: '#fbbf2420',
+    backgroundColor: 'rgba(245,183,89,0.12)',
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#fbbf2440',
+    borderColor: 'rgba(245,183,89,0.25)',
     padding: 12,
     marginBottom: 14,
   },
@@ -643,7 +642,7 @@ const styles = StyleSheet.create({
   },
   celebrationSub: {
     fontSize: 12,
-    color: '#fcd34d',
+    color: RivalColors.accentGold,
     opacity: 0.8,
   },
   encouragement: {
@@ -660,7 +659,8 @@ const styles = StyleSheet.create({
   },
   tryAgainBtnText: { fontSize: 14, fontWeight: '700', color: RivalColors.onAccentFill },
   goalProgress: { flexDirection: 'row', alignItems: 'baseline', marginBottom: 20 },
-  progressCurrent: { fontSize: 28, fontWeight: '900', color: RivalColors.textPrimary },
+  // Display number — the editorial serif, matching Today's Focus card.
+  progressCurrent: { fontFamily: RivalSerifFamily, fontStyle: 'italic', fontSize: 30, fontWeight: '700', color: RivalColors.textPrimary },
   progressSep: { color: RivalColors.textSecondary, fontSize: 16 },
   progressTarget: { color: RivalColors.textSecondary, fontSize: 15 },
   barContainer: { gap: 0 },

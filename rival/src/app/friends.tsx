@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { supabase } from '../lib/supabase';
 import { formatDisplayName, IdentityUser } from '../lib/identity';
-import { RivalTopNav } from '../components/rival';
+import { RivalTopNav, RivalPageHeader } from '../components/rival';
 
 type UserResult = IdentityUser & {
   id: string;
@@ -166,7 +166,7 @@ export default function FriendsScreen() {
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.title}>Friends</Text>
+        <RivalPageHeader title="Friends" subtitle="The people you show up with." />
 
         {/* Search */}
         <View style={styles.searchRow}>
