@@ -69,22 +69,25 @@ export default function FriendsScreen() {
     const weekEnd = new Date(weekStart);
     weekEnd.setDate(weekStart.getDate() + 7);
 
-    const friendsWithScores = await Promise.all(
-      usersData.map(async (u: any) => {
-        const { data: acts } = await supabase
-          .from('activities')
-          .select('effort_score')
-          .eq('user_id', u.id)
-          .gte('started_at', weekStart.toISOString())
-          .lt('started_at', weekEnd.toISOString());
+    // One query for every friend, not one per friend. Activity rows carry
+    // user_id, so the week's Effort can be summed per person in memory —
+    // otherwise a long friends list fanned out into a request each.
+    const { data: acts } = await supabase
+      .from('activities')
+      .select('user_id, effort_score')
+      .in('user_id', usersData.map((u: any) => u.id))
+      .gte('started_at', weekStart.toISOString())
+      .lt('started_at', weekEnd.toISOString());
 
-        const weekly = acts?.reduce((sum, a) => sum + (a.effort_score || 0), 0) ?? 0;
-        return {
-          ...u,
-          weekly_score: Math.round(weekly * 10) / 10,
-        };
-      })
-    );
+    const weeklyByUser: Record<string, number> = {};
+    (acts || []).forEach((a: any) => {
+      weeklyByUser[a.user_id] = (weeklyByUser[a.user_id] || 0) + (a.effort_score || 0);
+    });
+
+    const friendsWithScores = usersData.map((u: any) => ({
+      ...u,
+      weekly_score: Math.round((weeklyByUser[u.id] || 0) * 10) / 10,
+    }));
 
     friendsWithScores.sort((a, b) => b.weekly_score - a.weekly_score);
     setFriends(friendsWithScores);
