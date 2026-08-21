@@ -1656,7 +1656,9 @@ const styles = StyleSheet.create({
   // first thing in the mobile feed and is meant to sit flush against the nav
   // bar, no gap. That gap was exposing the plain mBgFixed color as a visible
   // seam above the card's own textured background.
-  contentMobile: { paddingTop: 0, paddingBottom: 120 },
+  // 6px of breathing room under the top nav — flush against it read as
+  // cramped once the Weekly Leader card gained its own texture.
+  contentMobile: { paddingTop: 6, paddingBottom: 120 },
 
   navBar: { width: '100%', backgroundColor: 'rgba(14,14,14,0.65)', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' },
   navRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', maxWidth: 1200, marginHorizontal: 'auto', paddingHorizontal: 24, paddingVertical: 12 },
@@ -1751,7 +1753,7 @@ const styles = StyleSheet.create({
   // attention; this labels the bar instead of competing with the progress
   // number above it.
   focusProgressPctOnBar: {
-    position: 'absolute', alignSelf: 'center', fontSize: 9, fontWeight: '600', color: 'rgba(255,255,255,0.4)',
+    position: 'absolute', left: 0, right: 0, textAlign: 'center', fontSize: 9, fontWeight: '600', color: 'rgba(255,255,255,0.4)',
     textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
   },
   // Active-goal card: left-aligned instead of centered (goalsEmptyCentered's
