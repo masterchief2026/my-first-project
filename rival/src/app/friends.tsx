@@ -1,10 +1,11 @@
 import { useEffect, useState, useCallback } from 'react';
+import { RivalColors } from '../constants/rivalTheme';
 import { StyleSheet, TouchableOpacity, View, Text, TextInput, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { supabase } from '../lib/supabase';
 import { formatDisplayName, IdentityUser } from '../lib/identity';
-import { RivalTopNav } from '../components/rival';
+import { RivalTopNav, RivalPageHeader } from '../components/rival';
 
 type UserResult = IdentityUser & {
   id: string;
@@ -69,22 +70,25 @@ export default function FriendsScreen() {
     const weekEnd = new Date(weekStart);
     weekEnd.setDate(weekStart.getDate() + 7);
 
-    const friendsWithScores = await Promise.all(
-      usersData.map(async (u: any) => {
-        const { data: acts } = await supabase
-          .from('activities')
-          .select('effort_score')
-          .eq('user_id', u.id)
-          .gte('started_at', weekStart.toISOString())
-          .lt('started_at', weekEnd.toISOString());
+    // One query for every friend, not one per friend. Activity rows carry
+    // user_id, so the week's Effort can be summed per person in memory —
+    // otherwise a long friends list fanned out into a request each.
+    const { data: acts } = await supabase
+      .from('activities')
+      .select('user_id, effort_score')
+      .in('user_id', usersData.map((u: any) => u.id))
+      .gte('started_at', weekStart.toISOString())
+      .lt('started_at', weekEnd.toISOString());
 
-        const weekly = acts?.reduce((sum, a) => sum + (a.effort_score || 0), 0) ?? 0;
-        return {
-          ...u,
-          weekly_score: Math.round(weekly * 10) / 10,
-        };
-      })
-    );
+    const weeklyByUser: Record<string, number> = {};
+    (acts || []).forEach((a: any) => {
+      weeklyByUser[a.user_id] = (weeklyByUser[a.user_id] || 0) + (a.effort_score || 0);
+    });
+
+    const friendsWithScores = usersData.map((u: any) => ({
+      ...u,
+      weekly_score: Math.round((weeklyByUser[u.id] || 0) * 10) / 10,
+    }));
 
     friendsWithScores.sort((a, b) => b.weekly_score - a.weekly_score);
     setFriends(friendsWithScores);
@@ -162,20 +166,20 @@ export default function FriendsScreen() {
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.title}>Friends</Text>
+        <RivalPageHeader title="Friends" subtitle="The people you show up with." />
 
         {/* Search */}
         <View style={styles.searchRow}>
           <TextInput
             style={styles.searchInput}
             placeholder="Search by name or email…"
-            placeholderTextColor="#666666"
+            placeholderTextColor={RivalColors.textSecondary}
             value={query}
             onChangeText={search}
             autoCapitalize="none"
             autoCorrect={false}
           />
-          {searching && <ActivityIndicator color="#E91E8C" style={styles.searchSpinner} />}
+          {searching && <ActivityIndicator color={RivalColors.accentFill} style={styles.searchSpinner} />}
         </View>
 
         {searchResults.length > 0 && (
@@ -227,7 +231,7 @@ export default function FriendsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#111111',
+    backgroundColor: RivalColors.surfaceLow,
   },
   content: {
     paddingHorizontal: 24,
@@ -238,13 +242,13 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   back: {
-    color: '#E91E8C',
+    color: RivalColors.accentFill,
     fontSize: 16,
   },
   title: {
     fontSize: 32,
     fontWeight: '900',
-    color: '#FFFFFF',
+    color: RivalColors.textPrimary,
     marginBottom: 20,
   },
   searchRow: {
@@ -254,22 +258,22 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    backgroundColor: '#111111',
+    backgroundColor: RivalColors.surfaceLow,
     borderRadius: 12,
     padding: 14,
-    color: '#FFFFFF',
+    color: RivalColors.textPrimary,
     fontSize: 16,
     borderWidth: 1,
-    borderColor: '#8DC63F',
+    borderColor: RivalColors.accentText,
   },
   searchSpinner: {
     marginLeft: 12,
   },
   resultsCard: {
-    backgroundColor: '#111111',
+    backgroundColor: RivalColors.surfaceLow,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#8DC63F',
+    borderColor: RivalColors.accentText,
     marginBottom: 24,
     overflow: 'hidden',
   },
@@ -278,7 +282,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#8DC63F',
+    borderBottomColor: RivalColors.accentText,
   },
   resultInfo: {
     flex: 1,
@@ -287,14 +291,14 @@ const styles = StyleSheet.create({
   resultName: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: RivalColors.textPrimary,
   },
   resultEmail: {
     fontSize: 12,
-    color: '#999999',
+    color: RivalColors.textSecondary,
   },
   followButton: {
-    backgroundColor: '#E91E8C',
+    backgroundColor: RivalColors.accentFill,
     paddingVertical: 7,
     paddingHorizontal: 16,
     borderRadius: 8,
@@ -302,25 +306,25 @@ const styles = StyleSheet.create({
   followingButton: {
     backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: '#E91E8C',
+    borderColor: RivalColors.accentFill,
   },
   followButtonText: {
-    color: '#FFFFFF',
+    color: RivalColors.textPrimary,
     fontSize: 13,
     fontWeight: '700',
   },
   followingButtonText: {
-    color: '#E91E8C',
+    color: RivalColors.accentFill,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#FFFFFF',
+    color: RivalColors.textPrimary,
     marginBottom: 14,
     marginTop: 8,
   },
   emptyText: {
-    color: '#999999',
+    color: RivalColors.textSecondary,
     fontSize: 15,
     textAlign: 'center',
     paddingVertical: 24,
@@ -328,17 +332,17 @@ const styles = StyleSheet.create({
   friendRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#111111',
+    backgroundColor: RivalColors.surfaceLow,
     borderRadius: 12,
     padding: 16,
     marginBottom: 10,
     gap: 12,
     borderWidth: 1,
-    borderColor: '#8DC63F',
+    borderColor: RivalColors.accentText,
   },
   friendRank: {
     fontSize: 16,
-    color: '#999999',
+    color: RivalColors.textSecondary,
     width: 24,
     textAlign: 'center',
   },
@@ -349,15 +353,15 @@ const styles = StyleSheet.create({
   friendName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: RivalColors.textPrimary,
   },
   friendSub: {
     fontSize: 12,
-    color: '#999999',
+    color: RivalColors.textSecondary,
   },
   friendScore: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#E91E8C',
+    color: RivalColors.accentFill,
   },
 });

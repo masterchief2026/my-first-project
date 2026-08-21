@@ -5,7 +5,7 @@ import { useFocusEffect, router } from 'expo-router';
 import { supabase } from '../lib/supabase';
 import { formatTeamName } from '../lib/identity';
 import { RivalTopNav, RivalIcon } from '../components/rival';
-import { RivalColors } from '../constants/rivalTheme';
+import { RivalColors, RivalSerifFamily } from '../constants/rivalTheme';
 
 // Same per-name color assignment as team-feed.tsx's team rail — kept as a
 // local copy rather than shared, matching how timeAgo is already duplicated
@@ -175,7 +175,7 @@ const styles = StyleSheet.create({
   },
   container: { flex: 1 },
   content: { paddingHorizontal: 18, paddingTop: 20, paddingBottom: 48, gap: 16, width: '100%', maxWidth: 640, marginHorizontal: 'auto' },
-  title: { fontSize: 22, fontWeight: '800', color: '#fff' },
+  title: { fontFamily: RivalSerifFamily, fontStyle: 'italic', fontSize: 22, fontWeight: '700', color: '#fff' },
   stateText: { color: 'rgba(255,255,255,0.5)', fontSize: 14, textAlign: 'center', marginTop: 40 },
 
   list: { gap: 4 },

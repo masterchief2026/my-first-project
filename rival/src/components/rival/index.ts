@@ -7,6 +7,7 @@ export { RivalEmptyState } from './RivalEmptyState';
 export { RivalAvatar } from './RivalAvatar';
 export { RivalIcon, activityIconName } from './RivalIcon';
 export { RivalTopNav } from './RivalTopNav';
+export { RivalPageHeader } from './RivalPageHeader';
 export { RivalFixedBackground } from './RivalFixedBackground';
 export { ActivityDiaryViewer } from './ActivityDiaryViewer';
 export { PhotoPositioner } from './PhotoPositioner';

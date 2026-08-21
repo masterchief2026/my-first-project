@@ -3,9 +3,10 @@ import { StyleSheet, TouchableOpacity, View, Text, ScrollView, TextInput, Modal,
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { supabase } from '../lib/supabase';
+import { notify } from '../lib/notify';
 import { CANONICAL_LIFTS, matchCanonicalLift } from './scan-workout';
 import { RivalIcon, RivalTopNav, RivalFixedBackground } from '../components/rival';
-import { RivalColors, RivalRadius, RivalType } from '../constants/rivalTheme';
+import { RivalColors, RivalRadius, RivalType, RivalSerifFamily } from '../constants/rivalTheme';
 import { BREAKPOINT_WIDE_LAYOUT } from '../constants/breakpoints';
 
 type Entry = { id: string; exercise_name: string; weight_kg: number; reps: number | null; performed_at: string };
@@ -90,7 +91,7 @@ export default function LiftsScreen() {
     if (!exerciseName || !weight || weight <= 0) return;
 
     setSaving(true);
-    await supabase.from('exercise_entries').insert({
+    const { error } = await supabase.from('exercise_entries').insert({
       user_id: user.id,
       exercise_name: exerciseName,
       weight_kg: weight,
@@ -98,6 +99,10 @@ export default function LiftsScreen() {
       performed_at: new Date().toISOString(),
     });
     setSaving(false);
+    if (error) {
+      notify("Couldn't log that lift", error.message);
+      return;
+    }
     if (exerciseName) setFocused(exerciseName);
     setLogModalFor(null);
     load();
@@ -408,7 +413,7 @@ const styles = StyleSheet.create({
 
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16, marginBottom: 28 },
   back: { color: RivalColors.accentText, fontSize: 16, width: 48 },
-  headerTitle: { ...RivalType.labelCaps, fontSize: 26, lineHeight: 32, letterSpacing: 3, fontWeight: '600', color: RivalColors.accentText, textAlign: 'center', textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 12 },
+  headerTitle: { fontFamily: RivalSerifFamily, fontStyle: 'italic', fontSize: 26, lineHeight: 32, letterSpacing: 0.5, fontWeight: '700', color: RivalColors.accentText, textAlign: 'center', textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 12 },
   emptyText: { color: RivalColors.textSecondary, textAlign: 'center', marginTop: 40 },
 
   // Hero glass card

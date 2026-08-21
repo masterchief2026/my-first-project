@@ -44,10 +44,14 @@ export async function registerForPushNotifications(): Promise<string | null> {
 
     const { data: { user } } = await supabase.auth.getUser();
     if (user && token) {
-      await supabase.from('push_tokens').upsert(
+      // Background registration — never interrupt the athlete for this, but a
+      // silent failure here means push notifications simply never arrive, with
+      // nothing anywhere to say why.
+      const { error: tokenErr } = await supabase.from('push_tokens').upsert(
         { user_id: user.id, token, updated_at: new Date().toISOString() },
         { onConflict: 'user_id' }
       );
+      if (tokenErr) console.error('Push token registration failed:', tokenErr.message);
     }
 
     return token;

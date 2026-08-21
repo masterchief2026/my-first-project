@@ -134,7 +134,14 @@ export default function ProfileScreen() {
     setSaving(true);
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { setSaving(false); return; }
-    await supabase.from('users').update({ display_name: newName.trim() }).eq('id', user.id);
+    const { error } = await supabase.from('users').update({ display_name: newName.trim() }).eq('id', user.id);
+    if (error) {
+      // Don't advance the UI past a write that didn't land — showing the new
+      // name while the row still holds the old one is worse than an error.
+      notify("Couldn't save your name", error.message);
+      setSaving(false);
+      return;
+    }
     await supabase.auth.updateUser({ data: { display_name: newName.trim() } });
     setDisplayName(newName.trim());
     setEditingName(false);
@@ -179,7 +186,12 @@ export default function ProfileScreen() {
     setSavingStyle(true);
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { setSavingStyle(false); return; }
-    await supabase.from('users').update({ display_style: style }).eq('id', user.id);
+    const { error } = await supabase.from('users').update({ display_style: style }).eq('id', user.id);
+    if (error) {
+      notify("Couldn't save that name style", error.message);
+      setSavingStyle(false);
+      return;
+    }
     setDisplayStyle(style);
     setSavingStyle(false);
   }
@@ -188,7 +200,12 @@ export default function ProfileScreen() {
     setSavingTone(true);
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { setSavingTone(false); return; }
-    await supabase.from('users').update({ quote_tone: tone }).eq('id', user.id);
+    const { error } = await supabase.from('users').update({ quote_tone: tone }).eq('id', user.id);
+    if (error) {
+      notify("Couldn't save that preference", error.message);
+      setSavingTone(false);
+      return;
+    }
     setQuoteTone(tone);
     setQuotePreview(getQuote(tone).text);
     setSavingTone(false);
@@ -213,8 +230,15 @@ export default function ProfileScreen() {
           .upload(path, file, { contentType: file.type, upsert: true });
         if (!storageErr) {
           const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path);
-          await supabase.from('users').update({ avatar_url: urlData.publicUrl }).eq('id', user.id);
-          setAvatarUrl(urlData.publicUrl);
+          // The file uploaded, but the row still has to point at it — if this
+          // half fails the photo is orphaned in storage and the profile keeps
+          // the old avatar, so say so rather than showing the new one.
+          const { error: rowErr } = await supabase.from('users').update({ avatar_url: urlData.publicUrl }).eq('id', user.id);
+          if (rowErr) {
+            notify("Couldn't update your photo", rowErr.message);
+          } else {
+            setAvatarUrl(urlData.publicUrl);
+          }
         }
       } finally {
         setUploadingAvatar(false);
@@ -227,7 +251,14 @@ export default function ProfileScreen() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
     setDisconnecting(true);
-    await supabase.from('fitness_connections').delete().eq('user_id', user.id).eq('provider', 'strava');
+    // The connection row is the thing that actually keeps Strava linked. If this
+    // fails silently the UI shows "disconnected" while the sync keeps running.
+    const { error: connErr } = await supabase.from('fitness_connections').delete().eq('user_id', user.id).eq('provider', 'strava');
+    if (connErr) {
+      notify("Couldn't disconnect Strava", connErr.message);
+      setDisconnecting(false);
+      return;
+    }
 
     if (wipeActivities) {
       const { error: wipeErr } = await supabase.from('activities').delete().eq('user_id', user.id).eq('provider', 'strava');

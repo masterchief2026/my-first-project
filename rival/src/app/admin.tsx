@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
+import { RivalColors } from '../constants/rivalTheme';
 import { StyleSheet, TouchableOpacity, View, Text, TextInput, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { supabase } from '../lib/supabase';
+import { notify } from '../lib/notify';
 
 type ScoringRow = {
   activity_type: string;
@@ -104,7 +106,8 @@ export default function AdminScreen() {
   }
 
   async function deleteRow(type: string) {
-    await supabase.from('scoring_config').delete().eq('activity_type', type);
+    const { error } = await supabase.from('scoring_config').delete().eq('activity_type', type);
+    if (error) { notify("Couldn't reset that scoring rule", error.message); return; }
     setRows((prev) => prev.filter((r) => r.activity_type !== type));
   }
 
@@ -112,7 +115,7 @@ export default function AdminScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.centered}>
-          <ActivityIndicator color="#E91E8C" />
+          <ActivityIndicator color={RivalColors.accentFill} />
         </View>
       </SafeAreaView>
     );
@@ -186,7 +189,7 @@ export default function AdminScreen() {
           <TextInput
             style={styles.addTypeInput}
             placeholder="e.g. Pilates"
-            placeholderTextColor="#666666"
+            placeholderTextColor={RivalColors.textSecondary}
             value={newType}
             onChangeText={setNewType}
             autoCapitalize="words"
@@ -194,7 +197,7 @@ export default function AdminScreen() {
           <TextInput
             style={styles.addMultiplierInput}
             placeholder="×"
-            placeholderTextColor="#666666"
+            placeholderTextColor={RivalColors.textSecondary}
             value={newMultiplier}
             onChangeText={setNewMultiplier}
             keyboardType="decimal-pad"
@@ -216,7 +219,7 @@ export default function AdminScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#111111',
+    backgroundColor: RivalColors.surfaceLow,
   },
   content: {
     paddingHorizontal: 24,
@@ -232,26 +235,26 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   back: {
-    color: '#E91E8C',
+    color: RivalColors.accentFill,
     fontSize: 16,
   },
   title: {
     fontSize: 32,
     fontWeight: '900',
-    color: '#FFFFFF',
+    color: RivalColors.textPrimary,
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 13,
-    color: '#999999',
+    color: RivalColors.textSecondary,
     marginBottom: 28,
     lineHeight: 18,
   },
   table: {
-    backgroundColor: '#111111',
+    backgroundColor: RivalColors.surfaceLow,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#8DC63F',
+    borderColor: RivalColors.accentText,
     overflow: 'hidden',
   },
   tableHeader: {
@@ -260,13 +263,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#8DC63F',
-    backgroundColor: '#111111',
+    borderBottomColor: RivalColors.accentText,
+    backgroundColor: RivalColors.surfaceLow,
   },
   tableHeaderText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#666666',
+    color: RivalColors.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
@@ -281,7 +284,7 @@ const styles = StyleSheet.create({
   activityType: {
     flex: 1,
     fontSize: 15,
-    color: '#FFFFFF',
+    color: RivalColors.textPrimary,
     fontWeight: '500',
   },
   multiplierCell: {
@@ -291,7 +294,7 @@ const styles = StyleSheet.create({
   multiplierValue: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#E91E8C',
+    color: RivalColors.accentFill,
   },
   editCell: {
     flexDirection: 'row',
@@ -299,31 +302,31 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   multiplierInput: {
-    backgroundColor: '#111111',
+    backgroundColor: RivalColors.surfaceLow,
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    color: '#FFFFFF',
+    color: RivalColors.textPrimary,
     fontSize: 15,
     fontWeight: '700',
     borderWidth: 1,
-    borderColor: '#E91E8C',
+    borderColor: RivalColors.accentFill,
     width: 64,
     textAlign: 'center',
   },
   saveBtn: {
-    backgroundColor: '#E91E8C',
+    backgroundColor: RivalColors.accentFill,
     borderRadius: 6,
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
   saveBtnText: {
-    color: '#FFFFFF',
+    color: RivalColors.textPrimary,
     fontWeight: '700',
     fontSize: 14,
   },
   cancelText: {
-    color: '#999999',
+    color: RivalColors.textSecondary,
     fontSize: 16,
     paddingHorizontal: 4,
   },
@@ -341,7 +344,7 @@ const styles = StyleSheet.create({
   addTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: RivalColors.textPrimary,
     marginTop: 28,
     marginBottom: 12,
   },
@@ -352,29 +355,29 @@ const styles = StyleSheet.create({
   },
   addTypeInput: {
     flex: 1,
-    backgroundColor: '#111111',
+    backgroundColor: RivalColors.surfaceLow,
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    color: '#FFFFFF',
+    color: RivalColors.textPrimary,
     fontSize: 15,
     borderWidth: 1,
-    borderColor: '#8DC63F',
+    borderColor: RivalColors.accentText,
   },
   addMultiplierInput: {
     width: 64,
-    backgroundColor: '#111111',
+    backgroundColor: RivalColors.surfaceLow,
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    color: '#FFFFFF',
+    color: RivalColors.textPrimary,
     fontSize: 15,
     borderWidth: 1,
-    borderColor: '#8DC63F',
+    borderColor: RivalColors.accentText,
     textAlign: 'center',
   },
   addBtn: {
-    backgroundColor: '#E91E8C',
+    backgroundColor: RivalColors.accentFill,
     borderRadius: 10,
     paddingHorizontal: 16,
     paddingVertical: 12,
@@ -383,7 +386,7 @@ const styles = StyleSheet.create({
     opacity: 0.4,
   },
   addBtnText: {
-    color: '#FFFFFF',
+    color: RivalColors.textPrimary,
     fontWeight: '700',
     fontSize: 14,
   },

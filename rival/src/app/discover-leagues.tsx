@@ -3,6 +3,7 @@ import { StyleSheet, TouchableOpacity, View, Text, ScrollView, TextInput, Image,
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { supabase } from '../lib/supabase';
+import { notify } from '../lib/notify';
 import { RivalTopNav, RivalIcon, RivalFixedBackground } from '../components/rival';
 import { formatTeamName } from '../lib/identity';
 import type { RivalIconName } from '../components/rival/RivalIcon';
@@ -288,7 +289,8 @@ export default function DiscoverLeaguesScreen() {
         return new Date(b.lastActivityAt || 0).getTime() - new Date(a.lastActivityAt || 0).getTime();
       }));
 
-    await supabase.from('league_members').update({ pinned: !wasPinned }).eq('user_id', user.id).eq('league_id', leagueId);
+    const { error } = await supabase.from('league_members').update({ pinned: !wasPinned }).eq('user_id', user.id).eq('league_id', leagueId);
+    if (error) notify("Couldn't pin that team", error.message);
   }
 
   async function join(leagueId: string) {

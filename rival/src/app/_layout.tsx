@@ -1,17 +1,24 @@
+// The Manrope webfont lives here. It used to be imported only by
+// constants/theme.ts, a starter-template module whose consumers were deleted --
+// which silently dropped the stylesheet from the build entirely and fell every
+// heading back to the browser's default serif. Imported at the app root now, so
+// it cannot be orphaned by removing a screen again.
+import '../global.css';
 import { useEffect, useState } from 'react';
 import { Platform, View } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { useFonts, Manrope_300Light, Manrope_400Regular, Manrope_500Medium, Manrope_600SemiBold, Manrope_700Bold, Manrope_800ExtraBold } from '@expo-google-fonts/manrope';
+import { useAppFonts } from '../lib/useAppFonts';
 import { registerForPushNotifications } from '../lib/notifications';
 
 export default function RootLayout() {
-  // Web loads Manrope via the CSS @import in global.css and renders fine
-  // before this resolves; native needs the font registered before any Text
-  // using it mounts, but we don't gate rendering on it — a brief native
-  // fallback-font flash is an acceptable tradeoff against a blank splash.
-  useFonts({ Manrope_300Light, Manrope_400Regular, Manrope_500Medium, Manrope_600SemiBold, Manrope_700Bold, Manrope_800ExtraBold });
+  // Native registers Manrope from bundled .ttf files; web is a no-op because
+  // global.css already loads the family from Google Fonts. See useAppFonts.ts —
+  // the platform split keeps ~570KB of duplicate .ttf out of the web bundle.
+  // Rendering is deliberately not gated on this: a brief native fallback-font
+  // flash beats a blank splash.
+  useAppFonts();
 
   useEffect(() => {
     registerForPushNotifications();

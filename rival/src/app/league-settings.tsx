@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
-import { StyleSheet, TouchableOpacity, View, Text, TextInput, ScrollView, Alert, Image, Platform } from 'react-native';
+import { RivalColors, RivalSerifFamily } from '../constants/rivalTheme';
+import { StyleSheet, TouchableOpacity, View, Text, TextInput, ScrollView, Image, Platform } from 'react-native';
+import { notify } from '../lib/notify';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { supabase } from '../lib/supabase';
@@ -118,7 +120,7 @@ export default function LeagueSettingsScreen() {
     if (approve) {
       const { error } = await supabase.from('league_members').update({ status: 'active' }).eq('league_id', id).eq('user_id', userId);
       if (error) {
-        Alert.alert("Couldn't approve", error.message);
+        notify("Couldn't approve", error.message);
         setRespondingTo(null);
         return;
       }
@@ -127,7 +129,7 @@ export default function LeagueSettingsScreen() {
     } else {
       const { error } = await supabase.from('league_members').delete().eq('league_id', id).eq('user_id', userId);
       if (error) {
-        Alert.alert("Couldn't decline", error.message);
+        notify("Couldn't decline", error.message);
         setRespondingTo(null);
         return;
       }
@@ -204,7 +206,7 @@ export default function LeagueSettingsScreen() {
       .eq('user_id', userId);
 
     if (error) {
-      Alert.alert("Couldn't remove member", error.message);
+      notify("Couldn't remove member", error.message);
       return;
     }
     setMembers((prev) => prev.filter((m) => m.user_id !== userId));
@@ -219,7 +221,7 @@ export default function LeagueSettingsScreen() {
       .eq('user_id', userId);
 
     if (error) {
-      Alert.alert("Couldn't update role", error.message);
+      notify("Couldn't update role", error.message);
       return;
     }
     setMembers((prev) =>
@@ -358,7 +360,13 @@ export default function LeagueSettingsScreen() {
               onPress={async () => {
                 const newVal = !isPrivate;
                 setIsPrivate(newVal);
-                await supabase.from('leagues').update({ is_private: newVal }).eq('id', id);
+                const { error } = await supabase.from('leagues').update({ is_private: newVal }).eq('id', id);
+                if (error) {
+                  // Put the switch back. Showing "Private" over a team that is
+                  // still discoverable is a privacy failure, not a cosmetic one.
+                  setIsPrivate(!newVal);
+                  notify("Couldn't change who can find this team", error.message);
+                }
               }}
             >
               <Text style={styles.visibilityToggleText}>{isPrivate ? 'Make Public' : 'Make Private'}</Text>
@@ -442,7 +450,7 @@ export default function LeagueSettingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#111111',
+    backgroundColor: RivalColors.surfaceLow,
   },
   content: {
     paddingHorizontal: 24,
@@ -455,43 +463,45 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    color: '#999999',
+    color: RivalColors.textSecondary,
     fontSize: 16,
   },
   header: {
     marginBottom: 24,
   },
   back: {
-    color: '#E91E8C',
+    color: RivalColors.accentFill,
     fontSize: 16,
   },
   title: {
-    fontSize: 32,
-    fontWeight: '900',
-    color: '#FFFFFF',
+    fontFamily: RivalSerifFamily,
+    fontStyle: 'italic',
+    fontSize: 26,
+    fontWeight: '700',
+    color: RivalColors.textPrimary,
     marginBottom: 28,
   },
   sectionLabel: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#666666',
+    color: RivalColors.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 1,
     marginBottom: 10,
   },
-  visibilityCard: { backgroundColor: '#1A1A1A', borderRadius: 14, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: '#2A2A2A' },
+  visibilityCard: { backgroundColor: RivalColors.surfaceContainer, borderRadius: 14, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: RivalColors.surfaceHigh },
   visibilityRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
-  visibilityTitle: { fontSize: 15, fontWeight: '700', color: '#FFFFFF', marginBottom: 4 },
-  visibilityDesc: { fontSize: 12, color: '#999999', flexShrink: 1 },
-  visibilityToggle: { backgroundColor: '#0D0D0D', borderRadius: 10, paddingVertical: 8, paddingHorizontal: 12, borderWidth: 1, borderColor: '#2A2A2A' },
-  visibilityToggleOn: { backgroundColor: '#0A1A0F', borderColor: '#8DC63F' },
+  visibilityTitle: { fontSize: 15, fontWeight: '700', color: RivalColors.textPrimary, marginBottom: 4 },
+  visibilityDesc: { fontSize: 12, color: RivalColors.textSecondary, flexShrink: 1 },
+  visibilityToggle: { backgroundColor: '#0D0D0D', borderRadius: 10, paddingVertical: 8, paddingHorizontal: 12, borderWidth: 1, borderColor: RivalColors.surfaceHigh },
+  visibilityToggleOn: { backgroundColor: '#0A1A0F', borderColor: RivalColors.accentText },
   visibilityToggleText: { fontSize: 12, fontWeight: '700', color: '#CCCCCC' },
   nameCard: {
-    backgroundColor: '#111111',
+    backgroundColor: RivalColors.surfaceLow,
     borderRadius: 12,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#8DC63F',
+    borderColor: RivalColors.accentText,
     marginBottom: 28,
   },
   nameRow: {
@@ -502,19 +512,19 @@ const styles = StyleSheet.create({
   nameText: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: RivalColors.textPrimary,
   },
   editHint: {
     fontSize: 13,
-    color: '#E91E8C',
+    color: RivalColors.accentFill,
   },
   editHintLocked: {
     fontSize: 13,
-    color: '#666666',
+    color: RivalColors.textSecondary,
   },
   nameLockedHint: {
     fontSize: 12,
-    color: '#666666',
+    color: RivalColors.textSecondary,
     marginTop: -20,
     marginBottom: 20,
   },
@@ -525,49 +535,49 @@ const styles = StyleSheet.create({
   },
   nameInput: {
     flex: 1,
-    backgroundColor: '#111111',
+    backgroundColor: RivalColors.surfaceLow,
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    color: '#FFFFFF',
+    color: RivalColors.textPrimary,
     fontSize: 16,
     fontWeight: '700',
     borderWidth: 1,
-    borderColor: '#E91E8C',
+    borderColor: RivalColors.accentFill,
   },
   saveBtn: {
-    backgroundColor: '#E91E8C',
+    backgroundColor: RivalColors.accentFill,
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 8,
   },
   saveBtnText: {
-    color: '#FFFFFF',
+    color: RivalColors.textPrimary,
     fontWeight: '700',
     fontSize: 14,
   },
   cancelText: {
-    color: '#999999',
+    color: RivalColors.textSecondary,
     fontSize: 13,
   },
-  logoCard: { backgroundColor: '#1A1A1A', borderRadius: 12, borderWidth: 1, borderColor: '#8DC63F', marginBottom: 28, overflow: 'hidden', alignItems: 'center' },
+  logoCard: { backgroundColor: RivalColors.surfaceContainer, borderRadius: 12, borderWidth: 1, borderColor: RivalColors.accentText, marginBottom: 28, overflow: 'hidden', alignItems: 'center' },
   logoImage: { width: '100%', height: 160 },
   logoPlaceholder: { paddingVertical: 32, alignItems: 'center', gap: 8 },
   logoPlaceholderIcon: { fontSize: 36 },
-  logoPlaceholderHint: { fontSize: 13, color: '#666666' },
-  crestBtn: { marginTop: 10, paddingVertical: 12, borderRadius: 10, alignItems: 'center', backgroundColor: '#E91E8C' },
-  crestBtnDisabled: { backgroundColor: '#2A2A2A' },
-  crestBtnText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
+  logoPlaceholderHint: { fontSize: 13, color: RivalColors.textSecondary },
+  crestBtn: { marginTop: 10, paddingVertical: 12, borderRadius: 10, alignItems: 'center', backgroundColor: RivalColors.accentFill },
+  crestBtnDisabled: { backgroundColor: RivalColors.surfaceHigh },
+  crestBtnText: { color: RivalColors.textPrimary, fontSize: 14, fontWeight: '700' },
   crestErrorText: { color: '#FF6B6B', fontSize: 13, marginTop: 6 },
-  crestPickHint: { color: '#999999', fontSize: 13, marginBottom: 10 },
+  crestPickHint: { color: RivalColors.textSecondary, fontSize: 13, marginBottom: 10 },
   crestPickRow: { flexDirection: 'row', gap: 10, marginBottom: 28 },
-  crestPickFrame: { flex: 1, aspectRatio: 1, backgroundColor: '#1A1A1A', borderRadius: 12, borderWidth: 1, borderColor: '#8DC63F', overflow: 'hidden' },
+  crestPickFrame: { flex: 1, aspectRatio: 1, backgroundColor: RivalColors.surfaceContainer, borderRadius: 12, borderWidth: 1, borderColor: RivalColors.accentText, overflow: 'hidden' },
   crestPickImg: { width: '100%', height: '100%' },
   membersCard: {
-    backgroundColor: '#111111',
+    backgroundColor: RivalColors.surfaceLow,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#8DC63F',
+    borderColor: RivalColors.accentText,
     overflow: 'hidden',
   },
   memberRow: {
@@ -584,11 +594,11 @@ const styles = StyleSheet.create({
   memberName: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: RivalColors.textPrimary,
   },
   adminBadge: {
     fontSize: 11,
-    color: '#999999',
+    color: RivalColors.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
@@ -599,13 +609,13 @@ const styles = StyleSheet.create({
   },
   adminToggleBtn: {
     borderWidth: 1,
-    borderColor: '#E91E8C',
+    borderColor: RivalColors.accentFill,
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
   adminToggleText: {
-    color: '#E91E8C',
+    color: RivalColors.accentFill,
     fontSize: 12,
     fontWeight: '600',
   },

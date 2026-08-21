@@ -1,4 +1,10 @@
-import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
+// Imported from the per-family subpaths, NOT the '@expo/vector-icons' barrel.
+// The barrel registers every family's .ttf as a static asset at module scope,
+// so importing two families from it shipped all of them -- FontAwesome (4/5/6),
+// Ionicons, Fontisto, AntDesign, MaterialSymbols and more, none of which this
+// app uses. That was ~3MB of fonts downloaded on first load for nothing.
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { StyleProp, TextStyle } from 'react-native';
 import { RivalColors } from '../../constants/rivalTheme';
 
@@ -25,6 +31,8 @@ const ICONS = {
   edit: 'edit',
   more: 'more-vert',
   close: 'close',
+  eye: 'visibility',
+  eyeOff: 'visibility-off',
   add: 'add',
   check: 'check',
   refresh: 'refresh',

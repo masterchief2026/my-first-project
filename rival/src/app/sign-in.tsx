@@ -4,7 +4,7 @@ import { Asset } from 'expo-asset';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { supabase } from '../lib/supabase';
-import { RivalButton } from '../components/rival';
+import { RivalButton, RivalIcon } from '../components/rival';
 import { RivalColors, RivalRadius, RivalType } from '../constants/rivalTheme';
 
 const REMEMBER_KEY = 'rival_remembered_email';
@@ -182,7 +182,7 @@ export default function SignInScreen() {
                   secureTextEntry={!showPassword}
                 />
                 <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeButton}>
-                  <Text style={styles.eyeText}>{showPassword ? '🙈' : '👁️'}</Text>
+                  <RivalIcon name={showPassword ? 'eyeOff' : 'eye'} size={20} color={RivalColors.textSecondary} />
                 </TouchableOpacity>
               </View>
             </View>

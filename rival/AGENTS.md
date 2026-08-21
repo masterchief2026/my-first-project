@@ -30,7 +30,7 @@ RIVAL is a social fitness app: friends form **Teams**, log workouts (manual entr
 ## Client-code footguns
 
 - **Always check `.error` (and `count` on deletes) from every Supabase write** before treating it as done or navigating away. RLS failures are silent no-ops (0 rows, no error thrown) — this has caused real shipped bugs (leave-team, kick-member).
-- **`Alert.alert` with buttons does not work on web.** Use `window.confirm` for confirmations and inline error text (state + styled Text) for errors.
+- **`Alert.alert` does nothing at all on web** — react-native-web ships it as an empty function (`static alert() {}`), so EVERY call is silently discarded, not just ones with buttons. Never call it directly. Use `notify()` from `src/lib/notify.ts` (web → `window.alert`, native → the real Alert) for messages, `window.confirm` for confirmations, and inline error text (state + styled Text) where the error belongs next to the control. This has bitten silently before: four error paths in league-settings (approve/decline//remove member/change role) reported failures into the void.
 - **PostgREST embedded-resource filters** (`.select('x, parent!inner(y)').eq('parent.y', …)`) can silently fail to filter. Use two plain sequential queries instead.
 - Dates display as **DD/MM/YYYY** everywhere; convert with `src/lib/dateFormat.ts` helpers at input boundaries, store ISO `YYYY-MM-DD`. Ricky is in NZ (UTC+12/13) — be careful parsing date-only strings with `new Date()`.
 - Week boundaries are **Monday-start** (`streak.ts` has the canonical helper).

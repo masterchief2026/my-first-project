@@ -709,7 +709,14 @@ export default function ScanWorkoutScreen() {
           return;
         }
         activityId = editActivityId;
-        await supabase.from('exercise_entries').delete().eq('activity_id', activityId);
+        // If the old rows can't be cleared, re-inserting below would DOUBLE the
+        // athlete's lifts for this workout and corrupt their PR history, so stop
+        // rather than press on.
+        const { error: clearErr } = await supabase.from('exercise_entries').delete().eq('activity_id', activityId);
+        if (clearErr) {
+          setErrorMsg(`Couldn't update your lifts: ${clearErr.message}`);
+          return;
+        }
       } else {
         const { data: inserted, error } = await supabase
           .from('activities')
@@ -742,7 +749,11 @@ export default function ScanWorkoutScreen() {
         }))
         .filter((e) => !!e.weight_kg && !!e.exercise_name);
       if (liftEntries.length > 0) {
-        await supabase.from('exercise_entries').insert(liftEntries);
+        const { error: liftErr } = await supabase.from('exercise_entries').insert(liftEntries);
+        // The activity itself is already saved, so this is reported rather than
+        // fatal -- but silently dropping the lifts would leave the PR tracker
+        // quietly wrong.
+        if (liftErr) setErrorMsg(`Workout saved, but the lifts didn't attach: ${liftErr.message}`);
       }
 
       // Only photos/videos added in the "Photos & Videos" section get stored and shown
@@ -765,11 +776,12 @@ export default function ScanWorkoutScreen() {
 
         const { data: urlData } = supabase.storage.from('activity-photos').getPublicUrl(path);
 
-        await supabase.from('activity_media').insert({
+        const { error: mediaErr } = await supabase.from('activity_media').insert({
           activity_id: activityId,
           media_url: urlData.publicUrl,
           media_type: item.type,
         });
+        if (mediaErr) { console.error('Media row insert failed:', mediaErr.message); continue; }
 
         if (item.type === 'photo' && !firstPhotoUrl) {
           firstPhotoUrl = urlData.publicUrl;
@@ -777,7 +789,8 @@ export default function ScanWorkoutScreen() {
       }
 
       if (firstPhotoUrl) {
-        await supabase.from('activities').update({ photo_url: firstPhotoUrl }).eq('id', activityId);
+        const { error: coverErr } = await supabase.from('activities').update({ photo_url: firstPhotoUrl }).eq('id', activityId);
+        if (coverErr) setErrorMsg(`Workout saved, but the cover photo didn't set: ${coverErr.message}`);
       }
 
       setSuccessMsg(`${workoutName} saved with ${Math.round(effortScore)} Effort!`);

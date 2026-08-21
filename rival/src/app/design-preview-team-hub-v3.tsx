@@ -12,9 +12,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle } from 'react-native-svg';
 import { RivalAvatar } from '../components/rival/RivalAvatar';
 import { RivalIcon, RivalIconName } from '../components/rival/RivalIcon';
-import { RivalColors, RivalType } from '../constants/rivalTheme';
+import { RivalColors, RivalType, RivalSerifFamily } from '../constants/rivalTheme';
 
-const HERO_PHOTO = require('../../assets/images/backgrounds/optimized/coastal-highway-triathlete-dusk-3.png');
+const HERO_PHOTO = require('../../assets/images/backgrounds/optimized/coastal-highway-triathlete-dusk-3.jpg');
 
 // react-native-web's ImageBackground/Image hardcode `background-position:
 // center` on the inner layer that actually paints the photo — the `style`/
@@ -61,7 +61,7 @@ function HeroPhoto({ style, children }: { style?: any; children?: React.ReactNod
   );
 }
 
-const SERIF = 'Georgia, "Times New Roman", serif';
+const SERIF = RivalSerifFamily;
 
 // The artifact's cards carry a subtle top-left radial highlight over a
 // diagonal dark-brown gradient (--card-warm-bg), not a flat fill — same

@@ -5,8 +5,9 @@ import { router, useFocusEffect } from 'expo-router';
 import { supabase } from '../lib/supabase';
 import { displayToIsoDate } from '../lib/dateFormat';
 import { computeGoalProgress } from '../lib/goalProgress';
-import { RivalTopNav, RivalIcon } from '../components/rival';
-import { RivalColors, RivalRadius } from '../constants/rivalTheme';
+import { notify } from '../lib/notify';
+import { RivalTopNav, RivalIcon, RivalPageHeader } from '../components/rival';
+import { RivalColors, RivalRadius, RivalSerifFamily } from '../constants/rivalTheme';
 
 type Goal = {
   id: string;
@@ -39,9 +40,9 @@ const GOAL_ABBR: Record<string, string> = {
 };
 
 const GOAL_BAR_COLOR: Record<string, string> = {
-  distance: '#8DC63F',
-  elevation: '#2563eb',
-  gym_sessions: '#E91E8C',
+  distance: RivalColors.accentText,
+  elevation: RivalColors.accentFill,
+  gym_sessions: RivalColors.accentFill,
 };
 
 // Activity types available as filters, with display names
@@ -198,17 +199,17 @@ function ProgressBar({
           return (
             <View
               key={cp}
-              style={[styles.tick, { left: `${cpPct}%`, backgroundColor: reached ? '#ffffff' : '#C0D8A0' }]}
+              style={[styles.tick, { left: `${cpPct}%`, backgroundColor: reached ? RivalColors.textPrimary : 'rgba(255,181,158,0.45)' }]}
             />
           );
         })}
 
-        <View style={[styles.thumb, thumbStyle, { borderColor: done ? '#fbbf24' : color, backgroundColor: done ? '#fbbf24' : '#FFFFFF' }]} />
+        <View style={[styles.thumb, thumbStyle, { borderColor: done ? RivalColors.accentGold : color, backgroundColor: done ? RivalColors.accentGold : RivalColors.textPrimary }]} />
       </View>
 
       <View style={styles.barLabels}>
         <Text style={styles.barLabelStart}>0</Text>
-        <Text style={[styles.barLabelProgress, { color: done ? '#fbbf24' : color }]}>{displayPct}%</Text>
+        <Text style={[styles.barLabelProgress, { color: done ? RivalColors.accentGold : color }]}>{displayPct}%</Text>
         <Text style={styles.barLabelEnd}>{target}</Text>
       </View>
     </View>
@@ -286,7 +287,7 @@ export default function GoalsScreen() {
     setSaving(true);
     const { start, end } = getDateRange(periodType);
 
-    await supabase.from('goals').insert({
+    const { error: addErr } = await supabase.from('goals').insert({
       user_id: userId,
       goal_type: goalType,
       target_value: parseFloat(targetValue),
@@ -295,6 +296,13 @@ export default function GoalsScreen() {
       end_date: dateToLocalStr(end),
       activity_filter: goalType === 'gym_sessions' ? null : activityFilter,
     });
+    if (addErr) {
+      // Keep the form open with the values still in it rather than closing on
+      // a goal that was never created.
+      notify("Couldn't create that goal", addErr.message);
+      setSaving(false);
+      return;
+    }
 
     setSaving(false);
     setShowAdd(false);
@@ -308,7 +316,11 @@ export default function GoalsScreen() {
 
   async function deleteGoal(id: string) {
     if (typeof window !== 'undefined' && !window.confirm('Delete this goal?')) return;
-    await supabase.from('goals').delete().eq('id', id);
+    const { error } = await supabase.from('goals').delete().eq('id', id);
+    if (error) {
+      notify("Couldn't delete that goal", error.message);
+      return;
+    }
     setGoals((prev) => prev.filter((g) => g.id !== id));
   }
 
@@ -332,7 +344,11 @@ export default function GoalsScreen() {
   // a 4th row, since it's the same slot picking back up, not a new goal.
   async function tryAgainGoal(goal: Goal) {
     const { start, end } = getDateRange(goal.period_type as 'week' | 'month');
-    await supabase.from('goals').insert({
+    // Insert the replacement BEFORE removing the old row, and abort if it
+    // fails: unchecked, a failed insert followed by a successful delete left
+    // the athlete with no goal at all -- silent data loss on a button labelled
+    // "try again".
+    const { error: insErr } = await supabase.from('goals').insert({
       user_id: userId,
       goal_type: goal.goal_type,
       target_value: goal.target_value,
@@ -341,7 +357,15 @@ export default function GoalsScreen() {
       end_date: dateToLocalStr(end),
       activity_filter: goal.activity_filter,
     });
-    await supabase.from('goals').delete().eq('id', goal.id);
+    if (insErr) {
+      notify("Couldn't start that goal again", insErr.message);
+      return;
+    }
+    const { error: delErr } = await supabase.from('goals').delete().eq('id', goal.id);
+    if (delErr) {
+      // The new goal exists, so nothing is lost; the old one just lingers.
+      notify('Started a fresh goal', 'The finished one could not be cleared away — you may see both for now.');
+    }
     load();
   }
 
@@ -364,8 +388,7 @@ export default function GoalsScreen() {
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.title}>Goals</Text>
-        <Text style={styles.subtitle}>Track what you're working towards.</Text>
+        <RivalPageHeader title="Goals" subtitle="Track what you're working towards." />
 
         {loading && <Text style={styles.emptyText}>Loading…</Text>}
 
@@ -384,7 +407,7 @@ export default function GoalsScreen() {
               key={goal.id}
               style={[
                 styles.goalCard,
-                done && { borderColor: '#fbbf24', borderWidth: 1.5 },
+                done && { borderColor: RivalColors.accentGold, borderWidth: 1.5 },
               ]}
             >
               <View style={styles.goalHeader}>
@@ -420,7 +443,7 @@ export default function GoalsScreen() {
               )}
 
               <View style={styles.goalProgress}>
-                <Text style={[styles.progressCurrent, done && { color: '#fbbf24' }]}>{goal.progress}</Text>
+                <Text style={[styles.progressCurrent, done && { color: RivalColors.accentGold }]}>{goal.progress}</Text>
                 <Text style={styles.progressSep}> / </Text>
                 <Text style={styles.progressTarget}>{goal.target_value} {unit}</Text>
               </View>
@@ -503,7 +526,7 @@ export default function GoalsScreen() {
             <TextInput
               style={styles.modalInput}
               placeholder={goalType === 'distance' ? '100' : goalType === 'elevation' ? '5000' : '12'}
-              placeholderTextColor="#666666"
+              placeholderTextColor={RivalColors.textSecondary}
               value={targetValue}
               onChangeText={setTargetValue}
               keyboardType="decimal-pad"
@@ -530,7 +553,7 @@ export default function GoalsScreen() {
                 <TextInput
                   style={styles.modalInput}
                   placeholder="31/12/2026"
-                  placeholderTextColor="#666666"
+                  placeholderTextColor={RivalColors.textSecondary}
                   value={customEndDate}
                   onChangeText={setCustomEndDate}
                   keyboardType="numbers-and-punctuation"
@@ -561,20 +584,20 @@ export default function GoalsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#111111' },
+  container: { flex: 1, backgroundColor: RivalColors.surfaceLow },
   content: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 40 },
   header: { marginBottom: 24 },
-  back: { color: '#E91E8C', fontSize: 16 },
-  title: { fontSize: 32, fontWeight: '900', color: '#FFFFFF', marginBottom: 4 },
-  subtitle: { fontSize: 14, color: '#999999', marginBottom: 28 },
-  emptyText: { color: '#999999', fontSize: 15, textAlign: 'center', paddingVertical: 24 },
+  back: { color: RivalColors.accentFill, fontSize: 16 },
+  title: { fontSize: 32, fontWeight: '900', color: RivalColors.textPrimary, marginBottom: 4 },
+  subtitle: { fontSize: 14, color: RivalColors.textSecondary, marginBottom: 28 },
+  emptyText: { color: RivalColors.textSecondary, fontSize: 15, textAlign: 'center', paddingVertical: 24 },
   goalCard: {
-    backgroundColor: '#1A1A1A',
+    backgroundColor: RivalColors.surfaceContainer,
     borderRadius: 16,
     padding: 20,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#2A2A2A',
+    borderColor: RivalColors.surfaceHigh,
   },
   goalHeader: {
     flexDirection: 'row',
@@ -592,40 +615,40 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   typeBadgeText: { fontSize: 11, fontWeight: '800', letterSpacing: 1 },
-  goalTitle: { fontSize: 17, fontWeight: '800', color: '#FFFFFF' },
-  goalPeriod: { fontSize: 12, color: '#999999', marginTop: 2 },
+  goalTitle: { fontSize: 17, fontWeight: '800', color: RivalColors.textPrimary },
+  goalPeriod: { fontSize: 12, color: RivalColors.textSecondary, marginTop: 2 },
   deleteBtn: {
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#222222',
+    backgroundColor: RivalColors.surfaceContainer,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  deleteBtnText: { color: '#666666', fontSize: 12, fontWeight: '700' },
+  deleteBtnText: { color: RivalColors.textSecondary, fontSize: 12, fontWeight: '700' },
   celebrationBanner: {
-    backgroundColor: '#fbbf2420',
+    backgroundColor: 'rgba(245,183,89,0.12)',
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#fbbf2440',
+    borderColor: 'rgba(245,183,89,0.25)',
     padding: 12,
     marginBottom: 14,
   },
   celebrationText: {
     fontSize: 15,
     fontWeight: '800',
-    color: '#fbbf24',
+    color: RivalColors.accentGold,
     marginBottom: 2,
   },
   celebrationSub: {
     fontSize: 12,
-    color: '#fcd34d',
+    color: RivalColors.accentGold,
     opacity: 0.8,
   },
   encouragement: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#999999',
+    color: RivalColors.textSecondary,
     marginTop: 10,
     fontStyle: 'italic',
   },
@@ -636,9 +659,10 @@ const styles = StyleSheet.create({
   },
   tryAgainBtnText: { fontSize: 14, fontWeight: '700', color: RivalColors.onAccentFill },
   goalProgress: { flexDirection: 'row', alignItems: 'baseline', marginBottom: 20 },
-  progressCurrent: { fontSize: 28, fontWeight: '900', color: '#FFFFFF' },
-  progressSep: { color: '#666666', fontSize: 16 },
-  progressTarget: { color: '#999999', fontSize: 15 },
+  // Display number — the editorial serif, matching Today's Focus card.
+  progressCurrent: { fontFamily: RivalSerifFamily, fontStyle: 'italic', fontSize: 30, fontWeight: '700', color: RivalColors.textPrimary },
+  progressSep: { color: RivalColors.textSecondary, fontSize: 16 },
+  progressTarget: { color: RivalColors.textSecondary, fontSize: 15 },
   barContainer: { gap: 0 },
   checkpointLabelRow: {
     position: 'relative',
@@ -651,12 +675,12 @@ const styles = StyleSheet.create({
   },
   checkpointLabelText: {
     fontSize: 9,
-    color: '#8DC63F',
+    color: RivalColors.accentText,
     fontWeight: '700',
   },
   barTrack: {
     height: 10,
-    backgroundColor: '#2A2A2A',
+    backgroundColor: RivalColors.surfaceHigh,
     borderRadius: 5,
     position: 'relative',
     overflow: 'visible',
@@ -679,7 +703,7 @@ const styles = StyleSheet.create({
     width: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: RivalColors.textPrimary,
     borderWidth: 3,
     marginLeft: -9,
     shadowColor: '#000',
@@ -692,18 +716,18 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: 10,
   },
-  barLabelStart: { fontSize: 11, color: '#666666' },
+  barLabelStart: { fontSize: 11, color: RivalColors.textSecondary },
   barLabelProgress: { fontSize: 11, fontWeight: '700' },
-  barLabelEnd: { fontSize: 11, color: '#666666' },
+  barLabelEnd: { fontSize: 11, color: RivalColors.textSecondary },
   addButton: {
-    backgroundColor: '#E91E8C',
+    backgroundColor: RivalColors.accentFill,
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',
     marginTop: 8,
   },
-  addButtonText: { color: '#FFFFFF', fontSize: 18, fontWeight: '700' },
-  maxText: { color: '#666666', fontSize: 13, textAlign: 'center', marginTop: 16 },
+  addButtonText: { color: RivalColors.textPrimary, fontSize: 18, fontWeight: '700' },
+  maxText: { color: RivalColors.textSecondary, fontSize: 13, textAlign: 'center', marginTop: 16 },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.7)',
@@ -713,34 +737,34 @@ const styles = StyleSheet.create({
     maxHeight: '85%',
   },
   modalCard: {
-    backgroundColor: '#1A1A1A',
+    backgroundColor: RivalColors.surfaceContainer,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 28,
     gap: 12,
   },
-  modalTitle: { fontSize: 22, fontWeight: '900', color: '#FFFFFF', marginBottom: 4 },
-  modalLabel: { fontSize: 12, fontWeight: '700', color: '#999999', textTransform: 'uppercase', letterSpacing: 1 },
+  modalTitle: { fontSize: 22, fontWeight: '900', color: RivalColors.textPrimary, marginBottom: 4 },
+  modalLabel: { fontSize: 12, fontWeight: '700', color: RivalColors.textSecondary, textTransform: 'uppercase', letterSpacing: 1 },
   segmentRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   segment: {
     paddingHorizontal: 14,
     paddingVertical: 9,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#2A2A2A',
-    backgroundColor: '#222222',
+    borderColor: RivalColors.surfaceHigh,
+    backgroundColor: RivalColors.surfaceContainer,
   },
-  segmentActive: { backgroundColor: '#E91E8C', borderColor: '#E91E8C' },
-  segmentText: { color: '#999999', fontSize: 13, fontWeight: '600' },
-  segmentTextActive: { color: '#FFFFFF' },
+  segmentActive: { backgroundColor: RivalColors.accentFill, borderColor: RivalColors.accentFill },
+  segmentText: { color: RivalColors.textSecondary, fontSize: 13, fontWeight: '600' },
+  segmentTextActive: { color: RivalColors.textPrimary },
   modalInput: {
-    backgroundColor: '#222222',
+    backgroundColor: RivalColors.surfaceContainer,
     borderRadius: 10,
     padding: 14,
-    color: '#FFFFFF',
+    color: RivalColors.textPrimary,
     fontSize: 16,
     borderWidth: 1,
-    borderColor: '#2A2A2A',
+    borderColor: RivalColors.surfaceHigh,
   },
   modalButtons: { flexDirection: 'row', gap: 12, marginTop: 8 },
   cancelButton: {
@@ -749,16 +773,16 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#2A2A2A',
+    borderColor: RivalColors.surfaceHigh,
   },
-  cancelButtonText: { color: '#999999', fontSize: 16, fontWeight: '600' },
+  cancelButtonText: { color: RivalColors.textSecondary, fontSize: 16, fontWeight: '600' },
   saveButton: {
     flex: 2,
-    backgroundColor: '#E91E8C',
+    backgroundColor: RivalColors.accentFill,
     paddingVertical: 14,
     borderRadius: 10,
     alignItems: 'center',
   },
   saveButtonDisabled: { opacity: 0.4 },
-  saveButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
+  saveButtonText: { color: RivalColors.textPrimary, fontSize: 16, fontWeight: '700' },
 });

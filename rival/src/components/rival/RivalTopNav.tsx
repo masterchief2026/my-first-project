@@ -130,7 +130,12 @@ export function RivalTopNav({ active, centerSlot, hideBar }: { active?: Section;
     // icons/labels. Giving the clearance padding to the pill itself (as before)
     // stretched its own visible background/border down through that empty
     // space, reading as a tall bar with dead space inside it.
-    <View style={[styles.bottomNavOuter, { bottom: navBottomOffset, paddingBottom: insets.bottom + 6 } as any]}>
+    // paddingBottom is the home-indicator clearance. insets.bottom is 34pt on a
+    // notched iPhone, which floated the pill a visible 40pt off the bottom edge
+    // and read as dead space under the nav. The indicator itself only needs
+    // ~14pt to clear, so trim the inset rather than honouring it wholesale;
+    // browser tabs (insets.bottom === 0) keep the original small padding.
+    <View style={[styles.bottomNavOuter, { bottom: navBottomOffset, paddingBottom: insets.bottom > 0 ? Math.max(insets.bottom - 20, 8) : 6 } as any]}>
       <View style={[styles.bottomNav, navShrunk && styles.bottomNavShrunk]}>
         {LINKS.map((l) => {
           const isActive = active === l.key;
@@ -160,7 +165,14 @@ export function RivalTopNav({ active, centerSlot, hideBar }: { active?: Section;
   }
 
   return (
-    <View style={[styles.bar, narrow && styles.barNarrow]}>
+    // Screens wrap this in a SafeAreaView, which pads the whole app down past
+    // the status bar / Dynamic Island (59pt in standalone). That left the inset
+    // strip painting the bare page background ABOVE the nav, reading as dead
+    // space over the header. Pull the bar back up through that padding and add
+    // it back as internal padding instead, so the bar's own background runs
+    // edge-to-edge under the status bar while its content stays clear of it.
+    // insets.top is 0 in a browser tab, where this is a no-op.
+    <View style={[styles.bar, narrow && styles.barNarrow, insets.top > 0 && ({ marginTop: -insets.top, paddingTop: insets.top } as any)]}>
       <View style={[styles.row, narrow && styles.rowNarrow]}>
         <TouchableOpacity
           onPress={() => router.push('/home')}
@@ -396,9 +408,18 @@ const styles = StyleSheet.create({
   // with dead space inside it instead of a snug pill sitting above the clearance.
   bottomNavOuter: {
     position: 'fixed' as any,
-    left: 16, right: 16,
+    left: 0, right: 0,
     zIndex: 200,
+    paddingHorizontal: 16,
+    // No background of its own. An earlier attempt faded this strip to #131313
+    // to stop scrolling content showing through the home-indicator clearance,
+    // but that colour is Today's flat backdrop -- over the photographic
+    // backgrounds on Activity and Team Feed it read as a dark shadow boxed in
+    // around the pill. The clearance is now small enough (see paddingBottom
+    // above) that content passing behind it is not distracting, and a floating
+    // pill is supposed to float over the page, not sit on a slab.
   },
+
   bottomNav: {
     flexDirection: 'row', justifyContent: 'space-between',
     backgroundColor: '#1c1c1c',

@@ -70,9 +70,14 @@ const styles = StyleSheet.create({
   },
   // minHeight, not height: fills at least one screen but is free to grow, same as
   // any ordinary hero section on a real webpage.
+  // 100dvh, not 100vh: on iOS 100vh is the LARGE viewport (741px of an 852px
+  // iPhone 15 Pro screen) while only the SMALL viewport (659px) is actually
+  // visible behind Safari's toolbar. Sizing the hero to 100vh pushed the
+  // "Sign In" link into that hidden 82px band with nothing scrollable to
+  // reach it. 100dvh tracks what is genuinely visible.
   hero: {
     position: 'relative',
-    minHeight: '100vh' as any,
+    minHeight: '100dvh' as any,
     width: '100%',
   },
   heroImageNative: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
@@ -82,7 +87,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(14,14,14,0.4)',
   },
   content: {
-    minHeight: '100vh' as any,
+    minHeight: '100dvh' as any,
     paddingHorizontal: 24,
     justifyContent: 'space-between',
     paddingBottom: 40,

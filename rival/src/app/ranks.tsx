@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
+import { RivalColors } from '../constants/rivalTheme';
 import { StyleSheet, View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { supabase } from '../lib/supabase';
 import { LEVELS, getLevel } from '../lib/xp';
-import { RivalTopNav } from '../components/rival';
+import { RivalTopNav, RivalPageHeader } from '../components/rival';
 
 export default function RanksScreen() {
   const [totalXp, setTotalXp] = useState(0);
@@ -36,8 +37,7 @@ export default function RanksScreen() {
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.title}>Ranks</Text>
-        <Text style={styles.subtitle}>Start as a Rookie. Become Unrivaled.</Text>
+        <RivalPageHeader title="Ranks" subtitle="Start as a Rookie. Become Unrivaled." />
 
         <View style={styles.list}>
           {LEVELS.map((lvl, i) => {
@@ -50,7 +50,7 @@ export default function RanksScreen() {
                 <View style={[
                   styles.row,
                   isCurrent && { borderColor: lvl.color, borderWidth: 2, backgroundColor: lvl.color + '11' },
-                  !isCurrent && { borderColor: isUnlocked ? lvl.color + '44' : '#2A2A2A' },
+                  !isCurrent && { borderColor: isUnlocked ? lvl.color + '44' : RivalColors.surfaceHigh },
                 ]}>
                   {/* Left: icon + colour strip */}
                   <View style={[styles.strip, { backgroundColor: lvl.color }]}>
@@ -87,7 +87,7 @@ export default function RanksScreen() {
                 {/* Connector line between rows */}
                 {i < LEVELS.length - 1 && (
                   <View style={styles.connector}>
-                    <View style={[styles.connectorLine, { backgroundColor: isUnlocked && totalXp >= LEVELS[i + 1].minXp ? lvl.color : '#2A2A2A' }]} />
+                    <View style={[styles.connectorLine, { backgroundColor: isUnlocked && totalXp >= LEVELS[i + 1].minXp ? lvl.color : RivalColors.surfaceHigh }]} />
                   </View>
                 )}
               </View>
@@ -103,12 +103,12 @@ export default function RanksScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#111111' },
+  container: { flex: 1, backgroundColor: RivalColors.surfaceLow },
   content: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 48 },
   header: { marginBottom: 24 },
-  back: { color: '#E91E8C', fontSize: 16 },
-  title: { fontSize: 32, fontWeight: '900', color: '#FFFFFF', marginBottom: 4 },
-  subtitle: { fontSize: 14, color: '#999999', marginBottom: 32 },
+  back: { color: RivalColors.accentFill, fontSize: 16 },
+  title: { fontSize: 32, fontWeight: '900', color: RivalColors.textPrimary, marginBottom: 4 },
+  subtitle: { fontSize: 14, color: RivalColors.textSecondary, marginBottom: 32 },
   list: { gap: 0 },
   row: {
     flexDirection: 'row',
@@ -116,7 +116,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     overflow: 'hidden',
-    backgroundColor: '#111111',
+    backgroundColor: RivalColors.surfaceLow,
   },
   strip: {
     width: 56,
@@ -132,7 +132,7 @@ const styles = StyleSheet.create({
   stripNum: {
     fontSize: 11,
     fontWeight: '900',
-    color: '#FFFFFF',
+    color: RivalColors.textPrimary,
     opacity: 0.8,
   },
   rowContent: {
@@ -147,7 +147,7 @@ const styles = StyleSheet.create({
   },
   xpReq: {
     fontSize: 12,
-    color: '#666666',
+    color: RivalColors.textSecondary,
     fontWeight: '600',
   },
   rowRight: {
@@ -163,7 +163,7 @@ const styles = StyleSheet.create({
   currentBadgeText: {
     fontSize: 11,
     fontWeight: '900',
-    color: '#FFFFFF',
+    color: RivalColors.textPrimary,
     letterSpacing: 1,
   },
   check: {
@@ -184,7 +184,7 @@ const styles = StyleSheet.create({
   },
   footer: {
     fontSize: 13,
-    color: '#8DC63F',
+    color: RivalColors.accentText,
     textAlign: 'center',
     marginTop: 32,
     fontStyle: 'italic',

@@ -10,7 +10,7 @@ import { formatDisplayName, formatTeamName } from '../lib/identity';
 import { isoToDisplayDate, displayToIsoDate } from '../lib/dateFormat';
 import { getSeasonStartISO, daysUntilSeasonEnd } from '../lib/season';
 import { matchCanonicalLift } from './scan-workout';
-import { RivalColors } from '../constants/rivalTheme';
+import { RivalColors, RivalSerifFamily } from '../constants/rivalTheme';
 import { BREAKPOINT_WIDE_LAYOUT } from '../constants/breakpoints';
 import { ACTIVITY_ICONS } from '../constants/activityIcons';
 import { formatDuration } from '../lib/format';
@@ -36,7 +36,11 @@ type FeedItem =
   | { kind: 'race'; id: string; userId: string; name: string; raceName: string; raceDate: string; ts: string }
   | { kind: 'session'; id: string; userId: string; ts: string; name: string; message: ChatMessage };
 
-const AVATAR_COLORS = ['#E91E8C', '#8DC63F', '#FF6B35', '#4FC3F7', '#AB47BC', '#26A69A'];
+// Deterministic per-person fallback colours (see the hash below). Six hues are
+// still needed to tell teammates apart at a glance; these are drawn from a warm
+// palette that sits alongside Refined Ember, rather than the old brand magenta
+// and lime which now read as artefacts of the previous design.
+const AVATAR_COLORS = ['#D97757', '#F5B759', '#C2694A', '#E8A87C', '#A85638', '#8C6E54'];
 
 function avatarColor(name: string): string {
   let hash = 0;
@@ -211,7 +215,7 @@ function TeamChallengeRing({ pct, value, unit, size = 176, thickness = 13 }: { p
   );
 }
 
-const TEAM_CHALLENGE_PHOTO = require('../../assets/images/backgrounds/optimized/coastal-highway-triathlete-dusk-3.png');
+const TEAM_CHALLENGE_PHOTO = require('../../assets/images/backgrounds/optimized/coastal-highway-triathlete-dusk-3.jpg');
 
 // Same technique as RivalFixedBackground (see that file's comment for the
 // full explanation of why): react-native-web's ImageBackground hardcodes
@@ -400,7 +404,11 @@ export default function LeagueScreen() {
   }
 
   async function saveGoal() {
-    await supabase.from('league_members').update({ personal_goal: goalDraft.trim() || null }).eq('league_id', id).eq('user_id', currentUserId);
+    const { error } = await supabase.from('league_members').update({ personal_goal: goalDraft.trim() || null }).eq('league_id', id).eq('user_id', currentUserId);
+    if (error) {
+      notify("Couldn't save your goal", error.message);
+      return;
+    }
     setMembers(prev => prev.map(m => m.user_id === currentUserId ? { ...m, personal_goal: goalDraft.trim() || null } : m));
     setEditingGoal(false);
   }
@@ -672,33 +680,46 @@ export default function LeagueScreen() {
     const { start, end } = getWeekWindow(offset);
     const { start: lastStart, end: lastEnd } = getWeekWindow(offset - 1);
 
-    const membersWithScores = await Promise.all(
-      membersData.map(async (m: any) => {
-        const [weekRes, prevRes, allRes] = await Promise.all([
-          supabase.from('activities').select('effort_score, duration_seconds').eq('user_id', m.user_id)
-            .gte('started_at', start.toISOString()).lt('started_at', end.toISOString()),
-          supabase.from('activities').select('effort_score').eq('user_id', m.user_id)
-            .gte('started_at', lastStart.toISOString()).lt('started_at', lastEnd.toISOString()),
-          supabase.from('activities').select('effort_score').eq('user_id', m.user_id)
-            .gte('started_at', getSeasonStartISO()),
-        ]);
+    // Three queries for the whole team, not three PER MEMBER. This previously
+    // fanned out inside a map — a twenty-person team fired sixty requests at
+    // once, which is slow to settle and heavy on the connection pool. Effort
+    // rows carry user_id, so the same numbers come back from one query per
+    // window and a group-by in memory.
+    const memberIds = membersData.map((m: any) => m.user_id);
+    const sumBy = (rows: any[] | null | undefined, field = 'effort_score') => {
+      const acc: Record<string, number> = {};
+      (rows || []).forEach((r: any) => {
+        acc[r.user_id] = (acc[r.user_id] || 0) + (r[field] || 0);
+      });
+      return acc;
+    };
 
-        const total = weekRes.data?.reduce((s, a) => s + (a.effort_score || 0), 0) ?? 0;
-        const weekTimeMinutes = Math.round((weekRes.data?.reduce((s, a) => s + (a.duration_seconds || 0), 0) ?? 0) / 60);
-        const lastWeekTotal = prevRes.data?.reduce((s, a) => s + (a.effort_score || 0), 0) ?? 0;
-        const allTimeXp = allRes.data?.reduce((s, a) => s + (a.effort_score || 0), 0) ?? 0;
+    const [weekRes, prevRes, allRes] = await Promise.all([
+      supabase.from('activities').select('user_id, effort_score, duration_seconds').in('user_id', memberIds)
+        .gte('started_at', start.toISOString()).lt('started_at', end.toISOString()),
+      supabase.from('activities').select('user_id, effort_score').in('user_id', memberIds)
+        .gte('started_at', lastStart.toISOString()).lt('started_at', lastEnd.toISOString()),
+      supabase.from('activities').select('user_id, effort_score').in('user_id', memberIds)
+        .gte('started_at', getSeasonStartISO()),
+    ]);
 
-        return {
-          ...m,
-          total_score: Math.round(total * 10) / 10,
-          last_week_score: Math.round(lastWeekTotal * 10) / 10,
-          all_time_xp: allTimeXp,
-          rank_change: null as number | null,
-          isHot: false,
-          week_time_minutes: weekTimeMinutes,
-        };
-      })
-    );
+    const weekByUser = sumBy(weekRes.data);
+    const weekSecondsByUser = sumBy(weekRes.data, 'duration_seconds');
+    const prevByUser = sumBy(prevRes.data);
+    const allByUser = sumBy(allRes.data);
+
+    const membersWithScores = membersData.map((m: any) => {
+      const total = weekByUser[m.user_id] || 0;
+      return {
+        ...m,
+        total_score: Math.round(total * 10) / 10,
+        last_week_score: Math.round((prevByUser[m.user_id] || 0) * 10) / 10,
+        all_time_xp: allByUser[m.user_id] || 0,
+        rank_change: null as number | null,
+        isHot: false,
+        week_time_minutes: Math.round((weekSecondsByUser[m.user_id] || 0) / 60),
+      };
+    });
 
     // MVP = highest scorer in the prior week
     const mvp = [...membersWithScores]
@@ -765,7 +786,8 @@ export default function LeagueScreen() {
           .upload(path, file, { contentType: file.type, upsert: true });
         if (!storageErr) {
           const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path);
-          await supabase.from('leagues').update({ logo_url: urlData.publicUrl }).eq('id', id);
+          const { error: logoErr } = await supabase.from('leagues').update({ logo_url: urlData.publicUrl }).eq('id', id);
+          if (logoErr) notify("Couldn't update the team logo", logoErr.message);
           setLeague(prev => prev ? { ...prev, logo_url: urlData.publicUrl } : prev);
         }
       } finally {
@@ -1005,7 +1027,10 @@ export default function LeagueScreen() {
         const winnerId = !progress || progress.challenger === progress.opponent
           ? null
           : progress.challenger > progress.opponent ? c.challenger_id : c.opponent_id;
-        await supabase.from('league_challenges').update({ status: 'completed', winner_id: winnerId }).eq('id', c.id);
+        // Background sweep that settles finished challenges on load. Logs
+        // rather than interrupts: it retries on the next visit anyway.
+        const { error: doneErr } = await supabase.from('league_challenges').update({ status: 'completed', winner_id: winnerId }).eq('id', c.id);
+        if (doneErr) console.error('Challenge completion failed:', doneErr.message);
         setChallenges(prev => prev.map(x => x.id === c.id ? { ...x, status: 'completed', winner_id: winnerId } : x));
       }
     }
@@ -1022,7 +1047,7 @@ export default function LeagueScreen() {
     const endDateStr = `${ey}-${String(em).padStart(2, '0')}-${String(ed).padStart(2, '0')}`;
 
     setPostingChallenge(true);
-    const { data: inserted } = await supabase.from('league_challenges').insert({
+    const { data: inserted, error: insErr } = await supabase.from('league_challenges').insert({
       league_id: id,
       challenger_id: currentUserId,
       opponent_id: challengeModalFor,
@@ -1031,6 +1056,11 @@ export default function LeagueScreen() {
       end_date: endDateStr,
       status: 'pending',
     }).select('id').single();
+    if (insErr) {
+      setPostingChallenge(false);
+      notify("Couldn't create that challenge", insErr.message);
+      return;
+    }
     setPostingChallenge(false);
     setChallengeModalFor(null);
     if (inserted) fireChallengeNotification('1v1_sent', inserted.id);
@@ -1039,9 +1069,11 @@ export default function LeagueScreen() {
 
   async function respondToChallenge(challengeId: string, accept: boolean) {
     if (!accept) {
-      await supabase.from('league_challenges').update({ status: 'declined' }).eq('id', challengeId);
+      const { error: decErr } = await supabase.from('league_challenges').update({ status: 'declined' }).eq('id', challengeId);
+      if (decErr) { notify("Couldn't decline that challenge", decErr.message); return; }
     } else {
-      await supabase.from('league_challenges').update({ status: 'active' }).eq('id', challengeId);
+      const { error: accErr } = await supabase.from('league_challenges').update({ status: 'active' }).eq('id', challengeId);
+      if (accErr) { notify("Couldn't accept that challenge", accErr.message); return; }
     }
     fireChallengeNotification('1v1_response', challengeId, { accept });
     loadChallenges();
@@ -1101,7 +1133,10 @@ export default function LeagueScreen() {
         const p = map[c.id];
         const winnerId = !p || p.challenger === p.opponent ? null
           : p.challenger > p.opponent ? c.challenger_league_id : c.opponent_league_id;
-        await supabase.from('league_vs_league_challenges').update({ status: 'completed', winner_league_id: winnerId }).eq('id', c.id);
+        // Background sweep that settles finished challenges on load. Logs
+        // rather than interrupts: it retries on the next visit anyway.
+        const { error: doneErr } = await supabase.from('league_vs_league_challenges').update({ status: 'completed', winner_league_id: winnerId }).eq('id', c.id);
+        if (doneErr) console.error('Challenge completion failed:', doneErr.message);
         setLvlChallenges(prev => prev.map(x => x.id === c.id ? { ...x, status: 'completed', winner_league_id: winnerId } : x));
       }
     }
@@ -1122,11 +1157,16 @@ export default function LeagueScreen() {
     const [ey, em, ed] = [end.getFullYear(), end.getMonth() + 1, end.getDate()];
     const endDateStr = `${ey}-${String(em).padStart(2, '0')}-${String(ed).padStart(2, '0')}`;
     setPostingLvl(true);
-    const { data: inserted } = await supabase.from('league_vs_league_challenges').insert({
+    const { data: inserted, error: insErr } = await supabase.from('league_vs_league_challenges').insert({
       challenger_league_id: id, opponent_league_id: lvlTargetLeague,
       created_by: currentUserId, metric: lvlMetric,
       start_date: today, end_date: endDateStr, status: 'pending',
     }).select('id').single();
+    if (insErr) {
+      setPostingLvl(false);
+      notify("Couldn't create that challenge", insErr.message);
+      return;
+    }
     setPostingLvl(false);
     setShowLvlModal(false);
     setLvlTargetLeague(null);
@@ -1145,9 +1185,16 @@ export default function LeagueScreen() {
     const text = chatInput.trim();
     if (!text || !currentUserId) return;
     setChatInput('');
-    await supabase.from('league_messages').insert({
+    const { error } = await supabase.from('league_messages').insert({
       league_id: id, user_id: currentUserId, kind: 'text', body: text,
     });
+    if (error) {
+      // The input was cleared optimistically — put the text back so a failed
+      // send doesn't silently swallow what they typed.
+      setChatInput(text);
+      notify("Couldn't send that message", error.message);
+      return;
+    }
     loadChat();
   }
 
@@ -1176,7 +1223,10 @@ export default function LeagueScreen() {
       notify("Couldn't post session", error?.message || 'Please try again.');
       return;
     }
-    await supabase.from('league_session_rsvps').insert({ message_id: inserted.id, user_id: currentUserId });
+    // Auto-RSVP the creator to their own session. Non-fatal: the session
+    // exists, they can tap to join like anyone else.
+    const { error: selfRsvpErr } = await supabase.from('league_session_rsvps').insert({ message_id: inserted.id, user_id: currentUserId });
+    if (selfRsvpErr) console.error('Creator auto-RSVP failed:', selfRsvpErr.message);
     setShowSessionComposer(false);
     setSessionLocation('');
     setSessionNote('');
@@ -1189,14 +1239,24 @@ export default function LeagueScreen() {
     const scheduledAt = new Date(Date.now() + quickTrainMinutes * 60 * 1000);
 
     setPostingQuickTrain(true);
-    const { data: inserted } = await supabase.from('league_messages').insert({
+    const { data: inserted, error: insErr } = await supabase.from('league_messages').insert({
       league_id: id, user_id: currentUserId, kind: 'session',
       activity_type: quickTrainType, scheduled_at: scheduledAt.toISOString(),
       location: quickTrainLocation.trim() || null,
     }).select('id').single();
+    if (insErr) {
+      // Must clear the spinner too — an early return that skips it leaves the
+      // button stuck in its posting state with no way back.
+      setPostingQuickTrain(false);
+      notify("Couldn't create that session", insErr.message);
+      return;
+    }
 
     if (inserted) {
-      await supabase.from('league_session_rsvps').insert({ message_id: inserted.id, user_id: currentUserId });
+      // Auto-RSVP the creator to their own session. Non-fatal: the session
+    // exists, they can tap to join like anyone else.
+    const { error: selfRsvpErr } = await supabase.from('league_session_rsvps').insert({ message_id: inserted.id, user_id: currentUserId });
+    if (selfRsvpErr) console.error('Creator auto-RSVP failed:', selfRsvpErr.message);
 
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
@@ -1224,10 +1284,12 @@ export default function LeagueScreen() {
     if (!currentUserId) return;
     const joined = (rsvpMap[messageId] || []).includes(currentUserId);
     if (joined) {
-      await supabase.from('league_session_rsvps').delete().eq('message_id', messageId).eq('user_id', currentUserId);
+      const { error: rsvpOutErr } = await supabase.from('league_session_rsvps').delete().eq('message_id', messageId).eq('user_id', currentUserId);
+      if (rsvpOutErr) { notify("Couldn't update your RSVP", rsvpOutErr.message); loadChat(); return; }
       setRsvpMap(prev => ({ ...prev, [messageId]: (prev[messageId] || []).filter(u => u !== currentUserId) }));
     } else {
-      await supabase.from('league_session_rsvps').insert({ message_id: messageId, user_id: currentUserId });
+      const { error: rsvpInErr } = await supabase.from('league_session_rsvps').insert({ message_id: messageId, user_id: currentUserId });
+      if (rsvpInErr) { notify("Couldn't update your RSVP", rsvpInErr.message); loadChat(); return; }
       setRsvpMap(prev => ({ ...prev, [messageId]: [...(prev[messageId] || []), currentUserId] }));
     }
   }
@@ -1256,10 +1318,14 @@ export default function LeagueScreen() {
     const existing = (reactionsMap[key] || []).find(r => r.user_id === currentUserId);
 
     if (existing && existing.emoji === emoji) {
-      await supabase.from('feed_reactions').delete().eq('target_type', targetType).eq('target_id', targetId).eq('user_id', currentUserId);
+      // Reactions are a quiet, high-frequency tap — resync rather than
+      // interrupting with a dialog, but never leave the UI showing a reaction
+      // the server rejected.
+      const { error: unreactErr } = await supabase.from('feed_reactions').delete().eq('target_type', targetType).eq('target_id', targetId).eq('user_id', currentUserId);
+      if (unreactErr) loadChat();
       setReactionsMap(prev => ({ ...prev, [key]: (prev[key] || []).filter(r => r.user_id !== currentUserId) }));
     } else {
-      await supabase.from('feed_reactions').upsert(
+      const { error: reactErr } = await supabase.from('feed_reactions').upsert(
         { league_id: id, target_type: targetType, target_id: targetId, user_id: currentUserId, emoji },
         { onConflict: 'target_type,target_id,user_id' }
       );
@@ -2504,7 +2570,7 @@ export default function LeagueScreen() {
                           <View style={styles.challengeProgressBlock}>
                             <Text style={styles.challengeProgressLabel}>{memberName(c.challenger_id)}</Text>
                             <View style={styles.challengeTrack}>
-                              <View style={[styles.challengeBar, { width: `${Math.round((p.challenger / max) * 100)}%`, backgroundColor: '#E91E8C' } as any]} />
+                              <View style={[styles.challengeBar, { width: `${Math.round((p.challenger / max) * 100)}%`, backgroundColor: RivalColors.accentFill } as any]} />
                             </View>
                             <Text style={styles.challengeProgressScore}>{p.challenger}</Text>
                           </View>
@@ -2568,7 +2634,7 @@ export default function LeagueScreen() {
                       onPress={() => setLvlTargetLeague(l.id)}
                     >
                       <Text style={styles.lvlLeaguePickerText}>{formatTeamName(l.name)}</Text>
-                      {lvlTargetLeague === l.id && <Text style={{ color: '#8DC63F' }}>✓</Text>}
+                      {lvlTargetLeague === l.id && <Text style={{ color: RivalColors.accentText }}>✓</Text>}
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -2649,7 +2715,7 @@ export default function LeagueScreen() {
                   <View style={styles.challengeProgressBlock}>
                     <Text style={styles.challengeProgressLabel}>{challengerName}</Text>
                     <View style={styles.challengeTrack}>
-                      <View style={[styles.challengeBar, { width: `${Math.round((ourScore / max) * 100)}%`, backgroundColor: '#E91E8C' } as any]} />
+                      <View style={[styles.challengeBar, { width: `${Math.round((ourScore / max) * 100)}%`, backgroundColor: RivalColors.accentFill } as any]} />
                     </View>
                     <Text style={styles.challengeProgressScore}>{ourScore}</Text>
                   </View>
@@ -2791,7 +2857,7 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
   teamChallengeTitle: {
-    fontFamily: 'Georgia, "Times New Roman", serif', fontStyle: 'italic', fontWeight: '700', fontSize: 18, color: '#fff', marginTop: 2,
+    fontFamily: RivalSerifFamily, fontStyle: 'italic', fontWeight: '700', fontSize: 18, color: '#fff', marginTop: 2,
     textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
   },
   teamChallengeEditBtn: { backgroundColor: 'rgba(20,20,20,0.55)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10 },
@@ -2808,17 +2874,17 @@ const styles = StyleSheet.create({
     borderRadius: 14, padding: 12,
   },
   paceIcon: { width: 34, height: 34, borderRadius: 10, backgroundColor: 'rgba(217,119,87,0.22)', alignItems: 'center', justifyContent: 'center' },
-  paceTitle: { fontFamily: 'Georgia, "Times New Roman", serif', fontStyle: 'italic', fontWeight: '700', fontSize: 14, color: '#fff' },
+  paceTitle: { fontFamily: RivalSerifFamily, fontStyle: 'italic', fontWeight: '700', fontSize: 14, color: '#fff' },
   paceSub: { fontSize: 12, color: RivalColors.onSurfaceVariant, marginTop: 2 },
   paceSubBold: { fontWeight: '800', color: '#fff' },
 
   statMiniRow: { flexDirection: 'row', gap: 8 },
   statMiniCard: { flex: 1, backgroundColor: '#2a211d', borderWidth: 1, borderColor: `${RivalColors.accentText}24`, borderRadius: 14, paddingVertical: 12, alignItems: 'center' },
   statMiniVal: { fontSize: 17, fontWeight: '800', color: '#fff', letterSpacing: -0.3 },
-  statMiniLbl: { fontFamily: 'Georgia, "Times New Roman", serif', fontStyle: 'italic', fontWeight: '700', fontSize: 9, letterSpacing: 0.4, color: 'rgba(255,255,255,0.55)', textTransform: 'uppercase', textAlign: 'center', marginTop: 4 },
+  statMiniLbl: { fontFamily: RivalSerifFamily, fontStyle: 'italic', fontWeight: '700', fontSize: 9, letterSpacing: 0.4, color: 'rgba(255,255,255,0.55)', textTransform: 'uppercase', textAlign: 'center', marginTop: 4 },
 
   teamChallengeContributors: { borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)', paddingTop: 12, gap: 2 },
-  teamChallengeSectionTitle: { fontFamily: 'Georgia, "Times New Roman", serif', fontStyle: 'italic', fontWeight: '700', fontSize: 14, color: '#fff', marginBottom: 6 },
+  teamChallengeSectionTitle: { fontFamily: RivalSerifFamily, fontStyle: 'italic', fontWeight: '700', fontSize: 14, color: '#fff', marginBottom: 6 },
   contribRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 7 },
   contribRank: { width: 14, textAlign: 'center', color: RivalColors.textSecondary, fontSize: 12, fontWeight: '700' },
   contribCrown: { position: 'absolute', top: -10, left: '50%', transform: [{ translateX: -7 }], zIndex: 2 },

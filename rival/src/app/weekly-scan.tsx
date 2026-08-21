@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
-import { StyleSheet, TouchableOpacity, View, Text, ScrollView, Image, Platform, ActivityIndicator, TextInput, Alert } from 'react-native';
+import { RivalColors } from '../constants/rivalTheme';
+import { StyleSheet, TouchableOpacity, View, Text, ScrollView, Image, Platform, ActivityIndicator, TextInput } from 'react-native';
+import { notify } from '../lib/notify';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
@@ -218,7 +220,10 @@ export default function WeeklyScanScreen() {
             performed_at: day.date.toISOString(),
           }));
         if (liftEntries.length > 0) {
-          await supabase.from('exercise_entries').insert(liftEntries);
+          // The activity row is already in; dropping the lifts silently would
+          // leave the PR tracker quietly short.
+          const { error: liftErr } = await supabase.from('exercise_entries').insert(liftEntries);
+          if (liftErr) setErrorMsg(`Saved, but the lifts didn't attach: ${liftErr.message}`);
         }
 
         setResults((prev) => prev!.map((r, ri) => ri === i ? {
@@ -244,7 +249,12 @@ export default function WeeklyScanScreen() {
     const trimmed = editingName.trim();
     if (!trimmed) { setEditingIndex(null); return; }
 
-    await supabase.from('activities').update({ name: trimmed, name_locked: true }).eq('id', result.activityId);
+    const { error: nameErr } = await supabase.from('activities').update({ name: trimmed, name_locked: true }).eq('id', result.activityId);
+    if (nameErr) {
+      setErrorMsg(`Couldn't rename that workout: ${nameErr.message}`);
+      setEditingIndex(null);
+      return;
+    }
     setResults((prev) => prev!.map((r, ri) => ri === index ? { ...r, name: trimmed } : r));
     setEditingIndex(null);
   }
@@ -334,16 +344,18 @@ export default function WeeklyScanScreen() {
 
         const { data: urlData } = supabase.storage.from('activity-photos').getPublicUrl(path);
 
-        await supabase.from('activity_media').insert({
+        const { error: mediaErr } = await supabase.from('activity_media').insert({
           activity_id: activityId,
           media_url: urlData.publicUrl,
           media_type: item.mediaType,
         });
+        if (mediaErr) { setErrorMsg(`A photo didn't attach: ${mediaErr.message}`); continue; }
 
         if (item.mediaType === 'photo') {
           photoCount++;
           if (existing === 0 && photoCount === 1) {
-            await supabase.from('activities').update({ photo_url: urlData.publicUrl }).eq('id', activityId);
+            const { error: coverErr } = await supabase.from('activities').update({ photo_url: urlData.publicUrl }).eq('id', activityId);
+            if (coverErr) setErrorMsg(`Cover photo didn't set: ${coverErr.message}`);
           }
         } else {
           videoCount++;
@@ -387,7 +399,7 @@ export default function WeeklyScanScreen() {
                   <View key={i} style={[styles.dayCard, hasPhotos && styles.dayCardActive, isFuture && styles.dayCardDisabled]}>
                     <TouchableOpacity
                       onPress={() => isFuture
-                        ? Alert.alert("Can't log a future workout", "You can only log activities for today or earlier — come back once you've actually done it!")
+                        ? notify("Can't log a future workout", "You can only log activities for today or earlier — come back once you've actually done it!")
                         : pickPhotosForDay(i)}
                       style={styles.dayCardTouchable}
                     >
@@ -445,7 +457,7 @@ export default function WeeklyScanScreen() {
                   {r.status === 'pending' && <Text style={styles.resultStatusPending}>Waiting…</Text>}
                   {r.status === 'scanning' && (
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                      <ActivityIndicator size="small" color="#E91E8C" />
+                      <ActivityIndicator size="small" color={RivalColors.accentFill} />
                       <Text style={styles.resultStatusPending}>Scanning…</Text>
                     </View>
                   )}
@@ -500,51 +512,51 @@ export default function WeeklyScanScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#111111' },
+  container: { flex: 1, backgroundColor: RivalColors.surfaceLow },
   content: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 40 },
   header: { marginBottom: 16 },
-  back: { color: '#E91E8C', fontSize: 16 },
-  title: { fontSize: 32, fontWeight: '900', color: '#FFFFFF', marginBottom: 6 },
-  subtitle: { fontSize: 14, color: '#999999', marginBottom: 24, lineHeight: 20 },
+  back: { color: RivalColors.accentFill, fontSize: 16 },
+  title: { fontSize: 32, fontWeight: '900', color: RivalColors.textPrimary, marginBottom: 6 },
+  subtitle: { fontSize: 14, color: RivalColors.textSecondary, marginBottom: 24, lineHeight: 20 },
 
   floatingErrorBar: { position: 'absolute', top: 8, left: 12, right: 12, zIndex: 50, backgroundColor: '#3b0a0a', borderRadius: 10, padding: 12, borderWidth: 1, borderColor: '#f87171', shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 2 } },
   floatingErrorText: { color: '#f87171', fontSize: 13, fontWeight: '600' },
 
   daysGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 },
-  dayCard: { width: '13%', minWidth: 44, aspectRatio: 0.75, backgroundColor: '#1A1A1A', borderRadius: 12, borderWidth: 1, borderColor: '#2A2A2A' },
-  dayCardActive: { backgroundColor: '#1A0A12', borderColor: '#E91E8C' },
+  dayCard: { width: '13%', minWidth: 44, aspectRatio: 0.75, backgroundColor: RivalColors.surfaceContainer, borderRadius: 12, borderWidth: 1, borderColor: RivalColors.surfaceHigh },
+  dayCardActive: { backgroundColor: '#1A0A12', borderColor: RivalColors.accentFill },
   dayCardDisabled: { opacity: 0.35 },
   dayCardTouchable: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 4 },
-  dayLabel: { fontSize: 11, fontWeight: '700', color: '#666666', textTransform: 'uppercase' },
-  dayLabelActive: { color: '#E91E8C' },
-  dayDate: { fontSize: 16, fontWeight: '800', color: '#999999' },
+  dayLabel: { fontSize: 11, fontWeight: '700', color: RivalColors.textSecondary, textTransform: 'uppercase' },
+  dayLabelActive: { color: RivalColors.accentFill },
+  dayDate: { fontSize: 16, fontWeight: '800', color: RivalColors.textSecondary },
   dayAddIcon: { fontSize: 16, color: '#444444', fontWeight: '700' },
-  dayPhotoCount: { fontSize: 11, fontWeight: '700', color: '#E91E8C' },
+  dayPhotoCount: { fontSize: 11, fontWeight: '700', color: RivalColors.accentFill },
 
   thumbsSection: { gap: 14, marginBottom: 24 },
   thumbsRow: { gap: 8 },
-  thumbsRowLabel: { fontSize: 13, fontWeight: '700', color: '#999999' },
+  thumbsRowLabel: { fontSize: 13, fontWeight: '700', color: RivalColors.textSecondary },
   thumbWrap: { position: 'relative' },
-  thumb: { width: 70, height: 70, borderRadius: 10, backgroundColor: '#2A2A2A' },
-  thumbRemove: { position: 'absolute', top: -6, right: -6, backgroundColor: '#E91E8C', borderRadius: 10, width: 20, height: 20, alignItems: 'center', justifyContent: 'center' },
-  thumbRemoveText: { color: '#FFFFFF', fontSize: 11, fontWeight: '800' },
+  thumb: { width: 70, height: 70, borderRadius: 10, backgroundColor: RivalColors.surfaceHigh },
+  thumbRemove: { position: 'absolute', top: -6, right: -6, backgroundColor: RivalColors.accentFill, borderRadius: 10, width: 20, height: 20, alignItems: 'center', justifyContent: 'center' },
+  thumbRemoveText: { color: RivalColors.textPrimary, fontSize: 11, fontWeight: '800' },
 
-  scanAllBtn: { backgroundColor: '#E91E8C', paddingVertical: 16, borderRadius: 14, alignItems: 'center' },
+  scanAllBtn: { backgroundColor: RivalColors.accentFill, paddingVertical: 16, borderRadius: 14, alignItems: 'center' },
   scanAllBtnDisabled: { backgroundColor: '#3A2530' },
-  scanAllBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '800' },
+  scanAllBtnText: { color: RivalColors.textPrimary, fontSize: 16, fontWeight: '800' },
 
   resultsSection: { gap: 10 },
-  resultRowCard: { backgroundColor: '#1A1A1A', borderRadius: 12, padding: 16, borderWidth: 1, borderColor: '#2A2A2A', gap: 8 },
+  resultRowCard: { backgroundColor: RivalColors.surfaceContainer, borderRadius: 12, padding: 16, borderWidth: 1, borderColor: RivalColors.surfaceHigh, gap: 8 },
   resultRowTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   resultSavedRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  resultNameInput: { flex: 1, backgroundColor: '#222222', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, color: '#FFFFFF', fontSize: 13, fontWeight: '700', borderWidth: 1, borderColor: '#E91E8C' },
-  resultPhotoBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: '#2A2A2A' },
+  resultNameInput: { flex: 1, backgroundColor: RivalColors.surfaceContainer, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, color: RivalColors.textPrimary, fontSize: 13, fontWeight: '700', borderWidth: 1, borderColor: RivalColors.accentFill },
+  resultPhotoBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: RivalColors.surfaceHigh },
   resultPhotoBtnText: { fontSize: 13, fontWeight: '700', color: '#CCCCCC' },
-  resultLabel: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
-  resultStatusPending: { fontSize: 13, color: '#666666' },
-  resultStatusSaved: { fontSize: 13, color: '#8DC63F', fontWeight: '700' },
+  resultLabel: { fontSize: 14, fontWeight: '700', color: RivalColors.textPrimary },
+  resultStatusPending: { fontSize: 13, color: RivalColors.textSecondary },
+  resultStatusSaved: { fontSize: 13, color: RivalColors.accentText, fontWeight: '700' },
   resultStatusError: { fontSize: 12, color: '#f87171', fontWeight: '600' },
 
-  doneBtn: { backgroundColor: '#E91E8C', paddingVertical: 16, borderRadius: 14, alignItems: 'center', marginTop: 8 },
-  doneBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '800' },
+  doneBtn: { backgroundColor: RivalColors.accentFill, paddingVertical: 16, borderRadius: 14, alignItems: 'center', marginTop: 8 },
+  doneBtnText: { color: RivalColors.textPrimary, fontSize: 16, fontWeight: '800' },
 });

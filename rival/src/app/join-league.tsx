@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { RivalColors } from '../constants/rivalTheme';
 import { StyleSheet, TouchableOpacity, View, Text, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -65,7 +66,7 @@ export default function JoinLeagueScreen() {
           <TextInput
             style={styles.input}
             placeholder="e.g. UXXOKL"
-            placeholderTextColor="#666666"
+            placeholderTextColor={RivalColors.textSecondary}
             value={code}
             onChangeText={(t) => setCode(t.toUpperCase())}
             maxLength={8}
@@ -95,7 +96,7 @@ export default function JoinLeagueScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#111111',
+    backgroundColor: RivalColors.surfaceLow,
   },
   content: {
     flex: 1,
@@ -106,18 +107,18 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   back: {
-    color: '#E91E8C',
+    color: RivalColors.accentFill,
     fontSize: 16,
   },
   title: {
     fontSize: 32,
     fontWeight: '900',
-    color: '#FFFFFF',
+    color: RivalColors.textPrimary,
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: '#999999',
+    color: RivalColors.textSecondary,
     marginBottom: 40,
   },
   form: {
@@ -126,17 +127,17 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: RivalColors.textPrimary,
   },
   input: {
-    backgroundColor: '#111111',
+    backgroundColor: RivalColors.surfaceLow,
     borderRadius: 12,
     padding: 16,
     fontSize: 24,
     fontWeight: '800',
-    color: '#FFFFFF',
+    color: RivalColors.textPrimary,
     borderWidth: 1,
-    borderColor: '#8DC63F',
+    borderColor: RivalColors.accentText,
     letterSpacing: 6,
     textAlign: 'center',
   },
@@ -146,7 +147,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   joinButton: {
-    backgroundColor: '#E91E8C',
+    backgroundColor: RivalColors.accentFill,
     paddingVertical: 18,
     borderRadius: 12,
     alignItems: 'center',
@@ -156,7 +157,7 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   joinButtonText: {
-    color: '#FFFFFF',
+    color: RivalColors.textPrimary,
     fontSize: 18,
     fontWeight: '700',
   },

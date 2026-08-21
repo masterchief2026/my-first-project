@@ -2,8 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, PanResponder, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Image } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '../../lib/supabase';
+import { notify } from '../../lib/notify';
 import { formatDurationClock } from '../../lib/format';
-import { RivalColors, RivalRadius } from '../../constants/rivalTheme';
+import { RivalColors, RivalRadius, RivalSerifFamily } from '../../constants/rivalTheme';
 import { RivalIcon, activityIconName } from './RivalIcon';
 import { CoverImage } from './CoverImage';
 
@@ -192,7 +193,11 @@ export function ActivityDiaryViewer({
     if (!activity) return;
     const next = !activity.pinned;
     onUpdate(activity.id, { pinned: next });
-    await supabase.from('activities').update({ pinned: next }).eq('id', activity.id);
+    const { error } = await supabase.from('activities').update({ pinned: next }).eq('id', activity.id);
+    if (error) {
+      onUpdate(activity.id, { pinned: !next });   // put it back
+      notify("Couldn't pin that activity", error.message);
+    }
   }
 
   function advance(dir: 1 | -1) {
@@ -401,7 +406,7 @@ const styles = StyleSheet.create({
   // the terracotta/brown palette the card grid and recap card already use.
   footer: { backgroundColor: '#1a1512', borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)', padding: 20, paddingBottom: 100, minHeight: '30%' as any },
   typeKicker: { fontSize: 13, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', color: RivalColors.accentText },
-  nameInput: { marginTop: 3, padding: 0, fontFamily: 'Georgia, "Times New Roman", serif', fontStyle: 'italic', fontSize: 22, fontWeight: '700', color: '#fff', lineHeight: 28, ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}) },
+  nameInput: { marginTop: 3, padding: 0, fontFamily: RivalSerifFamily, fontStyle: 'italic', fontSize: 22, fontWeight: '700', color: '#fff', lineHeight: 28, ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}) },
   // Solid at the left, fades out toward the right — a separate gradient bar
   // (plain borders can't fade), same pattern as the Month calendar's title.
   nameUnderline: {
@@ -441,7 +446,7 @@ const styles = StyleSheet.create({
   // RNW passes this straight through to the underlying <textarea>'s CSS.
   journalInput: {
     padding: 0, backgroundColor: 'transparent',
-    fontFamily: 'Georgia, "Times New Roman", serif', fontStyle: 'italic', fontSize: 16, lineHeight: 22, letterSpacing: 0.1,
+    fontFamily: RivalSerifFamily, fontStyle: 'italic', fontSize: 16, lineHeight: 22, letterSpacing: 0.1,
     color: 'rgba(255,255,255,0.85)', minHeight: 22,
     // overflow:'hidden' — without this the underlying <textarea> falls back
     // to its own native scrollbar the instant content height and the

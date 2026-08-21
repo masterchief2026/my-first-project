@@ -12,7 +12,7 @@ import { getLevel } from '../lib/xp';
 import { computeGoalProgress, goalUnit, GoalRow } from '../lib/goalProgress';
 import { formatTeamName } from '../lib/identity';
 import { RivalButton, RivalCard, RivalProgressBar, RivalIcon, RivalTopNav } from '../components/rival';
-import { RivalColors, RivalRadius, RivalType, RivalFontFamily } from '../constants/rivalTheme';
+import { RivalColors, RivalRadius, RivalType, RivalFontFamily, RivalSerifFamily } from '../constants/rivalTheme';
 import { BREAKPOINT_WIDE_LAYOUT } from '../constants/breakpoints';
 
 type League = { id: string; name: string; invite_code: string; logo_url: string | null; recentCount?: number };
@@ -684,15 +684,19 @@ export default function HomeScreen() {
       weekEnd.setHours(23, 59, 59, 999);
       const daysRemaining = Math.max(0, Math.ceil((weekEnd.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
 
+      // Batched, not per-league. This used to run TWO awaited queries inside a
+      // loop over every team — activities, then profiles — so an athlete in
+      // four teams waited on eight sequential round trips before Today could
+      // render. Effort for the week is per-user and independent of team, so it
+      // can all be fetched once and grouped in memory; the teams only decide
+      // WHICH users appear in each list.
+      // allMemberIds is already in scope above — every member across every team.
       const leaders: WeeklyLeader[] = [];
-      for (const league of leagueListWithCounts) {
-        const leagueMemberIds = memberIdsByLeague[league.id] || [];
-        if (leagueMemberIds.length === 0) continue;
-
+      if (allMemberIds.length > 0) {
         const { data: weekActivities } = await supabase
           .from('activities')
           .select('user_id, effort_score')
-          .in('user_id', leagueMemberIds)
+          .in('user_id', allMemberIds)
           .gte('started_at', weekStart.toISOString());
 
         const pointsByUser: Record<string, number> = {};
@@ -700,39 +704,44 @@ export default function HomeScreen() {
           pointsByUser[a.user_id] = (pointsByUser[a.user_id] || 0) + (a.effort_score || 0);
         });
 
-        // Full ranked list (not just the podium) — the viewer's own rank
-        // might be 4th+, and the card still needs to tell that story.
-        const rankedIds = Object.keys(pointsByUser)
-          .filter((id) => pointsByUser[id] > 0)
-          .sort((a, b) => pointsByUser[b] - pointsByUser[a]);
-        if (rankedIds.length === 0) continue;
+        // Work out every ranked athlete across every team first, so their
+        // profiles come back in a single request too.
+        const rankedByLeague: Record<string, string[]> = {};
+        const everyRankedId = new Set<string>();
+        for (const league of leagueListWithCounts) {
+          const ids = (memberIdsByLeague[league.id] || [])
+            .filter((id) => (pointsByUser[id] || 0) > 0)
+            .sort((a, b) => pointsByUser[b] - pointsByUser[a]);
+          if (ids.length === 0) continue;
+          rankedByLeague[league.id] = ids;
+          ids.forEach((id) => everyRankedId.add(id));
+        }
 
-        const { data: profiles } = await supabase
-          .from('users')
-          .select('id, display_name, avatar_url, email')
-          .in('id', rankedIds);
         const profileById: Record<string, any> = {};
-        (profiles || []).forEach((p: any) => { profileById[p.id] = p; });
+        if (everyRankedId.size > 0) {
+          const { data: profiles } = await supabase
+            .from('users')
+            .select('id, display_name, avatar_url, email')
+            .in('id', Array.from(everyRankedId));
+          (profiles || []).forEach((p: any) => { profileById[p.id] = p; });
+        }
 
-        // First name + last initial always, regardless of the user's
-        // chosen display style (e.g. username_only) — a leaderboard reads
-        // better with names than handles, unlike league.tsx's member list
-        // which respects that preference.
-        const standings: WeeklyLeaderEntry[] = rankedIds.map((id) => ({
-          userId: id,
-          name: weeklyLeaderName(profileById[id]),
-          avatarUrl: profileById[id]?.avatar_url || null,
-          points: Math.round(pointsByUser[id]),
-          isSelf: id === uId,
-        }));
-
-        // TEMP DEBUG — injects a fake 3rd teammate into the REAL standings
-        // (Ricky's real account only has 2) purely so the 3-column podium
-        // can be previewed on his own logged-in device. Revert this block.
-        const previewStandings = standings.length === 2
-          ? [...standings, { userId: 'debug-3rd', name: 'Jordan', avatarUrl: null, points: Math.max(1, Math.round(standings[1].points * 0.8)), isSelf: false }]
-          : standings;
-        leaders.push({ leagueId: league.id, teamName: formatTeamName(league.name), daysRemaining, standings: previewStandings });
+        for (const league of leagueListWithCounts) {
+          const rankedIds = rankedByLeague[league.id];
+          if (!rankedIds) continue;
+          // First name + last initial always, regardless of the user's chosen
+          // display style (e.g. username_only) — a leaderboard reads better
+          // with names than handles, unlike league.tsx's member list which
+          // respects that preference.
+          const standings: WeeklyLeaderEntry[] = rankedIds.map((id) => ({
+            userId: id,
+            name: weeklyLeaderName(profileById[id]),
+            avatarUrl: profileById[id]?.avatar_url || null,
+            points: Math.round(pointsByUser[id]),
+            isSelf: id === uId,
+          }));
+          leaders.push({ leagueId: league.id, teamName: formatTeamName(league.name), daysRemaining, standings });
+        }
       }
       setWeeklyLeaders(leaders);
     } else {
@@ -840,7 +849,7 @@ export default function HomeScreen() {
                     so it never travels with the content — only the podium/
                     text pages across on top of this fixed backdrop. */}
                 <Image
-                  source={require('../../assets/images/backgrounds/optimized/podium-smoke.png')}
+                  source={require('../../assets/images/backgrounds/optimized/podium-smoke.jpg')}
                   style={styles.mPodiumSmoke}
                   resizeMode="cover"
                 />
@@ -1647,7 +1656,9 @@ const styles = StyleSheet.create({
   // first thing in the mobile feed and is meant to sit flush against the nav
   // bar, no gap. That gap was exposing the plain mBgFixed color as a visible
   // seam above the card's own textured background.
-  contentMobile: { paddingTop: 0, paddingBottom: 120 },
+  // 6px of breathing room under the top nav — flush against it read as
+  // cramped once the Weekly Leader card gained its own texture.
+  contentMobile: { paddingTop: 6, paddingBottom: 120 },
 
   navBar: { width: '100%', backgroundColor: 'rgba(14,14,14,0.65)', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' },
   navRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', maxWidth: 1200, marginHorizontal: 'auto', paddingHorizontal: 24, paddingVertical: 12 },
@@ -1742,7 +1753,7 @@ const styles = StyleSheet.create({
   // attention; this labels the bar instead of competing with the progress
   // number above it.
   focusProgressPctOnBar: {
-    position: 'absolute', alignSelf: 'center', fontSize: 9, fontWeight: '600', color: 'rgba(255,255,255,0.4)',
+    position: 'absolute', left: 0, right: 0, textAlign: 'center', fontSize: 9, fontWeight: '600', color: 'rgba(255,255,255,0.4)',
     textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
   },
   // Active-goal card: left-aligned instead of centered (goalsEmptyCentered's
@@ -1848,10 +1859,17 @@ const styles = StyleSheet.create({
       : { backgroundColor: 'rgba(217,119,87,0.08)' }),
   },
   mFocusKicker: { ...RivalType.labelCaps, fontSize: 11, letterSpacing: 2, color: 'rgba(255,181,158,0.65)' },
-  mFocusTitle: { ...RivalType.bodyMd, fontSize: 15, color: RivalColors.textPrimary, marginTop: 6, marginBottom: 24 },
+  mFocusTitle: { ...RivalType.bodyMd, fontFamily: RivalSerifFamily, fontStyle: 'italic', fontWeight: '700', fontSize: 17, color: RivalColors.textPrimary, marginTop: 6, marginBottom: 24 },
   mFocusHeroRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginBottom: 4 },
+  // Display numbers use the editorial serif the app already speaks on Team Feed
+  // and Team Hub (Ricky's call, 2026-08-20, from design-preview-today-type).
+  // Selective by design: the number and the card title only -- kickers, units,
+  // labels and body text stay Manrope, so this reads as an accent rather than a
+  // change of typeface. Weight drops to 700 because Georgia has no 800 and
+  // rendered a synthetic bold; the tighter letter-spacing suited Manrope's
+  // geometry, not a serif's, so it goes too.
   mFocusHeroNumber: {
-    fontFamily: RivalFontFamily, fontSize: 44, fontWeight: '800', letterSpacing: -0.4, color: RivalColors.accentFill,
+    fontFamily: RivalSerifFamily, fontStyle: 'italic', fontSize: 46, fontWeight: '700', color: RivalColors.accentFill,
     ...(Platform.OS === 'web' ? {
       backgroundImage: 'linear-gradient(180deg, #FFFFFF 0%, #D97757 150%)',
       backgroundClip: 'text', WebkitBackgroundClip: 'text', color: 'transparent',
@@ -2061,7 +2079,7 @@ const styles = StyleSheet.create({
   mLegacyKicker: { ...RivalType.labelCaps, fontSize: 11, letterSpacing: 3, color: RivalColors.accentFill },
   mLegacySubtitle: { fontFamily: RivalFontFamily, fontSize: 13, color: RivalColors.textSecondary, marginTop: 4 },
   mLegacyHeroNumber: {
-    fontFamily: RivalFontFamily, fontSize: 44, fontWeight: '800', letterSpacing: -0.4, color: RivalColors.accentFill,
+    fontFamily: RivalSerifFamily, fontStyle: 'italic', fontSize: 46, fontWeight: '700', color: RivalColors.accentFill,
     ...(Platform.OS === 'web' ? {
       backgroundImage: 'linear-gradient(180deg, #FFFFFF 0%, #D97757 150%)',
       backgroundClip: 'text', WebkitBackgroundClip: 'text', color: 'transparent',
